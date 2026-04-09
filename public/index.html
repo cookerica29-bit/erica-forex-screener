@@ -386,7 +386,7 @@
   function setRR(v){minRR=v;document.querySelectorAll('[id^="rr-"]').forEach(b=>b.classList.remove('active','gold'));const b=document.getElementById('rr-'+v);b.classList.add('active','gold');renderSetups();}
   function setDir(v){dir=v;document.querySelectorAll('[id^="dir-"]').forEach(b=>b.classList.remove('active','green','red'));const b=document.getElementById('dir-'+v);b.classList.add('active');if(v==='LONG')b.classList.add('green');if(v==='SHORT')b.classList.add('red');renderSetups();}
   function setQuality(v){quality=v;document.querySelectorAll('[id^="q-"]').forEach(b=>b.classList.remove('active','gold','blue'));const b=document.getElementById('q-'+v);b.classList.add('active');if(v==='PREMIUM')b.classList.add('gold');if(v==='STRONG')b.classList.add('blue');renderSetups();}
-  function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...'.' Scan';}
+  function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...':' Scan';}
   function showLoading(){document.getElementById('mainContent').innerHTML='<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · 9 pairs</div></div></div>';document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
 </script>
 </body>
