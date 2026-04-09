@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import 'dotenv/config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
