@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Erica's Forex Scanner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0A0D12; --card: #0D1117; --inner: #080B10; --border: #1e2530;
+      --green: #00FF88; --red: #FF3B5C; --gold: #F5A623; --blue: #60A5FA;
+      --slate: #94a3b8; --slate-dim: #475569; --slate-dark: #1e293b; --text: #f1f5f9;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; min-height: 100vh; }
+    .header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .header-title { font-size: 18px; font-weight: 700; color: var(--text); }
+    .header-sub { font-size: 11px; color: var(--slate-dim); text-transform: uppercase; letter-spacing: 1px; }
+    .oanda-badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; border: 1px solid rgba(96,165,250,0.4); color: var(--blue); background: rgba(96,165,250,0.08); }
+    .controls { padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-bottom: 1px solid var(--border); }
+    .control-group { display: flex; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 2px; }
+    .control-label { font-size: 10px; color: var(--slate-dim); text-transform: uppercase; padding: 0 8px; }
+    .pill { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: none; background: transparent; color: var(--slate); cursor: pointer; transition: all 0.15s; font-family: inherit; }
+    .pill:hover { color: var(--text); }
+    .pill.active { background: var(--slate-dark); color: var(--text); }
+    .pill.active.green { background: rgba(0,255,136,0.15); color: var(--green); }
+    .pill.active.red { background: rgba(255,59,92,0.15); color: var(--red); }
+    .pill.active.gold { background: rgba(245,166,35,0.15); color: var(--gold); }
+    .pill.active.blue { background: rgba(96,165,250,0.15); color: var(--blue); }
+    .scan-btn { padding: 7px 18px; border-radius: 8px; border: 1px solid rgba(96,165,250,0.4); background: rgba(96,165,250,0.12); color: var(--blue); font-size: 12px; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+    .scan-btn:hover { background: rgba(96,165,250,0.2); }
+    .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .stats-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+    .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
+    .stat-value { font-size: 20px; font-weight: 700; }
+    .stat-label { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; margin-top: 2px; letter-spacing: 0.5px; }
+    .setup-grid { padding: 16px 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; }
+    .setup-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+    .setup-card.premium { border-color: rgba(245,166,35,0.35); box-shadow: 0 0 12px rgba(245,166,35,0.08); }
+    .setup-card.strong { border-color: rgba(96,165,250,0.3); }
+    .card-body { padding: 14px; }
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .card-left { display: flex; align-items: center; gap: 10px; }
+    .dir-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .dir-icon.long { background: rgba(0,255,136,0.1); }
+    .dir-icon.short { background: rgba(255,59,92,0.1); }
+    .symbol { font-size: 16px; font-weight: 700; color: var(--text); }
+    .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+    .badge { font-size: 9px; padding: 2px 6px; border-radius: 99px; border: 1px solid; }
+    .badge.premium { color: var(--gold); border-color: rgba(245,166,35,0.4); background: rgba(245,166,35,0.08); }
+    .badge.strong { color: var(--blue); border-color: rgba(96,165,250,0.4); background: rgba(96,165,250,0.08); }
+    .badge.developing { color: var(--slate); border-color: rgba(148,163,184,0.3); background: rgba(148,163,184,0.05); }
+    .badge.long { color: var(--green); border-color: rgba(0,255,136,0.4); background: rgba(0,255,136,0.06); }
+    .badge.short { color: var(--red); border-color: rgba(255,59,92,0.4); background: rgba(255,59,92,0.06); }
+    .badge.tf { color: var(--slate-dim); border-color: rgba(71,85,105,0.5); background: transparent; }
+    .badge.session { color: #64748b; border-color: rgba(71,85,105,0.3); background: transparent; }
+    .pattern-name { font-size: 11px; color: var(--slate-dim); margin-top: 3px; }
+    .rr-block { text-align: right; }
+    .rr-main { font-size: 22px; font-weight: 700; }
+    .rr-main.rr-great { color: var(--green); }
+    .rr-main.rr-good { color: var(--blue); }
+    .rr-main.rr-ok { color: var(--slate); }
+    .rr-sub { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; }
+    .current-price { font-size: 11px; color: var(--slate-dim); margin-bottom: 10px; }
+    .current-price span { color: var(--slate); }
+    .levels-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+    .levels-grid-ext { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+    .level-box { background: var(--inner); border-radius: 8px; padding: 8px 10px; border: 1px solid var(--border); }
+    .level-box.sl { border-color: rgba(255,59,92,0.25); }
+    .level-box.tp1 { border-color: rgba(0,255,136,0.2); }
+    .level-box.tp2 { border-color: rgba(0,255,136,0.12); }
+    .level-box.tp3 { border-color: rgba(0,255,136,0.08); }
+    .level-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+    .level-label.entry { color: var(--slate-dim); }
+    .level-label.sl { color: rgba(255,59,92,0.7); }
+    .level-label.tp1 { color: rgba(0,255,136,0.7); }
+    .level-label.tp2 { color: rgba(0,255,136,0.5); }
+    .level-label.tp3 { color: rgba(0,255,136,0.4); }
+    .level-price { font-size: 13px; font-weight: 600; }
+    .level-price.entry { color: var(--text); }
+    .level-price.sl { color: var(--red); }
+    .level-price.tp1 { color: var(--green); }
+    .level-price.tp2 { color: rgba(0,255,136,0.75); }
+    .level-price.tp3 { color: rgba(0,255,136,0.55); }
+    .level-rr { font-size: 9px; color: var(--slate-dim); margin-top: 2px; }
+    .conf-section { margin-top: 8px; }
+    .conf-title { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+    .conf-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .conf-tag { font-size: 10px; padding: 2px 8px; border-radius: 99px; background: var(--slate-dark); color: var(--slate); border: 1px solid rgba(71,85,105,0.4); }
+    .scanned-at { font-size: 9px; color: #334155; margin-top: 8px; }
+    .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 16px; }
+    .loading-ring { width: 56px; height: 56px; border-radius: 50%; border: 2px solid rgba(96,165,250,0.15); border-top-color: var(--blue); animation: spin 1s linear infinite; }
+    .loading-text { color: var(--blue); font-size: 13px; text-align: center; }
+    .loading-sub { color: var(--slate-dim); font-size: 11px; }
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 10px; color: var(--slate-dim); }
+    .filter-row { padding: 0 20px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .search-box { flex: 1; min-width: 160px; max-width: 240px; padding: 6px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; font-family: inherit; outline: none; }
+    .search-box::placeholder { color: var(--slate-dim); }
+    .result-count { font-size: 11px; color: var(--slate-dim); }
+    .result-count span { color: var(--text); }
+    @media (max-width: 600px) {
+      .stats-bar { grid-template-columns: repeat(3, 1fr); }
+      .setup-grid { grid-template-columns: 1fr; padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="pulse"></div>
+    <div>
+      <div class="header-title">Forex Scanner</div>
+      <div class="header-sub">Live OANDA · Price Action</div>
+    </div>
+    <span class="oanda-badge">OANDA v20</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <span id="lastScan" style="font-size:10px;color:var(--slate-dim)"></span>
+    <button class="scan-btn" onclick="runScan()" id="scanBtn">
+      <span id="scanIcon">↻</span> Scan
+    </button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="control-group">
+    <span class="control-label">TF</span>
+    <button class="pill" onclick="setTf('15m')" id="tf-15m">15m</button>
+    <button class="pill active" onclick="setTf('30m')" id="tf-30m">30m</button>
+    <button class="pill" onclick="setTf('1H')" id="tf-1H">1H</button>
+    <button class="pill" onclick="setTf('4H')" id="tf-4H">4H</button>
+    <button class="pill" onclick="setTf('Daily')" id="tf-Daily">Daily</button>
+  </div>
+  <div class="control-group">
+    <span class="control-label">Min RR</span>
+    <button class="pill active gold" onclick="setRR(1.5)" id="rr-1.5">1.5:1</button>
+    <button class="pill" onclick="setRR(2)" id="rr-2">2:1</button>
+    <button class="pill" onclick="setRR(2.5)" id="rr-2.5">2.5:1</button>
+    <button class="pill" onclick="setRR(3)" id="rr-3">3:1</button>
+  </div>
+  <div class="control-group">
+    <button class="pill active" onclick="setDir('ALL')" id="dir-ALL">All</button>
+    <button class="pill" onclick="setDir('LONG')" id="dir-LONG">Long</button>
+    <button class="pill" onclick="setDir('SHORT')" id="dir-SHORT">Short</button>
+  </div>
+  <div class="control-group">
+    <button class="pill active" onclick="setQuality('ALL')" id="q-ALL">All</button>
+    <button class="pill" onclick="setQuality('PREMIUM')" id="q-PREMIUM">Premium</button>
+    <button class="pill" onclick="setQuality('STRONG')" id="q-STRONG">Strong</button>
+    <button class="pill" onclick="setQuality('DEVELOPING')" id="q-DEVELOPING">Developing</button>
+  </div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-box"><div class="stat-value" id="s-total" style="color:var(--text)">—</div><div class="stat-label">Total</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-premium" style="color:var(--gold)">—</div><div class="stat-label">Premium</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-strong" style="color:var(--blue)">—</div><div class="stat-label">Strong</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-avgrr" style="color:var(--green)">—</div><div class="stat-label">Avg RR</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-long" style="color:var(--green)">—</div><div class="stat-label">Long</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-short" style="color:var(--red)">—</div><div class="stat-label">Short</div></div>
+</div>
+
+<div class="filter-row">
+  <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
+  <span id="resultCount" class="result-count"></span>
+</div>
+
+<div id="mainContent">
+  <div class="empty-state">
+    <div style="font-size:32px;opacity:0.3">📡</div>
+    <div>Hit Scan to fetch live OANDA data</div>
+  </div>
+</div>
+
+<script>
+  let allSetups = [], tf = '30m', minRR = 1.5, dir = 'ALL', quality = 'ALL', scanning = false;
+
+  const PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
+  const PAIR_LABELS = { XAG_USD:'XAG/USD', XAU_USD:'XAU/USD', GBP_JPY:'GBP/JPY', NZD_USD:'NZD/USD', AUD_USD:'AUD/USD', AUD_JPY:'AUD/JPY', USD_JPY:'USD/JPY', GBP_USD:'GBP/USD', EUR_USD:'EUR/USD' };
+  const TF_MAP = { '15m':'M15','30m':'M30','1H':'H1','4H':'H4','Daily':'D' };
+  const HTF_MAP = { M15:'H1', M30:'H4', H1:'H4', H4:'D', D:'W' };
+
+  function isJpy(s) { return s.includes('JPY')||s.includes('XAU')||s.includes('XAG'); }
+  function fmt(n,s) { if(n==null||isNaN(n)) return '—'; return isJpy(s) ? Number(n).toFixed(3) : Number(n).toFixed(5); }
+  function fmtRR(r) { return Number(r).toFixed(1)+':1'; }
+  function getSession() { const h=new Date().getUTCHours(); if(h<8) return 'Asian'; if(h<13) return 'London'; if(h<17) return 'NY'; return 'NY/London Close'; }
+
+  function calcEMA(vals, period) {
+    const k=2/(period+1), res=new Array(vals.length).fill(null);
+    let sum=0, cnt=0;
+    for(let i=0;i<vals.length;i++) {
+      if(vals[i]==null) continue;
+      if(cnt<period){sum+=vals[i];cnt++;if(cnt===period)res[i]=sum/period;}
+      else res[i]=vals[i]*k+res[i-1]*(1-k);
+    }
+    return res;
+  }
+
+  function calcATR(candles,period=14) {
+    if(candles.length<2) return 0.001;
+    const trs=candles.slice(-period).map((c,i,arr)=>i===0?c.h-c.l:Math.max(c.h-c.l,Math.abs(c.h-arr[i-1].c),Math.abs(c.l-arr[i-1].c)));
+    return trs.reduce((a,b)=>a+b,0)/trs.length;
+  }
+
+  function detectMomentum(c,p,dir) {
+    const body=Math.abs(c.c-c.o),range=c.h-c.l,bodyRatio=range>0?body/range:0;
+    const uw=c.h-Math.max(c.c,c.o),lw=Math.min(c.c,c.o)-c.l,pb=Math.abs(p.c-p.o);
+    if(dir==='LONG'&&c.c>c.o&&c.c>p.o&&c.o<p.c&&body>pb*0.9) return {type:'ENGULFING',strength:75};
+    if(dir==='SHORT'&&c.c<c.o&&c.o>p.c&&c.c<p.o&&body>pb*0.9) return {type:'ENGULFING',strength:75};
+    if(dir==='LONG'&&lw>body*2&&lw>uw*2) return {type:'PIN_BAR',strength:65};
+    if(dir==='SHORT'&&uw>body*2&&uw>lw*2) return {type:'PIN_BAR',strength:65};
+    if(dir==='LONG'&&c.c>c.o&&bodyRatio>0.6) return {type:'STRONG_CLOSE',strength:50};
+    if(dir==='SHORT'&&c.c<c.o&&bodyRatio>0.6) return {type:'STRONG_CLOSE',strength:50};
+    return null;
+  }
+
+  function findSwingHigh(candles,lb=60,mb=2) {
+    const sl=candles.slice(-lb,-1); let best=null;
+    for(let i=mb;i<sl.length-mb;i++){const c=sl[i];const ok=sl.slice(Math.max(0,i-mb),i).every(x=>x.h<=c.h)&&sl.slice(i+1,i+1+mb).every(x=>x.h<=c.h);if(ok&&(best===null||c.h>best))best=c.h;}
+    return best;
+  }
+
+  function findSwingLow(candles,lb=60,mb=2) {
+    const sl=candles.slice(-lb,-1); let best=null;
+    for(let i=mb;i<sl.length-mb;i++){const c=sl[i];const ok=sl.slice(Math.max(0,i-mb),i).every(x=>x.l>=c.l)&&sl.slice(i+1,i+1+mb).every(x=>x.l>=c.l);if(ok&&(best===null||c.l<best))best=c.l;}
+    return best;
+  }
+
+  function analyzeCandles(candles,htfCandles,symbol) {
+    if(candles.length<55) return null;
+    const closes=candles.map(c=>c.c);
+    const ema20=calcEMA(closes,20), ema50=calcEMA(closes,50);
+    const li=candles.length-1;
+    const e20=ema20[li], e50=ema50[li];
+    if(!e20||!e50) return null;
+    const direction=e20>e50?'LONG':'SHORT';
+    const slope=li>=3&&ema20[li-3]?(e20-ema20[li-3])/ema20[li-3]:0;
+    if(direction==='LONG'&&slope<-0.002) return null;
+    if(direction==='SHORT'&&slope>0.002) return null;
+    const last8=candles.slice(-8), ema20l8=ema20.slice(-8);
+    const pullback=last8.some((c,i)=>{const e=ema20l8[i];if(!e)return false;const wp=direction==='LONG'?c.l:c.h;return Math.abs(wp-e)/e<0.03;});
+    if(!pullback) return null;
+    const plLow=Math.min(...last8.map(c=>c.l)), plHigh=Math.max(...last8.map(c=>c.h));
+    const last=candles[li], prev=candles[li-1];
+    const mom=detectMomentum(last,prev,direction);
+    if(!mom) return null;
+    const atr=calcATR(candles), cp=last.c;
+    let sl;
+    if(direction==='LONG'){const r=plLow-atr*0.3;sl=Math.min(r,cp-atr*0.5);}
+    else{const r=plHigh+atr*0.3;sl=Math.max(r,cp+atr*0.5);}
+    const risk=Math.abs(cp-sl);
+    if(risk===0) return null;
+    const swT=direction==='LONG'?findSwingHigh(candles):findSwingLow(candles);
+    let tp1;
+    if(swT!==null){const srr=Math.abs(swT-cp)/risk;tp1=srr>=1.5?swT:(direction==='LONG'?cp+risk*2:cp-risk*2);}
+    else tp1=direction==='LONG'?cp+risk*2:cp-risk*2;
+    const tp2=direction==='LONG'?cp+risk*3:cp-risk*3;
+    const tp3=direction==='LONG'?cp+risk*4:cp-risk*4;
+    const rr=Math.abs(tp1-cp)/risk;
+    if(rr<minRR) return null;
+    const confs=[];
+    const esep=Math.abs(e20-e50)/e50*100;
+    confs.push(esep>2?'Strong EMA Separation':'EMA Trend Aligned');
+    confs.push('Momentum: '+mom.type.replace(/_/g,' '));
+    if(mom.strength>=60) confs.push('High-Strength Candle');
+    if(swT!==null) confs.push('Prior Swing Target');
+    if(rr>=3) confs.push(rr.toFixed(1)+':1 Risk-Reward');
+    if(htfCandles&&htfCandles.length>=20){
+      const hc=htfCandles.map(c=>c.c);
+      const he20=calcEMA(hc,20),he50=calcEMA(hc,50);
+      const hi=htfCandles.length-1;
+      if(he20[hi]&&he50[hi]&&(he20[hi]>he50[hi]?'LONG':'SHORT')===direction) confs.push('HTF Trend Aligned');
+    }
+    let qs=0;
+    if(esep>2)qs+=2; if(Math.abs(slope)>0.005)qs+=2;
+    if(mom.type==='ENGULFING')qs+=3; else if(mom.type==='PIN_BAR')qs+=3; else qs+=2;
+    if(mom.strength>=60)qs+=2; if(swT!==null)qs+=1;
+    if(rr>=3)qs+=2; else if(rr>=2)qs+=1;
+    if(confs.includes('HTF Trend Aligned'))qs+=2;
+    const qt=qs>=10?'PREMIUM':qs>=6?'STRONG':'DEVELOPING';
+    const dl=direction==='LONG'?'Bullish':'Bearish';
+    const pm={ENGULFING:`${dl} EMA Pullback + Engulfing`,PIN_BAR:`${dl} EMA Pullback + Pin Bar`,STRONG_CLOSE:`${dl} EMA Pullback + Strong Close`};
+    return {
+      id:`${symbol}-${tf}-${Date.now()}`, symbol, displaySymbol:PAIR_LABELS[symbol]||symbol.replace('_','/'),
+      direction, quality:qt, pattern:pm[mom.type]||`${dl} EMA Pullback`, timeframe:tf,
+      currentPrice:cp, entry:cp, stopLoss:sl, tp1, tp2, tp3, rrRatio:rr,
+      rr2:parseFloat((Math.abs(tp2-cp)/risk).toFixed(1)), rr3:parseFloat((Math.abs(tp3-cp)/risk).toFixed(1)),
+      confluences:confs, session:getSession(), scannedAt:new Date().toISOString()
+    };
+  }
+
+  async function fetchCandles(instrument,granularity,count=200) {
+    const res=await fetch(`/api/candles?instrument=${instrument}&granularity=${granularity}&count=${count}`);
+    if(!res.ok) throw new Error(`OANDA error for ${instrument}`);
+    return res.json();
+  }
+
+  async function runScan() {
+    if(scanning) return;
+    scanning=true; updateScanBtn(true); showLoading();
+    const gran=TF_MAP[tf]||'H4', htfGran=HTF_MAP[gran]||'D';
+    const results=[];
+    for(const pair of PAIRS){
+      try{
+        const [c,h]=await Promise.all([fetchCandles(pair,gran,200),fetchCandles(pair,htfGran,100)]);
+        const s=analyzeCandles(c,h,pair);
+        if(s) results.push(s);
+      }catch(e){console.error(`Skip ${pair}:`,e.message);}
+    }
+    const ord={PREMIUM:0,STRONG:1,DEVELOPING:2};
+    results.sort((a,b)=>ord[a.quality]-ord[b.quality]||b.rrRatio-a.rrRatio);
+    allSetups=results; scanning=false; updateScanBtn(false);
+    document.getElementById('lastScan').textContent=`Last scan: ${new Date().toLocaleTimeString()}`;
+    renderSetups();
+  }
+
+  function getFiltered() {
+    const s=document.getElementById('searchBox').value.toLowerCase();
+    return allSetups.filter(x=>{
+      if(dir!=='ALL'&&x.direction!==dir) return false;
+      if(quality!=='ALL'&&x.quality!==quality) return false;
+      if(x.rrRatio<minRR) return false;
+      if(s&&!x.displaySymbol.toLowerCase().includes(s)&&!x.pattern.toLowerCase().includes(s)) return false;
+      return true;
+    });
+  }
+
+  function renderSetups() {
+    const filtered=getFiltered(), all=allSetups;
+    document.getElementById('s-total').textContent=all.length||'—';
+    document.getElementById('s-premium').textContent=all.filter(s=>s.quality==='PREMIUM').length||'—';
+    document.getElementById('s-strong').textContent=all.filter(s=>s.quality==='STRONG').length||'—';
+    const avg=all.length?(all.reduce((a,b)=>a+b.rrRatio,0)/all.length).toFixed(1):'—';
+    document.getElementById('s-avgrr').textContent=all.length?avg+':1':'—';
+    document.getElementById('s-long').textContent=all.filter(s=>s.direction==='LONG').length||'—';
+    document.getElementById('s-short').textContent=all.filter(s=>s.direction==='SHORT').length||'—';
+    const main=document.getElementById('mainContent');
+    if(!all.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">📡</div><div>Hit Scan to fetch live OANDA data</div></div>';document.getElementById('resultCount').textContent='';return;}
+    document.getElementById('resultCount').innerHTML=`Showing <span>${filtered.length}</span> setup${filtered.length!==1?'s':''} · min ${minRR}:1 RR`;
+    if(!filtered.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No setups match your filters</div></div>';return;}
+    main.innerHTML='<div class="setup-grid">'+filtered.map(renderCard).join('')+'</div>';
+  }
+
+  function renderCard(s) {
+    const isL=s.direction==='LONG', qc=s.quality.toLowerCase();
+    const rrc=s.rrRatio>=3?'rr-great':s.rrRatio>=2?'rr-good':'rr-ok';
+    const cf=s.confluences.length?`<div class="conf-section"><div class="conf-title">Confluences</div><div class="conf-tags">${s.confluences.map(c=>`<span class="conf-tag">${c}</span>`).join('')}</div></div>`:'';
+    return `<div class="setup-card ${qc}"><div class="card-body">
+      <div class="card-top">
+        <div class="card-left">
+          <div class="dir-icon ${isL?'long':'short'}">${isL?'↑':'↓'}</div>
+          <div>
+            <div class="symbol">${s.displaySymbol}</div>
+            <div class="badges">
+              <span class="badge ${qc}">⚡ ${s.quality}</span>
+              <span class="badge ${isL?'long':'short'}">${s.direction}</span>
+              <span class="badge tf">${s.timeframe}</span>
+              ${s.session?`<span class="badge session">${s.session}</span>`:''}
+            </div>
+            <div class="pattern-name">${s.pattern}</div>
+          </div>
+        </div>
+        <div class="rr-block"><div class="rr-main ${rrc}">${fmtRR(s.rrRatio)}</div><div class="rr-sub">RR Ratio</div></div>
+      </div>
+      <div class="current-price">Price: <span>${fmt(s.currentPrice,s.symbol)}</span></div>
+      <div class="levels-grid">
+        <div class="level-box"><div class="level-label entry">Entry</div><div class="level-price entry">${fmt(s.entry,s.symbol)}</div></div>
+        <div class="level-box sl"><div class="level-label sl">Stop Loss</div><div class="level-price sl">${fmt(s.stopLoss,s.symbol)}</div></div>
+        <div class="level-box tp1"><div class="level-label tp1">TP1 · ${fmtRR(s.rrRatio)}</div><div class="level-price tp1">${fmt(s.tp1,s.symbol)}</div></div>
+      </div>
+      <div class="levels-grid-ext">
+        <div class="level-box tp2"><div class="level-label tp2">TP2 · ${fmtRR(s.rr2)}</div><div class="level-price tp2">${fmt(s.tp2,s.symbol)}</div></div>
+        <div class="level-box tp3"><div class="level-label tp3">TP3 · ${fmtRR(s.rr3)}</div><div class="level-price tp3">${fmt(s.tp3,s.symbol)}</div></div>
+      </div>
+      ${cf}
+      <div class="scanned-at">Scanned: ${new Date(s.scannedAt).toLocaleTimeString()} · Live data via Oanda v20 API</div>
+    </div></div>`;
+  }
+
+  function setTf(v){tf=v;document.querySelectorAll('[id^="tf-"]').forEach(b=>b.classList.remove('active'));document.getElementById('tf-'+v).classList.add('active');}
+  function setRR(v){minRR=v;document.querySelectorAll('[id^="rr-"]').forEach(b=>b.classList.remove('active','gold'));const b=document.getElementById('rr-'+v);b.classList.add('active','gold');renderSetups();}
+  function setDir(v){dir=v;document.querySelectorAll('[id^="dir-"]').forEach(b=>b.classList.remove('active','green','red'));const b=document.getElementById('dir-'+v);b.classList.add('active');if(v==='LONG')b.classList.add('green');if(v==='SHORT')b.classList.add('red');renderSetups();}
+  function setQuality(v){quality=v;document.querySelectorAll('[id^="q-"]').forEach(b=>b.classList.remove('active','gold','blue'));const b=document.getElementById('q-'+v);b.classList.add('active');if(v==='PREMIUM')b.classList.add('gold');if(v==='STRONG')b.classList.add('blue');renderSetups();}
+  function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...'.' Scan';}
+  function showLoading(){document.getElementById('mainContent').innerHTML='<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · 9 pairs</div></div></div>';document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
+</script>
+</body>
+</html>
