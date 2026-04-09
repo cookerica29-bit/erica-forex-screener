@@ -44,7 +44,8 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
+console.log(`PORT env var is: ${process.env.PORT}`);
 server.listen(PORT, () => {
   console.log(`✅ Forex Scanner running on http://localhost:${PORT}`);
   console.log(`   OANDA: ${OANDA_API_KEY ? '✓ configured' : '✗ missing key'} (${OANDA_ACCOUNT_TYPE})`);
