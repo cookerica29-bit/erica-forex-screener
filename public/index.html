@@ -158,6 +158,19 @@
     .journal-edit-btn:hover { color: var(--text); border-color: var(--slate); }
     .journal-edit-panel { margin-top: 10px; padding: 10px; background: var(--inner); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
     @media (max-width: 600px) { .journal-stats { grid-template-columns: repeat(3, 1fr); } .journal-levels { grid-template-columns: repeat(3, 1fr); } }
+    .breakdown-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .breakdown-label { font-size: 11px; color: var(--slate); min-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .breakdown-bar-wrap { flex: 1; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+    .breakdown-bar { height: 100%; border-radius: 99px; transition: width 0.4s; }
+    .breakdown-bar.win { background: var(--green); }
+    .breakdown-bar.loss { background: var(--red); }
+    .breakdown-stat { font-size: 10px; color: var(--slate-dim); min-width: 60px; text-align: right; }
+    .breakdown-winrate { font-size: 11px; font-weight: 700; min-width: 40px; text-align: right; }
+    .pair-card { background: var(--inner); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+    .pair-card-symbol { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .pair-card-stats { display: flex; gap: 8px; font-size: 10px; color: var(--slate-dim); }
+    .pair-card-wr { font-weight: 700; }
+    .no-data { font-size: 11px; color: var(--slate-dim); font-style: italic; }
   </style>
 </head>
 <body>
@@ -182,6 +195,7 @@
 <div class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
+  <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
 </div>
 
 <div id="content-scanner" class="tab-content active">
@@ -236,6 +250,55 @@
   </div>
 </div>
 
+</div>
+
+<div id="content-analytics" class="tab-content">
+  <div class="journal-page">
+
+    <!-- Overview Stats -->
+    <div class="journal-stats" style="grid-template-columns: repeat(5,1fr); margin-bottom:16px;">
+      <div class="stat-box"><div class="stat-value" id="a-total" style="color:var(--text)">—</div><div class="stat-label">Total Trades</div></div>
+      <div class="stat-box"><div class="stat-value" id="a-winrate" style="color:var(--green)">—</div><div class="stat-label">Win Rate</div></div>
+      <div class="stat-box"><div class="stat-value" id="a-avgrr" style="color:var(--blue)">—</div><div class="stat-label">Avg RR</div></div>
+      <div class="stat-box"><div class="stat-value" id="a-pnl" style="color:var(--green)">—</div><div class="stat-label">Total P&L</div></div>
+      <div class="stat-box"><div class="stat-value" id="a-pending" style="color:var(--gold)">—</div><div class="stat-label">Pending</div></div>
+    </div>
+
+    <!-- Pattern Breakdown -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div class="stat-box" style="text-align:left;padding:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">📊 Pattern Breakdown</div>
+        <div id="a-patterns"></div>
+      </div>
+
+      <!-- Timeframe Breakdown -->
+      <div class="stat-box" style="text-align:left;padding:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">⏱ Timeframe Breakdown</div>
+        <div id="a-timeframes"></div>
+      </div>
+    </div>
+
+    <!-- Pair Breakdown -->
+    <div class="stat-box" style="text-align:left;padding:16px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">💱 Pair Breakdown</div>
+      <div id="a-pairs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;"></div>
+    </div>
+
+    <!-- Direction Breakdown -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div class="stat-box" style="text-align:left;padding:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">📈 Direction Breakdown</div>
+        <div id="a-directions"></div>
+      </div>
+
+      <!-- Session Breakdown -->
+      <div class="stat-box" style="text-align:left;padding:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">🕐 Session Breakdown</div>
+        <div id="a-sessions"></div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <div id="content-journal" class="tab-content">
@@ -507,6 +570,145 @@
     document.getElementById('tab-' + tab).classList.add('active');
     document.getElementById('content-' + tab).classList.add('active');
     if (tab === 'journal') await loadJournal();
+    if (tab === 'analytics') await loadAnalytics();
+  }
+
+  async function loadAnalytics() {
+    try {
+      const res = await fetch('/api/journal');
+      const entries = await res.json();
+      renderAnalytics(entries);
+    } catch(e) {
+      console.error('Failed to load analytics:', e);
+    }
+  }
+
+  function renderAnalytics(entries) {
+    const total = entries.length;
+    const closed = entries.filter(e => e.outcome === 'WIN' || e.outcome === 'LOSS');
+    const wins = entries.filter(e => e.outcome === 'WIN').length;
+    const losses = entries.filter(e => e.outcome === 'LOSS').length;
+    const pending = entries.filter(e => e.outcome === 'PENDING').length;
+    const winRate = closed.length > 0 ? Math.round((wins / closed.length) * 100) : 0;
+    const totalPnl = entries.reduce((sum, e) => sum + (parseFloat(e.pnl) || 0), 0);
+    const avgRR = entries.length > 0 ? (entries.reduce((sum, e) => sum + (parseFloat(e.rr1) || 0), 0) / entries.length).toFixed(1) : 0;
+
+    document.getElementById('a-total').textContent = total || '—';
+    document.getElementById('a-winrate').textContent = closed.length > 0 ? winRate + '%' : '—';
+    document.getElementById('a-avgrr').textContent = avgRR > 0 ? avgRR + ':1' : '—';
+    document.getElementById('a-pending').textContent = pending || '—';
+    const pnlEl = document.getElementById('a-pnl');
+    pnlEl.textContent = totalPnl !== 0 ? (totalPnl >= 0 ? '+$' : '-$') + Math.abs(totalPnl).toFixed(2) : '—';
+    pnlEl.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+    // Pattern breakdown
+    const patternMap = {};
+    entries.forEach(e => {
+      if (!patternMap[e.pattern]) patternMap[e.pattern] = { wins: 0, losses: 0, total: 0 };
+      patternMap[e.pattern].total++;
+      if (e.outcome === 'WIN') patternMap[e.pattern].wins++;
+      if (e.outcome === 'LOSS') patternMap[e.pattern].losses++;
+    });
+    document.getElementById('a-patterns').innerHTML = Object.keys(patternMap).length
+      ? Object.entries(patternMap).sort((a,b) => b[1].total - a[1].total).map(([pattern, stats]) => {
+          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
+          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          return `<div class="breakdown-row">
+            <div class="breakdown-label" title="${pattern}">${pattern}</div>
+            <div class="breakdown-bar-wrap"><div class="breakdown-bar win" style="width:${wr}%"></div></div>
+            <div class="breakdown-stat">${stats.total} trades</div>
+            <div class="breakdown-winrate" style="color:${wrColor}">${wr}%</div>
+          </div>`;
+        }).join('')
+      : '<div class="no-data">No data yet</div>';
+
+    // Timeframe breakdown
+    const tfMap = {};
+    entries.forEach(e => {
+      if (!tfMap[e.timeframe]) tfMap[e.timeframe] = { wins: 0, losses: 0, total: 0 };
+      tfMap[e.timeframe].total++;
+      if (e.outcome === 'WIN') tfMap[e.timeframe].wins++;
+      if (e.outcome === 'LOSS') tfMap[e.timeframe].losses++;
+    });
+    document.getElementById('a-timeframes').innerHTML = Object.keys(tfMap).length
+      ? Object.entries(tfMap).sort((a,b) => b[1].total - a[1].total).map(([tf, stats]) => {
+          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
+          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          return `<div class="breakdown-row">
+            <div class="breakdown-label">${tf}</div>
+            <div class="breakdown-bar-wrap"><div class="breakdown-bar win" style="width:${wr}%"></div></div>
+            <div class="breakdown-stat">${stats.total} trades</div>
+            <div class="breakdown-winrate" style="color:${wrColor}">${wr}%</div>
+          </div>`;
+        }).join('')
+      : '<div class="no-data">No data yet</div>';
+
+    // Pair breakdown
+    const pairMap = {};
+    entries.forEach(e => {
+      if (!pairMap[e.displaySymbol]) pairMap[e.displaySymbol] = { wins: 0, losses: 0, total: 0 };
+      pairMap[e.displaySymbol].total++;
+      if (e.outcome === 'WIN') pairMap[e.displaySymbol].wins++;
+      if (e.outcome === 'LOSS') pairMap[e.displaySymbol].losses++;
+    });
+    document.getElementById('a-pairs').innerHTML = Object.keys(pairMap).length
+      ? Object.entries(pairMap).sort((a,b) => b[1].total - a[1].total).map(([pair, stats]) => {
+          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
+          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          return `<div class="pair-card">
+            <div class="pair-card-symbol">${pair}</div>
+            <div class="pair-card-stats">
+              <span>${stats.total} trades</span>
+              <span style="color:var(--green)">${stats.wins}W</span>
+              <span style="color:var(--red)">${stats.losses}L</span>
+              <span class="pair-card-wr" style="color:${wrColor}">${wr}% WR</span>
+            </div>
+          </div>`;
+        }).join('')
+      : '<div class="no-data">No data yet</div>';
+
+    // Direction breakdown
+    const dirMap = {};
+    entries.forEach(e => {
+      if (!dirMap[e.direction]) dirMap[e.direction] = { wins: 0, losses: 0, total: 0 };
+      dirMap[e.direction].total++;
+      if (e.outcome === 'WIN') dirMap[e.direction].wins++;
+      if (e.outcome === 'LOSS') dirMap[e.direction].losses++;
+    });
+    document.getElementById('a-directions').innerHTML = Object.keys(dirMap).length
+      ? Object.entries(dirMap).map(([dir, stats]) => {
+          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
+          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          return `<div class="breakdown-row">
+            <div class="breakdown-label">${dir}</div>
+            <div class="breakdown-bar-wrap"><div class="breakdown-bar win" style="width:${wr}%"></div></div>
+            <div class="breakdown-stat">${stats.total} trades</div>
+            <div class="breakdown-winrate" style="color:${wrColor}">${wr}%</div>
+          </div>`;
+        }).join('')
+      : '<div class="no-data">No data yet</div>';
+
+    // Session breakdown
+    const sessMap = {};
+    entries.forEach(e => {
+      const sess = e.session || 'Unknown';
+      if (!sessMap[sess]) sessMap[sess] = { wins: 0, losses: 0, total: 0 };
+      sessMap[sess].total++;
+      if (e.outcome === 'WIN') sessMap[sess].wins++;
+      if (e.outcome === 'LOSS') sessMap[sess].losses++;
+    });
+    document.getElementById('a-sessions').innerHTML = Object.keys(sessMap).length
+      ? Object.entries(sessMap).sort((a,b) => b[1].total - a[1].total).map(([sess, stats]) => {
+          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
+          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          return `<div class="breakdown-row">
+            <div class="breakdown-label">${sess}</div>
+            <div class="breakdown-bar-wrap"><div class="breakdown-bar win" style="width:${wr}%"></div></div>
+            <div class="breakdown-stat">${stats.total} trades</div>
+            <div class="breakdown-winrate" style="color:${wrColor}">${wr}%</div>
+          </div>`;
+        }).join('')
+      : '<div class="no-data">No data yet</div>';
   }
 
   async function loadJournal() {
