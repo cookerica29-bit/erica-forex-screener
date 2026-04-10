@@ -1,0 +1,26 @@
+import { mysqlTable, int, varchar, decimal, text, timestamp, mysqlEnum } from 'drizzle-orm/mysql-core';
+
+export const journalEntries = mysqlTable('journal_entries', {
+  id: int('id').autoincrement().primaryKey(),
+  symbol: varchar('symbol', { length: 20 }).notNull(),
+  displaySymbol: varchar('display_symbol', { length: 20 }).notNull(),
+  direction: mysqlEnum('direction', ['LONG', 'SHORT']).notNull(),
+  quality: mysqlEnum('quality', ['PREMIUM', 'STRONG', 'DEVELOPING']).notNull(),
+  pattern: varchar('pattern', { length: 100 }).notNull(),
+  timeframe: varchar('timeframe', { length: 10 }).notNull(),
+  entry: decimal('entry', { precision: 10, scale: 5 }).notNull(),
+  stopLoss: decimal('stop_loss', { precision: 10, scale: 5 }).notNull(),
+  tp1: decimal('tp1', { precision: 10, scale: 5 }).notNull(),
+  tp2: decimal('tp2', { precision: 10, scale: 5 }),
+  tp3: decimal('tp3', { precision: 10, scale: 5 }),
+  rr1: decimal('rr1', { precision: 4, scale: 1 }),
+  rr2: decimal('rr2', { precision: 4, scale: 1 }),
+  rr3: decimal('rr3', { precision: 4, scale: 1 }),
+  outcome: mysqlEnum('outcome', ['WIN', 'LOSS', 'BREAKEVEN', 'PENDING']).default('PENDING'),
+  pnl: decimal('pnl', { precision: 10, scale: 2 }),
+  notes: text('notes'),
+  confluences: text('confluences'),
+  session: varchar('session', { length: 30 }),
+  pushedAt: timestamp('pushed_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+});

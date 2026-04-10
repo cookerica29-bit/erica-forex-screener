@@ -92,6 +92,22 @@
     .conf-tags { display: flex; flex-wrap: wrap; gap: 4px; }
     .conf-tag { font-size: 10px; padding: 2px 8px; border-radius: 99px; background: var(--slate-dark); color: var(--slate); border: 1px solid rgba(71,85,105,0.4); }
     .scanned-at { font-size: 9px; color: #334155; margin-top: 8px; }
+    .card-actions { margin-top: 10px; display: flex; gap: 8px; }
+    .push-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(245,166,35,0.4); background: rgba(245,166,35,0.08); color: var(--gold); font-size: 11px; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+    .push-btn:hover { background: rgba(245,166,35,0.15); }
+    .push-btn.pushed { border-color: rgba(0,255,136,0.4); background: rgba(0,255,136,0.08); color: var(--green); }
+    .journal-panel { margin-top: 10px; padding: 10px; background: var(--inner); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+    .outcome-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .outcome-label { font-size: 10px; color: var(--slate-dim); text-transform: uppercase; min-width: 50px; }
+    .outcome-btn { padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; font-size: 10px; font-family: inherit; cursor: pointer; color: var(--slate); transition: all 0.15s; }
+    .outcome-btn.win.active-outcome { background: rgba(0,255,136,0.15); border-color: rgba(0,255,136,0.4); color: var(--green); }
+    .outcome-btn.loss.active-outcome { background: rgba(255,59,92,0.15); border-color: rgba(255,59,92,0.4); color: var(--red); }
+    .outcome-btn.be.active-outcome { background: rgba(96,165,250,0.15); border-color: rgba(96,165,250,0.4); color: var(--blue); }
+    .outcome-btn.pending.active-outcome { background: rgba(148,163,184,0.15); border-color: rgba(148,163,184,0.4); color: var(--slate); }
+    .pnl-row { display: flex; align-items: center; gap: 6px; }
+    .pnl-input { flex: 1; padding: 4px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px; font-family: inherit; outline: none; }
+    .notes-row { display: flex; flex-direction: column; gap: 4px; }
+    .notes-input { width: 100%; padding: 6px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px; font-family: inherit; outline: none; resize: vertical; min-height: 60px; }
     .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 16px; }
     .loading-ring { width: 56px; height: 56px; border-radius: 50%; border: 2px solid rgba(96,165,250,0.15); border-top-color: var(--blue); animation: spin 1s linear infinite; }
     .loading-text { color: var(--blue); font-size: 13px; text-align: center; }
@@ -379,6 +395,26 @@
       </div>
       ${cf}
       <div class="scanned-at">Scanned: ${new Date(s.scannedAt).toLocaleTimeString()} · Live data via Oanda v20 API</div>
+      <div class="card-actions">
+        <button class="push-btn" onclick="pushToJournal('${s.id}')" id="push-${s.id}">📓 Push to Journal</button>
+      </div>
+      <div class="journal-panel" id="journal-${s.id}" style="display:none;">
+        <div class="outcome-row">
+          <span class="outcome-label">Outcome:</span>
+          <button class="outcome-btn win" onclick="setOutcome('${s.id}','WIN')">WIN</button>
+          <button class="outcome-btn loss" onclick="setOutcome('${s.id}','LOSS')">LOSS</button>
+          <button class="outcome-btn be" onclick="setOutcome('${s.id}','BE')">BE</button>
+          <button class="outcome-btn pending active-outcome" onclick="setOutcome('${s.id}','PENDING')">PENDING</button>
+        </div>
+        <div class="pnl-row">
+          <span class="outcome-label">P&L ($):</span>
+          <input type="number" class="pnl-input" id="pnl-${s.id}" placeholder="Click to add P&L" step="0.01" onchange="savePnl('${s.id}')" />
+        </div>
+        <div class="notes-row">
+          <span class="outcome-label">Notes:</span>
+          <textarea class="notes-input" id="notes-${s.id}" placeholder="Add notes..." onchange="saveNotes('${s.id}')"></textarea>
+        </div>
+      </div>
     </div></div>`;
   }
 
@@ -388,6 +424,80 @@
   function setQuality(v){quality=v;document.querySelectorAll('[id^="q-"]').forEach(b=>b.classList.remove('active','gold','blue'));const b=document.getElementById('q-'+v);b.classList.add('active');if(v==='PREMIUM')b.classList.add('gold');if(v==='STRONG')b.classList.add('blue');renderSetups();}
   function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...':' Scan';}
   function showLoading(){document.getElementById('mainContent').innerHTML='<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · 9 pairs</div></div></div>';document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
+
+  const journalMap = {};
+
+  async function pushToJournal(setupId) {
+    const setup = allSetups.find(s => s.id === setupId);
+    if (!setup) return;
+    try {
+      const res = await fetch('/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: setup.symbol,
+          displaySymbol: setup.displaySymbol,
+          direction: setup.direction,
+          quality: setup.quality,
+          pattern: setup.pattern,
+          timeframe: setup.timeframe,
+          entry: setup.entry,
+          stopLoss: setup.stopLoss,
+          tp1: setup.tp1,
+          tp2: setup.tp2,
+          tp3: setup.tp3,
+          rr1: setup.rrRatio,
+          rr2: setup.rr2,
+          rr3: setup.rr3,
+          confluences: setup.confluences,
+          session: setup.session,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        journalMap[setupId] = true;
+        const btn = document.getElementById('push-' + setupId);
+        if (btn) { btn.textContent = '✓ Journaled'; btn.classList.add('pushed'); }
+        const panel = document.getElementById('journal-' + setupId);
+        if (panel) panel.style.display = 'flex';
+      }
+    } catch(e) { console.error('Push failed:', e); }
+  }
+
+  async function setOutcome(setupId, outcome) {
+    const entry = journalMap[setupId];
+    if (!entry) return;
+    document.querySelectorAll(`#journal-${setupId} .outcome-btn`).forEach(b => b.classList.remove('active-outcome'));
+    const btn = document.querySelector(`#journal-${setupId} .outcome-btn.${outcome.toLowerCase()}`);
+    if (btn) btn.classList.add('active-outcome');
+    await fetch(`/api/journal/${entry}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ outcome }),
+    });
+  }
+
+  async function savePnl(setupId) {
+    const entry = journalMap[setupId];
+    if (!entry) return;
+    const val = document.getElementById('pnl-' + setupId)?.value;
+    await fetch(`/api/journal/${entry}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pnl: parseFloat(val) }),
+    });
+  }
+
+  async function saveNotes(setupId) {
+    const entry = journalMap[setupId];
+    if (!entry) return;
+    const val = document.getElementById('notes-' + setupId)?.value;
+    await fetch(`/api/journal/${entry}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: val }),
+    });
+  }
 </script>
 </body>
 </html>
