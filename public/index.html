@@ -512,9 +512,26 @@
     const mom=detectMomentum(last,prev,direction);
     if(!mom) return null;
     const atr=calcATR(candles), cp=last.c;
-    let sl;
-    if(direction==='LONG'){const r=plLow-atr*0.3;sl=Math.min(r,cp-atr*0.5);}
-    else{const r=plHigh+atr*0.3;sl=Math.max(r,cp+atr*0.5);}
+
+    // Find structure-based stop loss
+    // For LONG: SL goes below the lowest swing low in the last 20 candles (below demand zone)
+    // For SHORT: SL goes above the highest swing high in the last 20 candles (above supply zone)
+    function findStructureSL(candles, direction, atr) {
+      const lookback = candles.slice(-20);
+      if (direction === 'LONG') {
+        // Find the lowest low in the last 20 candles — this is the demand zone floor
+        const structureLow = Math.min(...lookback.map(c => c.l));
+        // SL goes 0.5 ATR below the structure low for breathing room
+        return structureLow - atr * 0.5;
+      } else {
+        // Find the highest high in the last 20 candles — this is the supply zone ceiling
+        const structureHigh = Math.max(...lookback.map(c => c.h));
+        // SL goes 0.5 ATR above the structure high for breathing room
+        return structureHigh + atr * 0.5;
+      }
+    }
+
+    let sl = findStructureSL(candles, direction, atr);
     const risk=Math.abs(cp-sl);
     if(risk===0) return null;
     const swT=direction==='LONG'?findSwingHigh(candles):findSwingLow(candles);
