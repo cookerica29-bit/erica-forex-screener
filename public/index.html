@@ -122,6 +122,42 @@
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
       .setup-grid { grid-template-columns: 1fr; padding: 10px; }
     }
+    .tab-nav { display: flex; background: var(--card); border-bottom: 1px solid var(--border); padding: 0 20px; }
+    .tab-btn { padding: 12px 20px; font-size: 12px; font-family: inherit; border: none; background: transparent; color: var(--slate-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .journal-page { padding: 16px 20px; }
+    .journal-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 16px; }
+    .journal-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
+    .journal-list { display: flex; flex-direction: column; gap: 10px; }
+    .journal-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .journal-card.win { border-color: rgba(0,255,136,0.3); }
+    .journal-card.loss { border-color: rgba(255,59,92,0.3); }
+    .journal-card.breakeven { border-color: rgba(96,165,250,0.3); }
+    .journal-card.pending { border-color: var(--border); }
+    .journal-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .journal-symbol { font-size: 16px; font-weight: 700; color: var(--text); }
+    .journal-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+    .journal-rr { font-size: 20px; font-weight: 700; text-align: right; }
+    .journal-levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+    .journal-outcome-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+    .journal-notes-text { font-size: 11px; color: var(--slate); background: var(--inner); padding: 8px; border-radius: 6px; margin-top: 6px; font-family: inherit; }
+    .journal-pnl { font-size: 13px; font-weight: 600; }
+    .journal-pnl.positive { color: var(--green); }
+    .journal-pnl.negative { color: var(--red); }
+    .journal-date { font-size: 10px; color: var(--slate-dim); margin-top: 6px; }
+    .empty-journal { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 10px; color: var(--slate-dim); }
+    .journal-outcome-badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; border: 1px solid; font-weight: 600; }
+    .journal-outcome-badge.win { color: var(--green); border-color: rgba(0,255,136,0.4); background: rgba(0,255,136,0.08); }
+    .journal-outcome-badge.loss { color: var(--red); border-color: rgba(255,59,92,0.4); background: rgba(255,59,92,0.08); }
+    .journal-outcome-badge.breakeven { color: var(--blue); border-color: rgba(96,165,250,0.4); background: rgba(96,165,250,0.08); }
+    .journal-outcome-badge.pending { color: var(--slate); border-color: rgba(148,163,184,0.3); background: rgba(148,163,184,0.05); }
+    .journal-edit-btn { font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--slate-dim); cursor: pointer; font-family: inherit; }
+    .journal-edit-btn:hover { color: var(--text); border-color: var(--slate); }
+    .journal-edit-panel { margin-top: 10px; padding: 10px; background: var(--inner); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+    @media (max-width: 600px) { .journal-stats { grid-template-columns: repeat(3, 1fr); } .journal-levels { grid-template-columns: repeat(3, 1fr); } }
   </style>
 </head>
 <body>
@@ -142,6 +178,13 @@
     </button>
   </div>
 </div>
+
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
+  <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
+</div>
+
+<div id="content-scanner" class="tab-content active">
 
 <div class="controls">
   <div class="control-group">
@@ -187,9 +230,38 @@
 </div>
 
 <div id="mainContent">
-  <div class="empty-state">
+  <div class="empty-state" id="initState">
     <div style="font-size:32px;opacity:0.3">📡</div>
-    <div>Hit Scan to fetch live OANDA data</div>
+    <div style="color:var(--slate-dim);font-size:13px;">Hit Scan to fetch live OANDA data</div>
+  </div>
+</div>
+
+</div>
+
+<div id="content-journal" class="tab-content">
+  <div class="journal-page">
+    <div class="journal-stats">
+      <div class="stat-box"><div class="stat-value" id="j-total" style="color:var(--text)">—</div><div class="stat-label">Total</div></div>
+      <div class="stat-box"><div class="stat-value" id="j-wins" style="color:var(--green)">—</div><div class="stat-label">Wins</div></div>
+      <div class="stat-box"><div class="stat-value" id="j-losses" style="color:var(--red)">—</div><div class="stat-label">Losses</div></div>
+      <div class="stat-box"><div class="stat-value" id="j-winrate" style="color:var(--blue)">—</div><div class="stat-label">Win Rate</div></div>
+      <div class="stat-box"><div class="stat-value" id="j-pnl" style="color:var(--green)">—</div><div class="stat-label">Total P&L</div></div>
+    </div>
+    <div class="journal-filters">
+      <div class="control-group">
+        <button class="pill active" onclick="setJFilter('outcome','ALL')" id="jf-ALL">All</button>
+        <button class="pill" onclick="setJFilter('outcome','WIN')" id="jf-WIN">Win</button>
+        <button class="pill" onclick="setJFilter('outcome','LOSS')" id="jf-LOSS">Loss</button>
+        <button class="pill" onclick="setJFilter('outcome','PENDING')" id="jf-PENDING">Pending</button>
+      </div>
+    </div>
+    <div id="journalList" class="journal-list">
+      <div class="empty-journal">
+        <div style="font-size:32px;opacity:0.3">📓</div>
+        <div>No journal entries yet</div>
+        <div style="font-size:11px;">Push setups from the Scanner tab to start tracking</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -426,6 +498,120 @@
   function showLoading(){document.getElementById('mainContent').innerHTML='<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · 9 pairs</div></div></div>';document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
 
   const journalMap = {};
+  let journalEntries = [];
+  let jFilter = 'ALL';
+
+  async function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('content-' + tab).classList.add('active');
+    if (tab === 'journal') await loadJournal();
+  }
+
+  async function loadJournal() {
+    try {
+      const res = await fetch('/api/journal');
+      journalEntries = await res.json();
+      renderJournal();
+    } catch(e) {
+      console.error('Failed to load journal:', e);
+    }
+  }
+
+  function setJFilter(type, val) {
+    jFilter = val;
+    document.querySelectorAll('[id^="jf-"]').forEach(b => b.classList.remove('active'));
+    document.getElementById('jf-' + val).classList.add('active');
+    renderJournal();
+  }
+
+  function isJpy(s) { return s.includes('JPY') || s.includes('XAU') || s.includes('XAG'); }
+
+  function renderJournal() {
+    const filtered = journalEntries.filter(e => jFilter === 'ALL' || e.outcome === jFilter);
+
+    const total = journalEntries.length;
+    const wins = journalEntries.filter(e => e.outcome === 'WIN').length;
+    const losses = journalEntries.filter(e => e.outcome === 'LOSS').length;
+    const closed = wins + losses;
+    const winRate = closed > 0 ? Math.round((wins / closed) * 100) : 0;
+    const totalPnl = journalEntries.reduce((sum, e) => sum + (parseFloat(e.pnl) || 0), 0);
+
+    document.getElementById('j-total').textContent = total || '—';
+    document.getElementById('j-wins').textContent = wins || '—';
+    document.getElementById('j-losses').textContent = losses || '—';
+    document.getElementById('j-winrate').textContent = closed > 0 ? winRate + '%' : '—';
+    const pnlEl = document.getElementById('j-pnl');
+    pnlEl.textContent = totalPnl !== 0 ? (totalPnl > 0 ? '+$' : '-$') + Math.abs(totalPnl).toFixed(2) : '—';
+    pnlEl.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+    const list = document.getElementById('journalList');
+    if (!filtered.length) {
+      list.innerHTML = '<div class="empty-journal"><div style="font-size:32px;opacity:0.3">📓</div><div>No entries found</div></div>';
+      return;
+    }
+
+    list.innerHTML = filtered.map(e => {
+      const isLong = e.direction === 'LONG';
+      const outcome = (e.outcome || 'PENDING').toLowerCase();
+      const rrClass = parseFloat(e.rr1) >= 3 ? 'rr-great' : parseFloat(e.rr1) >= 2 ? 'rr-good' : 'rr-ok';
+      const fmtP = (n) => n ? (isJpy(e.symbol) ? parseFloat(n).toFixed(3) : parseFloat(n).toFixed(5)) : '—';
+      const pnlVal = parseFloat(e.pnl);
+      const pnlHtml = e.pnl ? `<span class="journal-pnl ${pnlVal >= 0 ? 'positive' : 'negative'}">${pnlVal >= 0 ? '+' : ''}$${Math.abs(pnlVal).toFixed(2)}</span>` : '';
+      const notesHtml = e.notes ? `<div class="journal-notes-text">📝 ${e.notes}</div>` : '';
+      const date = new Date(e.pushedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      return `<div class="journal-card ${outcome}">
+        <div class="journal-top">
+          <div>
+            <div class="journal-symbol">${e.displaySymbol}</div>
+            <div class="journal-meta">
+              <span class="journal-outcome-badge ${outcome}">${e.outcome || 'PENDING'}</span>
+              <span class="badge ${isLong ? 'long' : 'short'}">${e.direction}</span>
+              <span class="badge tf">${e.timeframe}</span>
+              <span class="badge ${(e.quality || '').toLowerCase()}">${e.quality}</span>
+            </div>
+            <div class="pattern-name">${e.pattern}</div>
+          </div>
+          <div>
+            <div class="journal-rr ${rrClass}">${parseFloat(e.rr1).toFixed(1)}:1</div>
+            ${pnlHtml}
+          </div>
+        </div>
+        <div class="journal-levels">
+          <div class="level-box"><div class="level-label entry">Entry</div><div class="level-price entry">${fmtP(e.entry)}</div></div>
+          <div class="level-box sl"><div class="level-label sl">Stop Loss</div><div class="level-price sl">${fmtP(e.stopLoss)}</div></div>
+          <div class="level-box tp1"><div class="level-label tp1">TP1 · ${parseFloat(e.rr1).toFixed(1)}:1</div><div class="level-price tp1">${fmtP(e.tp1)}</div></div>
+        </div>
+        <div class="journal-outcome-row">
+          <span class="outcome-label">Outcome:</span>
+          <button class="outcome-btn win ${outcome === 'win' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'WIN')">WIN</button>
+          <button class="outcome-btn loss ${outcome === 'loss' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'LOSS')">LOSS</button>
+          <button class="outcome-btn be ${outcome === 'breakeven' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'BREAKEVEN')">BE</button>
+          <button class="outcome-btn pending ${outcome === 'pending' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'PENDING')">PENDING</button>
+          <button class="journal-edit-btn" onclick="deleteJournalCard(${e.id})">🗑 Delete</button>
+        </div>
+        ${notesHtml}
+        <div class="journal-date">Pushed: ${date} · ${e.session || ''}</div>
+      </div>`;
+    }).join('');
+  }
+
+  async function updateJournalOutcome(id, outcome) {
+    await fetch('/api/journal/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ outcome }),
+    });
+    await loadJournal();
+  }
+
+  async function deleteJournalCard(id) {
+    if (!confirm('Delete this journal entry?')) return;
+    await fetch('/api/journal/' + id, { method: 'DELETE' });
+    await loadJournal();
+  }
 
   async function pushToJournal(setupId) {
     const setup = allSetups.find(s => s.id === setupId);
@@ -455,7 +641,7 @@
       });
       const data = await res.json();
       if (data.success) {
-        journalMap[setupId] = true;
+        journalMap[setupId] = data.id;
         const btn = document.getElementById('push-' + setupId);
         if (btn) { btn.textContent = '✓ Journaled'; btn.classList.add('pushed'); }
         const panel = document.getElementById('journal-' + setupId);
