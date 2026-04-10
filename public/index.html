@@ -996,6 +996,61 @@
       body: JSON.stringify({ notes: val }),
     });
   }
+
+  function calcPosition() {
+    const account = parseFloat(document.getElementById('calc-account').value) || 0;
+    const riskPct = parseFloat(document.getElementById('calc-risk').value) || 0;
+    const pair = document.getElementById('calc-pair').value;
+    const entry = parseFloat(document.getElementById('calc-entry').value) || 0;
+    const sl = parseFloat(document.getElementById('calc-sl').value) || 0;
+    const tp1 = parseFloat(document.getElementById('calc-tp1').value) || 0;
+    const tp2 = parseFloat(document.getElementById('calc-tp2').value) || 0;
+    const tp3 = parseFloat(document.getElementById('calc-tp3').value) || 0;
+
+    if (!account || !riskPct || !entry || !sl) {
+      document.getElementById('calc-results').style.display = 'none';
+      return;
+    }
+
+    const isJPY = pair.includes('JPY');
+    const isXAU = pair.includes('XAU');
+    const isXAG = pair.includes('XAG');
+
+    const dollarRisk = account * (riskPct / 100);
+    const pipSize = isJPY ? 0.01 : isXAU ? 0.1 : isXAG ? 0.01 : 0.0001;
+    const pipValue = isJPY ? 1000 : isXAU ? 10 : isXAG ? 50 : 10;
+
+    const priceDiff = Math.abs(entry - sl);
+    const pipRisk = priceDiff / pipSize;
+    const dollarPerPip = dollarRisk / pipRisk;
+    const lots = dollarPerPip / pipValue;
+    const units = Math.round(lots * 100000);
+
+    document.getElementById('calc-results').style.display = 'block';
+    document.getElementById('calc-dollar-risk').textContent = '$' + dollarRisk.toFixed(2);
+    document.getElementById('calc-pip-risk').textContent = pipRisk.toFixed(1) + ' pips';
+    document.getElementById('calc-lots').textContent = lots.toFixed(2);
+    document.getElementById('calc-units').textContent = units.toLocaleString();
+
+    const calcProfit = (tp) => {
+      if (!tp) return null;
+      const tpPips = Math.abs(tp - entry) / pipSize;
+      const profit = tpPips * dollarPerPip;
+      const rr = (Math.abs(tp - entry) / Math.abs(entry - sl)).toFixed(1);
+      return { profit, rr };
+    };
+
+    const r1 = calcProfit(tp1);
+    const r2 = calcProfit(tp2);
+    const r3 = calcProfit(tp3);
+
+    document.getElementById('calc-profit1').textContent = r1 ? '+$' + r1.profit.toFixed(2) : '—';
+    document.getElementById('calc-rr1').textContent = r1 ? r1.rr + ':1 RR' : '';
+    document.getElementById('calc-profit2').textContent = r2 ? '+$' + r2.profit.toFixed(2) : '—';
+    document.getElementById('calc-rr2').textContent = r2 ? r2.rr + ':1 RR' : '';
+    document.getElementById('calc-profit3').textContent = r3 ? '+$' + r3.profit.toFixed(2) : '—';
+    document.getElementById('calc-rr3').textContent = r3 ? r3.rr + ':1 RR' : '';
+  }
 </script>
 </body>
 </html>
