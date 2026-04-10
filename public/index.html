@@ -196,6 +196,7 @@
   <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
   <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
+  <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">🧮 Calculator</button>
 </div>
 
 <div id="content-scanner" class="tab-content active">
@@ -250,6 +251,115 @@
   </div>
 </div>
 
+</div>
+
+<div id="content-calculator" class="tab-content">
+  <div class="journal-page">
+    <div style="max-width:600px;margin:0 auto;">
+
+      <div class="stat-box" style="text-align:left;padding:20px;margin-bottom:16px;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;">🧮 Position Size Calculator</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:4px;">Account Size ($)</div>
+            <input type="number" id="calc-account" class="pnl-input" style="width:100%;font-size:13px;padding:8px;" placeholder="10000" value="10000" oninput="calcPosition()" />
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:4px;">Risk % Per Trade</div>
+            <input type="number" id="calc-risk" class="pnl-input" style="width:100%;font-size:13px;padding:8px;" placeholder="1" value="1" step="0.1" oninput="calcPosition()" />
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:4px;">Pair</div>
+            <select id="calc-pair" class="pnl-input" style="width:100%;font-size:13px;padding:8px;" onchange="calcPosition()">
+              <option value="GBPJPY">GBP/JPY</option>
+              <option value="USDJPY">USD/JPY</option>
+              <option value="AUDJPY">AUD/JPY</option>
+              <option value="XAUUSD">XAU/USD</option>
+              <option value="XAGUSD">XAG/USD</option>
+              <option value="GBPUSD">GBP/USD</option>
+              <option value="EURUSD">EUR/USD</option>
+              <option value="AUDUSD">AUD/USD</option>
+              <option value="NZDUSD">NZD/USD</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:4px;">Entry Price</div>
+            <input type="number" id="calc-entry" class="pnl-input" style="width:100%;font-size:13px;padding:8px;" placeholder="213.500" step="0.001" oninput="calcPosition()" />
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:4px;">Stop Loss</div>
+            <input type="number" id="calc-sl" class="pnl-input" style="width:100%;font-size:13px;padding:8px;" placeholder="213.000" step="0.001" oninput="calcPosition()" />
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div>
+            <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:4px;">TP1</div>
+            <input type="number" id="calc-tp1" class="pnl-input" style="width:100%;font-size:13px;padding:8px;" placeholder="214.500" step="0.001" oninput="calcPosition()" />
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:4px;">TP2</div>
+            <input type="number" id="calc-tp2" class="pnl-input" style="width:100%;font-size:13px;padding:8px;" placeholder="215.000" step="0.001" oninput="calcPosition()" />
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:4px;">TP3</div>
+            <input type="number" id="calc-tp3" class="pnl-input" style="width:100%;font-size:13px;padding:8px;" placeholder="215.500" step="0.001" oninput="calcPosition()" />
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div id="calc-results" style="display:none;">
+          <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:12px;">
+            <div style="font-size:11px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:10px;">Results</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="level-box">
+                <div class="level-label entry">Dollar Risk</div>
+                <div class="level-price entry" id="calc-dollar-risk">—</div>
+              </div>
+              <div class="level-box">
+                <div class="level-label entry">Pip Risk</div>
+                <div class="level-price entry" id="calc-pip-risk">—</div>
+              </div>
+              <div class="level-box tp1">
+                <div class="level-label tp1">Lot Size (Standard)</div>
+                <div class="level-price tp1" id="calc-lots">—</div>
+              </div>
+              <div class="level-box tp1">
+                <div class="level-label tp1">Units</div>
+                <div class="level-price tp1" id="calc-units">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid var(--border);padding-top:16px;">
+            <div style="font-size:11px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:10px;">Profit Targets</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+              <div class="level-box tp1">
+                <div class="level-label tp1">TP1 Profit</div>
+                <div class="level-price tp1" id="calc-profit1">—</div>
+                <div class="level-rr" id="calc-rr1">—</div>
+              </div>
+              <div class="level-box tp2">
+                <div class="level-label tp2">TP2 Profit</div>
+                <div class="level-price tp2" id="calc-profit2">—</div>
+                <div class="level-rr" id="calc-rr2">—</div>
+              </div>
+              <div class="level-box tp3">
+                <div class="level-label tp3">TP3 Profit</div>
+                <div class="level-price tp3" id="calc-profit3">—</div>
+                <div class="level-rr" id="calc-rr3">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="content-analytics" class="tab-content">
