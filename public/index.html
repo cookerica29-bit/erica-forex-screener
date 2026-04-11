@@ -1203,7 +1203,8 @@
     btn.disabled=true;
     const base=getBotUrl();
     try{
-      const[sRes,pRes,sigRes]=await Promise.all([fetch(`${base}/status`),fetch(`${base}/positions`),fetch(`${base}/signals`)]);
+      const ngrokHeaders={'ngrok-skip-browser-warning':'true'};
+      const[sRes,pRes,sigRes]=await Promise.all([fetch(`${base}/status`,{headers:ngrokHeaders}),fetch(`${base}/positions`,{headers:ngrokHeaders}),fetch(`${base}/signals`,{headers:ngrokHeaders})]);
       const approvalsRes = await fetch('/api/approvals');
       const approvals = approvalsRes.ok ? await approvalsRes.json() : [];
       renderApprovals(approvals);
