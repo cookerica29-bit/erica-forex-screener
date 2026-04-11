@@ -1186,7 +1186,7 @@
 (function(){
   let botTimer=null;
   function getBotUrl(){return(document.getElementById('botUrl').value||'http://localhost:8000').replace(/\/$/,'');}
-  window.saveBotUrl=function(){localStorage.setItem('botUrl',getBotUrl());};
+  window.saveBotUrl=function(){localStorage.setItem('botUrl',document.getElementById('botUrl').value.trim());};
   const saved=localStorage.getItem('botUrl');
   if(saved)document.getElementById('botUrl').value=saved;
   function setConn(ok,msg){
@@ -1226,7 +1226,7 @@
       const sigEl=document.getElementById('bot-signals-list');
       if(!signals.length){sigEl.innerHTML='<div style="padding:40px;text-align:center;color:var(--slate-dim);font-size:12px;">No signals logged yet</div>';}
       else{const recent=signals.slice(-20).reverse();sigEl.innerHTML=recent.map((s,i)=>{const ok=s.status==='executed';const rej=s.status==='rejected';const sc=ok?'var(--green)':rej?'var(--red)':'var(--gold)';const sb=ok?'rgba(0,255,136,0.07)':rej?'rgba(255,59,92,0.07)':'rgba(245,166,35,0.07)';const sbo=ok?'rgba(0,255,136,0.35)':rej?'rgba(255,59,92,0.35)':'rgba(245,166,35,0.35)';const t=s.timestamp?new Date(s.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—';const dir=(s.action||'').toUpperCase();const dc=dir==='BUY'?'var(--green)':dir==='SELL'?'var(--red)':'var(--slate)';return`<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:${i<recent.length-1?'1px solid #111820':'none'};font-size:11px;flex-wrap:wrap;"><span style="font-size:10px;color:var(--slate-dim);min-width:46px;">${t}</span><span style="font-weight:700;min-width:64px;font-size:12px;">${s.symbol||'—'}</span><span style="color:${dc};font-size:10px;font-weight:700;min-width:32px;">${dir}</span><span style="color:var(--slate-dim);font-size:10px;flex:1;">${s.detail||''}</span><span style="font-size:9px;padding:2px 8px;border-radius:99px;border:1px solid ${sbo};color:${sc};background:${sb};">${s.status||'—'}</span></div>`;}).join('');}
-      setConn(true,'Connected');
+      setConn(true,'');
       document.getElementById('botUpdated').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
     }catch(err){setConn(false,err.message||'Unreachable');}
     finally{icon.style.animation='';icon.textContent='↻';btn.disabled=false;}
