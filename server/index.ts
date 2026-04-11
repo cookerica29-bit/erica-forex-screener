@@ -5,6 +5,7 @@ import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry } from './db.js';
+import { runScan, Setup } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -13,6 +14,34 @@ app.use(cors());
 const server = createServer(app);
 
 app.use(express.json());
+
+let latestSetups: Setup[] = [];
+let lastScanTime: string | null = null;
+
+async function scheduledScan() {
+  console.log(`[Scanner] Running scheduled scan at ${new Date().toISOString()}`);
+  try {
+    latestSetups = await runScan('H1', 1.5);
+    lastScanTime = new Date().toISOString();
+    console.log(`[Scanner] Found ${latestSetups.length} setups (${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium)`);
+  } catch(e: any) {
+    console.error('[Scanner] Scan failed:', e.message);
+  }
+}
+
+// Run immediately on startup then every 15 minutes
+scheduledScan();
+setInterval(scheduledScan, 15 * 60 * 1000);
+
+// ─── SCANNER API ──────────────────────────────────────────────────────────────
+app.get('/api/setups', (_req, res) => {
+  res.json({ setups: latestSetups, lastScanTime, count: latestSetups.length });
+});
+
+app.post('/api/scan', async (_req, res) => {
+  await scheduledScan();
+  res.json({ setups: latestSetups, lastScanTime, count: latestSetups.length });
+});
 
 const OANDA_API_KEY = process.env.OANDA_API_KEY || '';
 const OANDA_ACCOUNT_TYPE = process.env.OANDA_ACCOUNT_TYPE || 'practice';
