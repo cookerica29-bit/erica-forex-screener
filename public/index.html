@@ -442,6 +442,7 @@
 
 <script>
   let allSetups = [], tf = '30m', minRR = 1.5, dir = 'ALL', quality = 'ALL', scanning = false;
+  let autoRefreshTimer = null;
 
   const PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
   const PAIR_LABELS = { XAG_USD:'XAG/USD', XAU_USD:'XAU/USD', GBP_JPY:'GBP/JPY', NZD_USD:'NZD/USD', AUD_USD:'AUD/USD', AUD_JPY:'AUD/JPY', USD_JPY:'USD/JPY', GBP_USD:'GBP/USD', EUR_USD:'EUR/USD' };
@@ -620,6 +621,21 @@
     return res.json();
   }
 
+  async function fetchLatestSetups() {
+    try {
+      const res = await fetch('/api/setups');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.setups || data.setups.length === 0) return;
+      allSetups = data.setups;
+      document.getElementById('lastScan').textContent =
+        `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
+      renderSetups();
+    } catch(e) {
+      console.warn('Could not fetch latest setups:', e.message);
+    }
+  }
+
   async function runScan() {
     if(scanning) return;
     scanning=true; updateScanBtn(true); showLoading();
@@ -740,6 +756,11 @@
     document.getElementById('content-' + tab).classList.add('active');
     if (tab === 'journal') await loadJournal();
     if (tab === 'analytics') await loadAnalytics();
+    clearInterval(autoRefreshTimer);
+    if (tab === 'scanner') {
+      fetchLatestSetups();
+      autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
+    }
   }
 
   async function loadAnalytics() {
@@ -1110,6 +1131,10 @@
     document.getElementById('calc-profit3').textContent = r3 ? '+$' + r3.profit.toFixed(2) : '—';
     document.getElementById('calc-rr3').textContent = r3 ? r3.rr + ':1 RR' : '';
   }
+
+  // Populate scanner immediately on page load, then refresh every 15 min
+  fetchLatestSetups();
+  autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
 </script>
 
 <div id="content-bot" class="tab-content">
