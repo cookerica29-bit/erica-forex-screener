@@ -1,3 +1,4 @@
+// Required env vars: OANDA_API_KEY, OANDA_ACCOUNT_TYPE, BOT_URL, WEBHOOK_SECRET
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -17,6 +18,23 @@ app.use(express.json());
 
 let latestSetups: Setup[] = [];
 let lastScanTime: string | null = null;
+let pendingApprovals: (Setup & { id: string })[] = [];
+
+function queuePremiumSetups(setups: Setup[]) {
+  const premium = setups.filter(s => s.quality === 'PREMIUM');
+  for (const setup of premium) {
+    const exists = pendingApprovals.some(
+      p => p.pair === setup.pair && p.timeframe === setup.timeframe &&
+           Math.abs(p.entry - setup.entry) < 0.001
+    );
+    if (!exists) {
+      pendingApprovals.push({ ...setup, id: `${setup.pair}-${Date.now()}` });
+    }
+  }
+  if (pendingApprovals.length > 20) {
+    pendingApprovals = pendingApprovals.slice(-20);
+  }
+}
 
 async function scheduledScan() {
   console.log(`[Scanner] Running scheduled scan at ${new Date().toISOString()}`);
@@ -24,6 +42,7 @@ async function scheduledScan() {
     latestSetups = await runScan('H1', 1.5);
     lastScanTime = new Date().toISOString();
     console.log(`[Scanner] Found ${latestSetups.length} setups (${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium)`);
+    queuePremiumSetups(latestSetups);
   } catch(e: any) {
     console.error('[Scanner] Scan failed:', e.message);
   }
@@ -122,6 +141,48 @@ app.delete('/api/journal/:id', async (req, res) => {
 // ─── HEALTH ───────────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', oanda: OANDA_API_KEY ? 'configured' : 'missing', accountType: OANDA_ACCOUNT_TYPE });
+});
+
+// ─── APPROVALS API ────────────────────────────────────────────────────────────
+app.get('/api/approvals', (_req, res) => {
+  res.json(pendingApprovals);
+});
+
+app.delete('/api/approvals/:id', (req, res) => {
+  pendingApprovals = pendingApprovals.filter(p => p.id !== req.params.id);
+  res.json({ success: true });
+});
+
+app.post('/api/approvals/:id/execute', async (req, res) => {
+  const setup = pendingApprovals.find(p => p.id === req.params.id);
+  if (!setup) return res.status(404).json({ error: 'Setup not found' });
+
+  const botUrl = process.env.BOT_URL || 'http://localhost:8000';
+  const webhookSecret = process.env.WEBHOOK_SECRET || 'change-me';
+
+  try {
+    const payload = {
+      secret: webhookSecret,
+      action: setup.direction === 'LONG' ? 'buy' : 'sell',
+      symbol: setup.pair.replace('_', ''),
+      entry: setup.entry,
+      sl: setup.sl,
+      tp: setup.tp1,
+      comment: `Auto-${setup.quality}-${setup.pattern}`,
+    };
+
+    const response = await fetch(`${botUrl}/webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    pendingApprovals = pendingApprovals.filter(p => p.id !== setup.id);
+    return res.json({ success: true, result });
+  } catch(e: any) {
+    return res.status(500).json({ error: e.message });
+  }
 });
 
 // ─── STATIC ───────────────────────────────────────────────────────────────────

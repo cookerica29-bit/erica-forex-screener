@@ -26,6 +26,8 @@ export interface Setup {
   scannedAt: string;
   timeframe: string;
   session: string;
+  approved?: boolean;
+  approvedAt?: string;
 }
 
 export interface DebugResult {
