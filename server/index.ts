@@ -5,7 +5,7 @@ import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry } from './db.js';
-import { runScan, Setup } from './scanner.js';
+import { runScan, debugScan, Setup } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -41,6 +41,17 @@ app.get('/api/setups', (_req, res) => {
 app.post('/api/scan', async (_req, res) => {
   await scheduledScan();
   res.json({ setups: latestSetups, lastScanTime, count: latestSetups.length });
+});
+
+app.get('/api/debug', async (req, res) => {
+  const granularity = (req.query.tf as string) || 'H1';
+  const minRR = parseFloat((req.query.minRR as string) || '1.5');
+  try {
+    const results = await debugScan(granularity, minRR);
+    res.json(results);
+  } catch(e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 const OANDA_API_KEY = process.env.OANDA_API_KEY || '';

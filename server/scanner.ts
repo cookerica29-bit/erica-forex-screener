@@ -28,6 +28,22 @@ export interface Setup {
   session: string;
 }
 
+export interface DebugResult {
+  pair: string;
+  result: 'SETUP' | 'REJECTED' | 'ERROR';
+  reason?: string;
+  setup?: Setup;
+  detail?: {
+    trend?: string | null;
+    htfTrend?: string | null;
+    momentum?: string | null;
+    distToLevel?: number;
+    atr?: number;
+    price?: number;
+    structureLevel?: number;
+  };
+}
+
 async function fetchCandles(instrument: string, granularity: string, count=200): Promise<Candle[]> {
   const url = `${OANDA_BASE}/v3/instruments/${instrument}/candles?granularity=${granularity}&count=${count}&price=M`;
   const res = await fetch(url, {
@@ -109,44 +125,61 @@ function getSession(): string {
   return 'Transition';
 }
 
-function analyzeCandles(candles: Candle[], htf: Candle[], pair: string, granularity='H1', minRR=1.5): Setup|null {
-  if (candles.length < 80) return null;
+function analyzeCandles(
+  candles: Candle[], htf: Candle[], pair: string,
+  granularity='H1', minRR=1.5, debug=false
+): { setup: Setup|null; reason: string; detail: DebugResult['detail'] } {
+  const detail: DebugResult['detail'] = {};
+
+  if (candles.length < 80) return { setup: null, reason: 'Not enough candles (<80)', detail };
+
   const recent = candles.slice(-80);
   const atr = calcATR(recent);
+  detail.atr = atr;
+
   const swings = findSwings(recent);
   const trend = getTrend(swings);
-  if (!trend) return null;
+  detail.trend = trend;
+  if (!trend) return { setup: null, reason: 'No clear swing structure trend (need HH+HL or LH+LL)', detail };
 
   const htfSwings = findSwings(htf.slice(-50));
   const htfTrend  = getTrend(htfSwings);
-  if (htfTrend && htfTrend !== trend) return null; // HTF conflict — skip
+  detail.htfTrend = htfTrend;
 
   const last  = recent[recent.length-1];
   const prev  = recent[recent.length-2];
   const price = last.c;
+  detail.price = price;
 
   const momentum = detectMomentum(last, prev, trend);
-  if (!momentum) return null;
+  detail.momentum = momentum?.type ?? null;
+  if (!momentum) return { setup: null, reason: 'No momentum candle (need engulfing, pin bar, or strong close on last candle)', detail };
 
   const lows  = swings.filter(s=>s.type==='low');
   const highs = swings.filter(s=>s.type==='high');
 
   let structureLevel: number;
   if (trend==='LONG') {
-    if (!lows.length) return null;
+    if (!lows.length) return { setup: null, reason: 'LONG trend but no swing lows found', detail };
     structureLevel = lows[lows.length-1].price;
-    if (price > structureLevel + 1.5*atr) return null;
-    if (last.c < (last.o + last.h + last.l)/3) return null;
+    detail.structureLevel = structureLevel;
+    const distToLevel = price - structureLevel;
+    detail.distToLevel = distToLevel;
+    if (distToLevel > 1.5*atr) return { setup: null, reason: `Price too far above structure level (${distToLevel.toFixed(5)} > 1.5×ATR ${(1.5*atr).toFixed(5)}) — mid-move`, detail };
+    if (last.c < (last.o + last.h + last.l)/3) return { setup: null, reason: 'Candle closing bearishly (below avg price) — no bullish conviction', detail };
   } else {
-    if (!highs.length) return null;
+    if (!highs.length) return { setup: null, reason: 'SHORT trend but no swing highs found', detail };
     structureLevel = highs[highs.length-1].price;
-    if (price < structureLevel - 1.5*atr) return null;
-    if (last.c > (last.o + last.h + last.l)/3) return null;
+    detail.structureLevel = structureLevel;
+    const distToLevel = structureLevel - price;
+    detail.distToLevel = distToLevel;
+    if (distToLevel > 1.5*atr) return { setup: null, reason: `Price too far below structure level (${distToLevel.toFixed(5)} > 1.5×ATR ${(1.5*atr).toFixed(5)}) — mid-move`, detail };
+    if (last.c > (last.o + last.h + last.l)/3) return { setup: null, reason: 'Candle closing bullishly (above avg price) — no bearish conviction', detail };
   }
 
-  const sl  = trend==='LONG' ? structureLevel - 0.5*atr : structureLevel + 0.5*atr;
+  const sl   = trend==='LONG' ? structureLevel - 0.5*atr : structureLevel + 0.5*atr;
   const risk = Math.abs(price - sl);
-  if (risk <= 0) return null;
+  if (risk <= 0) return { setup: null, reason: 'Risk is zero (price equals SL)', detail };
 
   const opposingSwings = trend==='LONG'
     ? highs.filter(s=>s.price>price)
@@ -166,26 +199,28 @@ function analyzeCandles(candles: Candle[], htf: Candle[], pair: string, granular
   const tp2 = trend==='LONG' ? price+3*risk : price-3*risk;
   const tp3 = trend==='LONG' ? price+4*risk : price-4*risk;
   const rrRatio = Math.abs(tp1-price)/risk;
-  if (rrRatio < minRR) return null;
+  if (rrRatio < minRR) return { setup: null, reason: `RR too low (${rrRatio.toFixed(2)} < ${minRR})`, detail };
 
-  // Confluence scoring
+  // Confluence + scoring — HTF conflict is now a penalty, not a blocker
   const confluence: string[] = [];
-  if (momentum.type==='ENGULFING') confluence.push('Engulfing candle');
-  if (momentum.type==='PIN_BAR')   confluence.push('Pin bar');
+  if (momentum.type==='ENGULFING')    confluence.push('Engulfing candle');
+  if (momentum.type==='PIN_BAR')      confluence.push('Pin bar');
   if (momentum.type==='STRONG_CLOSE') confluence.push('Strong close');
-  if (htfTrend===trend) confluence.push('HTF aligned');
+  if (htfTrend===trend)  confluence.push('HTF aligned');
+  if (htfTrend && htfTrend!==trend) confluence.push('HTF conflict');
   if (rrRatio>=3) confluence.push('R:R ≥3');
-  if (atr>0) confluence.push('ATR structure');
+  if (atr>0)      confluence.push('ATR structure');
 
   let score = momentum.strength;
-  if (htfTrend===trend) score+=15;
-  if (rrRatio>=3)       score+=10;
-  if (rrRatio>=2)       score+=5;
+  if (htfTrend===trend)              score += 15;
+  if (htfTrend && htfTrend !== trend) score -= 20;  // penalty instead of hard block
+  if (rrRatio>=3) score += 10;
+  if (rrRatio>=2) score += 5;
 
   const quality: 'PREMIUM'|'STRONG'|'DEVELOPING' =
     score>=95 ? 'PREMIUM' : score>=70 ? 'STRONG' : 'DEVELOPING';
 
-  return {
+  const setup: Setup = {
     pair,
     direction: trend,
     quality,
@@ -201,6 +236,8 @@ function analyzeCandles(candles: Candle[], htf: Candle[], pair: string, granular
     timeframe: granularity,
     session: getSession(),
   };
+
+  return { setup, reason: 'OK', detail };
 }
 
 export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
@@ -212,7 +249,7 @@ export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
         fetchCandles(pair, granularity, 200),
         fetchCandles(pair, htfGran, 100),
       ]);
-      const setup = analyzeCandles(candles, htf, pair, granularity, minRR);
+      const { setup } = analyzeCandles(candles, htf, pair, granularity, minRR);
       if (setup) results.push(setup);
     } catch(e: any) {
       console.error(`Skip ${pair}:`, e.message);
@@ -222,5 +259,29 @@ export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
     const ord = {PREMIUM:0,STRONG:1,DEVELOPING:2};
     return ord[a.quality]-ord[b.quality] || b.rrRatio-a.rrRatio;
   });
+  return results;
+}
+
+export async function debugScan(granularity='H1', minRR=1.5): Promise<DebugResult[]> {
+  const htfGran = HTF_MAP[granularity] || 'D';
+  const results: DebugResult[] = [];
+  for (const pair of PAIRS) {
+    try {
+      const [candles, htf] = await Promise.all([
+        fetchCandles(pair, granularity, 200),
+        fetchCandles(pair, htfGran, 100),
+      ]);
+      const { setup, reason, detail } = analyzeCandles(candles, htf, pair, granularity, minRR, true);
+      results.push({
+        pair,
+        result: setup ? 'SETUP' : 'REJECTED',
+        reason,
+        detail,
+        ...(setup ? { setup } : {}),
+      });
+    } catch(e: any) {
+      results.push({ pair, result: 'ERROR', reason: (e as any).message });
+    }
+  }
   return results;
 }
