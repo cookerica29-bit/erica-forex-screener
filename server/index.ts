@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,6 +8,8 @@ import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJourna
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+app.use(cors());
+
 const server = createServer(app);
 
 app.use(express.json());

@@ -198,6 +198,7 @@
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
   <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
   <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">🧮 Calculator</button>
+  <button class="tab-btn" onclick="switchTab('bot')" id="tab-bot">🤖 Bot</button>
 </div>
 
 <div id="content-scanner" class="tab-content active">
@@ -469,104 +470,144 @@
     return trs.reduce((a,b)=>a+b,0)/trs.length;
   }
 
+  // Stricter momentum detection for pure price action
   function detectMomentum(c,p,dir) {
-    const body=Math.abs(c.c-c.o),range=c.h-c.l,bodyRatio=range>0?body/range:0;
-    const uw=c.h-Math.max(c.c,c.o),lw=Math.min(c.c,c.o)-c.l,pb=Math.abs(p.c-p.o);
-    if(dir==='LONG'&&c.c>c.o&&c.c>p.o&&c.o<p.c&&body>pb*0.9) return {type:'ENGULFING',strength:75};
-    if(dir==='SHORT'&&c.c<c.o&&c.o>p.c&&c.c<p.o&&body>pb*0.9) return {type:'ENGULFING',strength:75};
-    if(dir==='LONG'&&lw>body*2&&lw>uw*2) return {type:'PIN_BAR',strength:65};
-    if(dir==='SHORT'&&uw>body*2&&uw>lw*2) return {type:'PIN_BAR',strength:65};
-    if(dir==='LONG'&&c.c>c.o&&bodyRatio>0.6) return {type:'STRONG_CLOSE',strength:50};
-    if(dir==='SHORT'&&c.c<c.o&&bodyRatio>0.6) return {type:'STRONG_CLOSE',strength:50};
+    const body=Math.abs(c.c-c.o), range=c.h-c.l, bodyRatio=range>0?body/range:0;
+    const uw=c.h-Math.max(c.c,c.o), lw=Math.min(c.c,c.o)-c.l;
+    const pBody=Math.abs(p.c-p.o), pHigh=Math.max(p.c,p.o), pLow=Math.min(p.c,p.o);
+    // Engulfing: current body fully engulfs previous body
+    if(dir==='LONG'&&c.c>c.o&&Math.min(c.o,c.c)<=pLow&&Math.max(c.o,c.c)>=pHigh&&body>pBody*0.9)
+      return {type:'ENGULFING',strength:80};
+    if(dir==='SHORT'&&c.c<c.o&&Math.max(c.o,c.c)>=pHigh&&Math.min(c.o,c.c)<=pLow&&body>pBody*0.9)
+      return {type:'ENGULFING',strength:80};
+    // Pin bar: long wick at least 2x body, small body (<40% range), wick dominant in one direction
+    if(dir==='LONG'&&lw>body*2&&lw>uw*1.5&&bodyRatio<0.4)
+      return {type:'PIN_BAR',strength:70};
+    if(dir==='SHORT'&&uw>body*2&&uw>lw*1.5&&bodyRatio<0.4)
+      return {type:'PIN_BAR',strength:70};
+    // Strong close: large body breaking through prior candle close (weaker signal)
+    if(dir==='LONG'&&c.c>c.o&&bodyRatio>0.65&&c.c>p.c)
+      return {type:'STRONG_CLOSE',strength:50};
+    if(dir==='SHORT'&&c.c<c.o&&bodyRatio>0.65&&c.c<p.c)
+      return {type:'STRONG_CLOSE',strength:50};
     return null;
   }
 
-  function findSwingHigh(candles,lb=60,mb=2) {
-    const sl=candles.slice(-lb,-1); let best=null;
-    for(let i=mb;i<sl.length-mb;i++){const c=sl[i];const ok=sl.slice(Math.max(0,i-mb),i).every(x=>x.h<=c.h)&&sl.slice(i+1,i+1+mb).every(x=>x.h<=c.h);if(ok&&(best===null||c.h>best))best=c.h;}
-    return best;
+  // Find all pivot swing highs and lows using N candles on each side as confirmation
+  function findSwings(candles, margin=3) {
+    const swings=[];
+    for(let i=margin; i<candles.length-margin; i++){
+      const c=candles[i];
+      const lh=candles.slice(i-margin,i), rh=candles.slice(i+1,i+1+margin);
+      if(lh.every(x=>x.h<=c.h)&&rh.every(x=>x.h<=c.h))
+        swings.push({index:i,price:c.h,type:'high'});
+      else if(lh.every(x=>x.l>=c.l)&&rh.every(x=>x.l>=c.l))
+        swings.push({index:i,price:c.l,type:'low'});
+    }
+    return swings;
   }
 
-  function findSwingLow(candles,lb=60,mb=2) {
-    const sl=candles.slice(-lb,-1); let best=null;
-    for(let i=mb;i<sl.length-mb;i++){const c=sl[i];const ok=sl.slice(Math.max(0,i-mb),i).every(x=>x.l>=c.l)&&sl.slice(i+1,i+1+mb).every(x=>x.l>=c.l);if(ok&&(best===null||c.l<best))best=c.l;}
-    return best;
+  // Determine trend from swing structure: HH+HL = LONG, LH+LL = SHORT
+  function getTrend(swings) {
+    const highs=swings.filter(s=>s.type==='high');
+    const lows=swings.filter(s=>s.type==='low');
+    if(highs.length<2||lows.length<2) return null;
+    const hh=highs[highs.length-1].price>highs[highs.length-2].price;
+    const hl=lows[lows.length-1].price>lows[lows.length-2].price;
+    const lh=highs[highs.length-1].price<highs[highs.length-2].price;
+    const ll=lows[lows.length-1].price<lows[lows.length-2].price;
+    if(hh&&hl) return 'LONG';
+    if(lh&&ll) return 'SHORT';
+    return null;
   }
 
   function analyzeCandles(candles,htfCandles,symbol) {
-    if(candles.length<55) return null;
-    const closes=candles.map(c=>c.c);
-    const ema20=calcEMA(closes,20), ema50=calcEMA(closes,50);
+    if(candles.length<80) return null;
+    const atr=calcATR(candles);
     const li=candles.length-1;
-    const e20=ema20[li], e50=ema50[li];
-    if(!e20||!e50) return null;
-    const direction=e20>e50?'LONG':'SHORT';
-    const slope=li>=3&&ema20[li-3]?(e20-ema20[li-3])/ema20[li-3]:0;
-    if(direction==='LONG'&&slope<-0.002) return null;
-    if(direction==='SHORT'&&slope>0.002) return null;
-    const last8=candles.slice(-8), ema20l8=ema20.slice(-8);
-    const pullback=last8.some((c,i)=>{const e=ema20l8[i];if(!e)return false;const wp=direction==='LONG'?c.l:c.h;return Math.abs(wp-e)/e<0.03;});
-    if(!pullback) return null;
-    const plLow=Math.min(...last8.map(c=>c.l)), plHigh=Math.max(...last8.map(c=>c.h));
     const last=candles[li], prev=candles[li-1];
+    const cp=last.c;
+
+    // 1. Determine trend from swing structure on recent 80 candles
+    const recentCandles=candles.slice(-80);
+    const swings=findSwings(recentCandles,3);
+    const direction=getTrend(swings);
+    if(!direction) return null;
+
+    // 2. Find structural pullback level: most recent swing low (LONG) or swing high (SHORT)
+    const pullbackSwings=direction==='LONG'
+      ?swings.filter(s=>s.type==='low')
+      :swings.filter(s=>s.type==='high');
+    if(pullbackSwings.length<1) return null;
+    const pullbackLevel=pullbackSwings[pullbackSwings.length-1].price;
+
+    // 3. Price must be AT the structural level — reject mid-move entries
+    // The entry candle's wick must be touching within 1.5 ATR of the level
+    const distToLevel=direction==='LONG'
+      ?Math.abs(last.l-pullbackLevel)
+      :Math.abs(last.h-pullbackLevel);
+    if(distToLevel>atr*1.5) return null;
+
+    // 4. Entry candle must be closing in the trend direction (not stalling mid-wick)
+    const midPoint=(last.h+last.l)/2;
+    if(direction==='LONG'&&last.c<midPoint) return null;
+    if(direction==='SHORT'&&last.c>midPoint) return null;
+
+    // 5. Require a momentum confirmation candle (engulfing or pin bar)
     const mom=detectMomentum(last,prev,direction);
     if(!mom) return null;
-    const atr=calcATR(candles), cp=last.c;
 
-    // Find structure-based stop loss
-    // For LONG: SL goes below the lowest swing low in the last 20 candles (below demand zone)
-    // For SHORT: SL goes above the highest swing high in the last 20 candles (above supply zone)
-    function findStructureSL(candles, direction, atr) {
-      const lookback = candles.slice(-20);
-      if (direction === 'LONG') {
-        // Find the lowest low in the last 20 candles — this is the demand zone floor
-        const structureLow = Math.min(...lookback.map(c => c.l));
-        // SL goes 0.5 ATR below the structure low for breathing room
-        return structureLow - atr * 0.5;
-      } else {
-        // Find the highest high in the last 20 candles — this is the supply zone ceiling
-        const structureHigh = Math.max(...lookback.map(c => c.h));
-        // SL goes 0.5 ATR above the structure high for breathing room
-        return structureHigh + atr * 0.5;
-      }
-    }
-
-    let sl = findStructureSL(candles, direction, atr);
+    // 6. SL below/above the structural level with ATR buffer
+    const sl=direction==='LONG'
+      ?pullbackLevel-atr*0.5
+      :pullbackLevel+atr*0.5;
     const risk=Math.abs(cp-sl);
-    if(risk===0) return null;
-    const swT=direction==='LONG'?findSwingHigh(candles):findSwingLow(candles);
+    if(risk===0||risk<atr*0.3) return null;
+
+    // 7. TP at next opposing swing with minimum 1.5:1 RR
+    const targetSwings=direction==='LONG'
+      ?swings.filter(s=>s.type==='high')
+      :swings.filter(s=>s.type==='low');
+    const swT=targetSwings.length>0?targetSwings[targetSwings.length-1].price:null;
     let tp1;
-    if(swT!==null){const srr=Math.abs(swT-cp)/risk;tp1=srr>=1.5?swT:(direction==='LONG'?cp+risk*2:cp-risk*2);}
+    if(swT!==null){const srr=Math.abs(swT-cp)/risk; tp1=srr>=1.5?swT:(direction==='LONG'?cp+risk*2:cp-risk*2);}
     else tp1=direction==='LONG'?cp+risk*2:cp-risk*2;
     const tp2=direction==='LONG'?cp+risk*3:cp-risk*3;
     const tp3=direction==='LONG'?cp+risk*4:cp-risk*4;
     const rr=Math.abs(tp1-cp)/risk;
     if(rr<minRR) return null;
+
+    // 8. Confluences
     const confs=[];
-    const esep=Math.abs(e20-e50)/e50*100;
-    confs.push(esep>2?'Strong EMA Separation':'EMA Trend Aligned');
-    confs.push('Momentum: '+mom.type.replace(/_/g,' '));
-    if(mom.strength>=60) confs.push('High-Strength Candle');
+    confs.push('Swing Structure Trend');
+    confs.push(mom.type==='ENGULFING'?'Bullish Engulfing at Level':mom.type==='PIN_BAR'?'Pin Bar Rejection':'Strong Close');
     if(swT!==null) confs.push('Prior Swing Target');
     if(rr>=3) confs.push(rr.toFixed(1)+':1 Risk-Reward');
-    if(htfCandles&&htfCandles.length>=20){
-      const hc=htfCandles.map(c=>c.c);
-      const he20=calcEMA(hc,20),he50=calcEMA(hc,50);
-      const hi=htfCandles.length-1;
-      if(he20[hi]&&he50[hi]&&(he20[hi]>he50[hi]?'LONG':'SHORT')===direction) confs.push('HTF Trend Aligned');
+    if(distToLevel<atr*0.5) confs.push('Precise Level Touch');
+
+    // HTF alignment via swing structure
+    if(htfCandles&&htfCandles.length>=40){
+      const htfSwings=findSwings(htfCandles.slice(-60),3);
+      const htfTrend=getTrend(htfSwings);
+      if(htfTrend===direction) confs.push('HTF Trend Aligned');
     }
-    let qs=0;
-    if(esep>2)qs+=2; if(Math.abs(slope)>0.005)qs+=2;
-    if(mom.type==='ENGULFING')qs+=3; else if(mom.type==='PIN_BAR')qs+=3; else qs+=2;
-    if(mom.strength>=60)qs+=2; if(swT!==null)qs+=1;
-    if(rr>=3)qs+=2; else if(rr>=2)qs+=1;
-    if(confs.includes('HTF Trend Aligned'))qs+=2;
-    const qt=qs>=10?'PREMIUM':qs>=6?'STRONG':'DEVELOPING';
+
+    // 9. Quality score
+    let qs=3; // swing structure base
+    if(mom.type==='ENGULFING') qs+=3;
+    else if(mom.type==='PIN_BAR') qs+=3;
+    else qs+=1;
+    if(mom.strength>=70) qs+=2;
+    if(distToLevel<atr*0.5) qs+=2; // precise level touch
+    if(swT!==null) qs+=1;
+    if(rr>=3) qs+=2; else if(rr>=2) qs+=1;
+    if(confs.includes('HTF Trend Aligned')) qs+=3;
+    const qt=qs>=12?'PREMIUM':qs>=7?'STRONG':'DEVELOPING';
     const dl=direction==='LONG'?'Bullish':'Bearish';
-    const pm={ENGULFING:`${dl} EMA Pullback + Engulfing`,PIN_BAR:`${dl} EMA Pullback + Pin Bar`,STRONG_CLOSE:`${dl} EMA Pullback + Strong Close`};
+    const pm={ENGULFING:`${dl} Engulfing at Swing Level`,PIN_BAR:`${dl} Pin Bar Rejection`,STRONG_CLOSE:`${dl} Strong Close at Structure`};
     return {
       id:`${symbol}-${tf}-${Date.now()}`, symbol, displaySymbol:PAIR_LABELS[symbol]||symbol.replace('_','/'),
-      direction, quality:qt, pattern:pm[mom.type]||`${dl} EMA Pullback`, timeframe:tf,
+      direction, quality:qt, pattern:pm[mom.type]||`${dl} PA Pullback`, timeframe:tf,
       currentPrice:cp, entry:cp, stopLoss:sl, tp1, tp2, tp3, rrRatio:rr,
       rr2:parseFloat((Math.abs(tp2-cp)/risk).toFixed(1)), rr3:parseFloat((Math.abs(tp3-cp)/risk).toFixed(1)),
       confluences:confs, session:getSession(), scannedAt:new Date().toISOString()
@@ -1069,6 +1110,97 @@
     document.getElementById('calc-profit3').textContent = r3 ? '+$' + r3.profit.toFixed(2) : '—';
     document.getElementById('calc-rr3').textContent = r3 ? r3.rr + ':1 RR' : '';
   }
+</script>
+
+<div id="content-bot" class="tab-content">
+  <div class="journal-page">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+      <div class="conn-dot-bot" style="width:7px;height:7px;border-radius:50%;background:var(--slate-dim);flex-shrink:0"></div>
+      <input id="botUrl" class="pnl-input" style="flex:1;min-width:180px;max-width:320px;font-size:11px;padding:6px 10px;" placeholder="http://localhost:8000" value="http://localhost:8000" oninput="saveBotUrl()" />
+      <button class="scan-btn" onclick="refreshBot()" id="botRefreshBtn"><span id="botRefreshIcon">↻</span> Refresh</button>
+      <span id="botConnLabel" style="font-size:10px;color:var(--slate-dim);">—</span>
+      <span id="botUpdated" style="font-size:10px;color:var(--slate-dim);margin-left:auto;"></span>
+    </div>
+    <div class="stats-bar" style="margin-bottom:18px;">
+      <div class="stat-box"><div class="stat-value" id="bot-balance" style="color:var(--text)">—</div><div class="stat-label">Balance</div></div>
+      <div class="stat-box"><div class="stat-value" id="bot-pnl" style="color:var(--slate)">—</div><div class="stat-label">Daily P&L</div></div>
+      <div class="stat-box"><div class="stat-value" id="bot-open" style="color:var(--blue)">—</div><div class="stat-label">Open Trades</div></div>
+      <div class="stat-box"><div class="stat-value" id="bot-risk" style="color:var(--gold)">—</div><div class="stat-label">Risk / Trade</div></div>
+      <div class="stat-box"><div class="stat-value" id="bot-minrr" style="color:var(--slate)">—</div><div class="stat-label">Min R:R</div></div>
+      <div class="stat-box"><div class="stat-value" id="bot-limit" style="color:var(--red)">—</div><div class="stat-label">Daily Limit</div></div>
+    </div>
+    <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">Open positions</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:18px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="border-bottom:1px solid var(--border);">
+          <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-dim);">Symbol</th>
+          <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-dim);">Side</th>
+          <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-dim);">Lots</th>
+          <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-dim);">Entry</th>
+          <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-dim);">Stop loss</th>
+          <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-dim);">Take profit</th>
+          <th style="padding:9px 12px;text-align:right;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-dim);">Unrealized P&L</th>
+        </tr></thead>
+        <tbody id="bot-positions-body">
+          <tr><td colspan="7" style="padding:40px;text-align:center;color:var(--slate-dim);font-size:12px;">Click Refresh to load positions</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">Recent signals</div>
+    <div id="bot-signals-list" style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="padding:40px;text-align:center;color:var(--slate-dim);font-size:12px;">No signals yet</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  let botTimer=null;
+  function getBotUrl(){return(document.getElementById('botUrl').value||'http://localhost:8000').replace(/\/$/,'');}
+  window.saveBotUrl=function(){localStorage.setItem('botUrl',getBotUrl());};
+  const saved=localStorage.getItem('botUrl');
+  if(saved)document.getElementById('botUrl').value=saved;
+  function setConn(ok,msg){
+    const dot=document.querySelector('.conn-dot-bot');
+    const lbl=document.getElementById('botConnLabel');
+    dot.style.background=ok?'var(--green)':'var(--red)';
+    lbl.style.color=ok?'var(--green)':'var(--red)';
+    lbl.textContent=(ok?'● Connected':'● ')+msg;
+  }
+  window.refreshBot=async function(){
+    const btn=document.getElementById('botRefreshBtn');
+    const icon=document.getElementById('botRefreshIcon');
+    icon.style.animation='spin 1s linear infinite';
+    btn.disabled=true;
+    const base=getBotUrl();
+    try{
+      const[sRes,pRes,sigRes]=await Promise.all([fetch(`${base}/status`),fetch(`${base}/positions`),fetch(`${base}/signals`)]);
+      if(!sRes.ok)throw new Error(`${sRes.status}`);
+      const s=await sRes.json();
+      const positions=pRes.ok?await pRes.json():[];
+      const signals=sigRes.ok?await sigRes.json():[];
+      const bal=s.balance!=null?'$'+Number(s.balance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+      document.getElementById('bot-balance').textContent=bal;
+      const pnlEl=document.getElementById('bot-pnl');
+      if(s.daily_pnl_pct!=null){const sign=s.daily_pnl_pct>=0?'+':'';pnlEl.textContent=sign+Number(s.daily_pnl_pct).toFixed(2)+'%';pnlEl.style.color=s.daily_pnl_pct>=0?'var(--green)':'var(--red)';}
+      document.getElementById('bot-open').textContent=s.open_positions!=null?`${s.open_positions} / ${s.max_open_trades??'?'}`:'—';
+      document.getElementById('bot-risk').textContent=s.risk_per_trade||'—';
+      document.getElementById('bot-minrr').textContent=s.min_rr!=null?s.min_rr:'—';
+      document.getElementById('bot-limit').textContent=s.max_daily_loss_pct!=null?s.max_daily_loss_pct+'%':'—';
+      const tbody=document.getElementById('bot-positions-body');
+      if(!positions.length){tbody.innerHTML='<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--slate-dim);font-size:12px;">No open positions</td></tr>';}
+      else{tbody.innerHTML=positions.map(p=>{const buy=(p.side||'').toLowerCase()==='buy';const pnl=p.unrealized_pnl??null;const pnlStr=pnl!=null?(pnl>=0?'+$':'-$')+Math.abs(pnl).toFixed(2):'—';const pnlColor=pnl==null?'var(--slate-dim)':pnl>=0?'var(--green)':'var(--red)';return`<tr style="border-bottom:1px solid #111820;"><td style="padding:10px 12px;font-weight:700;font-size:13px;">${p.instrument||'—'}</td><td style="padding:10px 12px;"><span style="font-size:9px;padding:2px 7px;border-radius:99px;font-weight:700;color:${buy?'var(--green)':'var(--red)'};background:${buy?'rgba(0,255,136,0.1)':'rgba(255,59,92,0.1)'};border:1px solid ${buy?'rgba(0,255,136,0.25)':'rgba(255,59,92,0.25)'};">${buy?'BUY':'SELL'}</span></td><td style="padding:10px 12px;color:var(--slate-dim);">${p.qty??'—'}</td><td style="padding:10px 12px;">${p.entry??'—'}</td><td style="padding:10px 12px;color:var(--red);">${p.stop_loss??'—'}</td><td style="padding:10px 12px;color:var(--green);">${p.take_profit??'—'}</td><td style="padding:10px 12px;text-align:right;font-weight:700;color:${pnlColor};">${pnlStr}</td></tr>`;}).join('');}
+      const sigEl=document.getElementById('bot-signals-list');
+      if(!signals.length){sigEl.innerHTML='<div style="padding:40px;text-align:center;color:var(--slate-dim);font-size:12px;">No signals logged yet</div>';}
+      else{const recent=signals.slice(-20).reverse();sigEl.innerHTML=recent.map((s,i)=>{const ok=s.status==='executed';const rej=s.status==='rejected';const sc=ok?'var(--green)':rej?'var(--red)':'var(--gold)';const sb=ok?'rgba(0,255,136,0.07)':rej?'rgba(255,59,92,0.07)':'rgba(245,166,35,0.07)';const sbo=ok?'rgba(0,255,136,0.35)':rej?'rgba(255,59,92,0.35)':'rgba(245,166,35,0.35)';const t=s.timestamp?new Date(s.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—';const dir=(s.action||'').toUpperCase();const dc=dir==='BUY'?'var(--green)':dir==='SELL'?'var(--red)':'var(--slate)';return`<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:${i<recent.length-1?'1px solid #111820':'none'};font-size:11px;flex-wrap:wrap;"><span style="font-size:10px;color:var(--slate-dim);min-width:46px;">${t}</span><span style="font-weight:700;min-width:64px;font-size:12px;">${s.symbol||'—'}</span><span style="color:${dc};font-size:10px;font-weight:700;min-width:32px;">${dir}</span><span style="color:var(--slate-dim);font-size:10px;flex:1;">${s.detail||''}</span><span style="font-size:9px;padding:2px 8px;border-radius:99px;border:1px solid ${sbo};color:${sc};background:${sb};">${s.status||'—'}</span></div>`;}).join('');}
+      setConn(true,'Connected');
+      document.getElementById('botUpdated').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    }catch(err){setConn(false,err.message||'Unreachable');}
+    finally{icon.style.animation='';icon.textContent='↻';btn.disabled=false;}
+  };
+  const orig=window.switchTab;
+  window.switchTab=function(tab){orig&&orig(tab);clearInterval(botTimer);if(tab==='bot'){refreshBot();botTimer=setInterval(refreshBot,10000);}};
+})();
 </script>
 </body>
 </html>
