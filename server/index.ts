@@ -29,6 +29,18 @@ function queuePremiumSetups(setups: Setup[]) {
     );
     if (!exists) {
       pendingApprovals.push({ ...setup, id: `${setup.pair}-${Date.now()}` });
+      const slackWebhook = process.env.SLACK_WEBHOOK_URL;
+      if (slackWebhook) {
+        const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
+        const msg = {
+          text: `🔥 *PREMIUM SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`
+        };
+        fetch(slackWebhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(msg),
+        }).catch((e: any) => console.error('Slack notify failed:', e.message));
+      }
     }
   }
   if (pendingApprovals.length > 20) {
