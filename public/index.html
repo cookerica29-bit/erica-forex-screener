@@ -1379,7 +1379,7 @@
   };
 
   const orig=window.switchTab;
-  window.switchTab=function(tab){orig&&orig(tab);clearInterval(botTimer);if(tab==='bot'){refreshBot();botTimer=setInterval(refreshBot,10000);}};
+  window.switchTab=function(tab){orig&&orig(tab);clearInterval(botTimer);if(tab==='bot'){refreshBot();botTimer=setInterval(refreshBot,60000);}};
 })();
 </script>
 </body>
