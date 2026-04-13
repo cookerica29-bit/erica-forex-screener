@@ -52,6 +52,23 @@ function queueSetups(setups: Setup[]) {
         }).then(() => console.log(`[Slack] Notification sent for ${setup.pair}`))
           .catch((e: any) => console.error('Slack DM failed:', e.message));
       }
+      const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+      const telegramChatId = process.env.TELEGRAM_CHAT_ID;
+      if (telegramToken && telegramChatId) {
+        const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
+        const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
+        const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
+        const text = `${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
+        fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: telegramChatId,
+            text: text,
+            parse_mode: 'Markdown',
+          }),
+        }).catch((e: any) => console.error('Telegram notify failed:', e.message));
+      }
     }
   }
   if (pendingApprovals.length > 20) {
