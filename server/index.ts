@@ -25,7 +25,7 @@ function queuePremiumSetups(setups: Setup[]) {
   for (const setup of premium) {
     const exists = pendingApprovals.some(
       p => p.pair === setup.pair && p.timeframe === setup.timeframe &&
-           Math.abs(p.entry - setup.entry) < 0.001
+           Math.abs(p.entry - setup.entry) < (setup.pair.includes('JPY') ? 0.1 : 0.001)
     );
     if (!exists) {
       pendingApprovals.push({ ...setup, id: `${setup.pair}-${Date.now()}` });
