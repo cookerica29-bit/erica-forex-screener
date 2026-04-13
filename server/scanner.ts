@@ -167,6 +167,7 @@ function analyzeCandles(
     detail.structureLevel = structureLevel;
     const distToLevel = price - structureLevel;
     detail.distToLevel = distToLevel;
+    if (distToLevel < 0) return { setup: null, reason: `Price broke below structure level (${price.toFixed(5)} < support ${structureLevel.toFixed(5)}) — structure invalidated`, detail };
     if (distToLevel > 1.5*atr) return { setup: null, reason: `Price too far above structure level (${distToLevel.toFixed(5)} > 1.5×ATR ${(1.5*atr).toFixed(5)}) — mid-move`, detail };
     if (last.c < (last.o + last.h + last.l)/3) return { setup: null, reason: 'Candle closing bearishly (below avg price) — no bullish conviction', detail };
   } else {
@@ -175,6 +176,7 @@ function analyzeCandles(
     detail.structureLevel = structureLevel;
     const distToLevel = structureLevel - price;
     detail.distToLevel = distToLevel;
+    if (distToLevel < 0) return { setup: null, reason: `Price broke above structure level (${price.toFixed(5)} > resistance ${structureLevel.toFixed(5)}) — structure invalidated`, detail };
     if (distToLevel > 1.5*atr) return { setup: null, reason: `Price too far below structure level (${distToLevel.toFixed(5)} > 1.5×ATR ${(1.5*atr).toFixed(5)}) — mid-move`, detail };
     if (last.c > (last.o + last.h + last.l)/3) return { setup: null, reason: 'Candle closing bullishly (above avg price) — no bearish conviction', detail };
   }
