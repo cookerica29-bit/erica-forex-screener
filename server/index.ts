@@ -38,7 +38,7 @@ function queueSetups(setups: Setup[]) {
         const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
         const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
         const msg = {
-          text: `${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`
+          text: `<!channel> ${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`
         };
         fetch(slackWebhook, {
           method: 'POST',
