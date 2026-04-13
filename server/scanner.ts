@@ -213,18 +213,19 @@ function analyzeCandles(
   if (momentum.type==='PIN_BAR')      confluence.push('Pin bar');
   if (momentum.type==='STRONG_CLOSE') confluence.push('Strong close');
   if (htfTrend===trend)  confluence.push('HTF aligned');
-  if (htfTrend && htfTrend!==trend) confluence.push('HTF conflict');
   if (rrRatio>=3) confluence.push('R:R ≥3');
   if (atr>0)      confluence.push('ATR structure');
 
   let score = momentum.strength;
-  if (htfTrend===trend)              score += 15;
-  if (htfTrend && htfTrend !== trend) score -= 20;  // penalty instead of hard block
+  // HTF conflict is a hard block — no counter-trend trades
+  if (htfTrend && htfTrend !== trend) return { setup: null, reason: 'HTF conflict — counter-trend setup rejected', detail };
+  // HTF aligned bonus
+  if (htfTrend === trend) score += 15;
   if (rrRatio>=3) score += 10;
   if (rrRatio>=2) score += 5;
 
   const quality: 'PREMIUM'|'STRONG'|'DEVELOPING' =
-    score>=95 ? 'PREMIUM' : score>=70 ? 'STRONG' : 'DEVELOPING';
+    score>=95 ? 'PREMIUM' : score>=75 ? 'STRONG' : 'DEVELOPING';
 
   const setup: Setup = {
     pair,
