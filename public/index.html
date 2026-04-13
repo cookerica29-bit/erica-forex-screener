@@ -652,6 +652,8 @@
     results.sort((a,b)=>ord[a.quality]-ord[b.quality]||b.rrRatio-a.rrRatio);
     allSetups=results; scanning=false; updateScanBtn(false);
     document.getElementById('lastScan').textContent=`Last scan: ${new Date().toLocaleTimeString()}`;
+    // Trigger backend queue for any strong/premium setups found
+    fetch('/api/scan', { method: 'POST' }).catch(e => console.warn('Backend scan failed:', e));
     renderSetups();
   }
 
