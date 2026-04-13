@@ -31,6 +31,7 @@ function queueSetups(setups: Setup[]) {
       pendingApprovals.push({ ...setup, id: `${setup.pair}-${Date.now()}` });
       const slackWebhook = process.env.SLACK_WEBHOOK_URL;
       if (slackWebhook) {
+        console.log(`[Slack] Attempting to notify for ${setup.pair} ${setup.quality}`);
         const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
         const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
         const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
@@ -41,7 +42,8 @@ function queueSetups(setups: Setup[]) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(msg),
-        }).catch((e: any) => console.error('Slack notify failed:', e.message));
+        }).then(() => console.log(`[Slack] Notification sent for ${setup.pair}`))
+          .catch((e: any) => console.error('Slack notify failed:', e.message));
       }
     }
   }
@@ -210,4 +212,5 @@ console.log(`PORT env var is: ${process.env.PORT}`);
 server.listen(PORT, () => {
   console.log(`✅ Forex Scanner running on http://localhost:${PORT}`);
   console.log(`   OANDA: ${OANDA_API_KEY ? '✓ configured' : '✗ missing key'} (${OANDA_ACCOUNT_TYPE})`);
+  console.log(`[Config] SLACK_WEBHOOK_URL: ${process.env.SLACK_WEBHOOK_URL ? 'set' : 'MISSING'}`);
 });
