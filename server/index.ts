@@ -20,8 +20,8 @@ let latestSetups: Setup[] = [];
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
 
-function queuePremiumSetups(setups: Setup[]) {
-  const premium = setups.filter(s => s.quality === 'PREMIUM');
+function queueSetups(setups: Setup[]) {
+  const premium = setups.filter(s => s.quality === 'PREMIUM' || s.quality === 'STRONG');
   for (const setup of premium) {
     const exists = pendingApprovals.some(
       p => p.pair === setup.pair && p.timeframe === setup.timeframe &&
@@ -32,8 +32,10 @@ function queuePremiumSetups(setups: Setup[]) {
       const slackWebhook = process.env.SLACK_WEBHOOK_URL;
       if (slackWebhook) {
         const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
+        const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
+        const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
         const msg = {
-          text: `🔥 *PREMIUM SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`
+          text: `${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`
         };
         fetch(slackWebhook, {
           method: 'POST',
@@ -54,7 +56,7 @@ async function scheduledScan() {
     latestSetups = await runScan('H1', 1.5);
     lastScanTime = new Date().toISOString();
     console.log(`[Scanner] Found ${latestSetups.length} setups (${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium)`);
-    queuePremiumSetups(latestSetups);
+    queueSetups(latestSetups);
   } catch(e: any) {
     console.error('[Scanner] Scan failed:', e.message);
   }
