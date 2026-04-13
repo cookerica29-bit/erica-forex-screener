@@ -20,6 +20,8 @@ let latestSetups: Setup[] = [];
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
 
+const SLACK_WEBHOOK = process.env.SLACK_WEBHOOK_URL || Buffer.from('aHR0cHM6Ly9ob29rcy5zbGFjay5jb20vc2VydmljZXMvVDBBTjM5NVRYQTgvQjBBUzlTRVBYSzcvYkZsZ3E3UUtSSlRCZFRVNnVFdUl4cWpN', 'base64').toString();
+
 function queueSetups(setups: Setup[]) {
   const premium = setups.filter(s => s.quality === 'PREMIUM' || s.quality === 'STRONG');
   for (const setup of premium) {
@@ -29,7 +31,7 @@ function queueSetups(setups: Setup[]) {
     );
     if (!exists) {
       pendingApprovals.push({ ...setup, id: `${setup.pair}-${Date.now()}` });
-      const slackWebhook = process.env.SLACK_WEBHOOK_URL || Buffer.from('aHR0cHM6Ly9ob29rcy5zbGFjay5jb20vc2VydmljZXMvVDBBTjM5NVRYQTgvQjBBUzlTRVBYSzcvYkZsZ3E3UUtSSlRCZFRVNnVFdUl4cWpN', 'base64').toString();
+      const slackWebhook = SLACK_WEBHOOK;
       if (slackWebhook) {
         console.log(`[Slack] Attempting to notify for ${setup.pair} ${setup.quality}`);
         const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
@@ -212,5 +214,5 @@ console.log(`PORT env var is: ${process.env.PORT}`);
 server.listen(PORT, () => {
   console.log(`✅ Forex Scanner running on http://localhost:${PORT}`);
   console.log(`   OANDA: ${OANDA_API_KEY ? '✓ configured' : '✗ missing key'} (${OANDA_ACCOUNT_TYPE})`);
-  console.log(`[Config] SLACK_WEBHOOK_URL: ${process.env.SLACK_WEBHOOK_URL ? 'set' : 'MISSING'}`);
+  console.log(`[Config] SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK ? 'set' : 'MISSING'}`);
 });
