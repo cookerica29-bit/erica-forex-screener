@@ -31,21 +31,26 @@ function queueSetups(setups: Setup[]) {
     );
     if (!exists) {
       pendingApprovals.push({ ...setup, id: `${setup.pair}-${Date.now()}` });
-      const slackWebhook = SLACK_WEBHOOK;
-      if (slackWebhook) {
+      const slackToken = process.env.SLACK_BOT_TOKEN;
+      const slackUserId = process.env.SLACK_USER_ID || 'U0AMW8X3GLV';
+      if (slackToken) {
         console.log(`[Slack] Attempting to notify for ${setup.pair} ${setup.quality}`);
         const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
         const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
         const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
-        const msg = {
-          text: `<!channel> ${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`
-        };
-        fetch(slackWebhook, {
+        const text = `${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
+        fetch('https://slack.com/api/chat.postMessage', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(msg),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${slackToken}`,
+          },
+          body: JSON.stringify({
+            channel: slackUserId,
+            text: text,
+          }),
         }).then(() => console.log(`[Slack] Notification sent for ${setup.pair}`))
-          .catch((e: any) => console.error('Slack notify failed:', e.message));
+          .catch((e: any) => console.error('Slack DM failed:', e.message));
       }
     }
   }
@@ -214,5 +219,5 @@ console.log(`PORT env var is: ${process.env.PORT}`);
 server.listen(PORT, () => {
   console.log(`✅ Forex Scanner running on http://localhost:${PORT}`);
   console.log(`   OANDA: ${OANDA_API_KEY ? '✓ configured' : '✗ missing key'} (${OANDA_ACCOUNT_TYPE})`);
-  console.log(`[Config] SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK ? 'set' : 'MISSING'}`);
+  console.log(`[Config] SLACK_BOT_TOKEN: ${process.env.SLACK_BOT_TOKEN ? 'set' : 'MISSING'}`);
 });
