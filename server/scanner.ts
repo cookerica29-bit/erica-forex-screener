@@ -180,6 +180,8 @@ function analyzeCandles(
   }
 
   const sl   = trend==='LONG' ? structureLevel - 0.5*atr : structureLevel + 0.5*atr;
+  if (trend === 'LONG' && sl >= price) return { setup: null, reason: 'Inverted SL: sl >= entry for LONG', detail };
+  if (trend === 'SHORT' && sl <= price) return { setup: null, reason: 'Inverted SL: sl <= entry for SHORT', detail };
   const risk = Math.abs(price - sl);
   if (risk <= 0) return { setup: null, reason: 'Risk is zero (price equals SL)', detail };
 
