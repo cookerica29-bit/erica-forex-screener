@@ -609,7 +609,7 @@
     return {
       id:`${symbol}-${tf}-${Date.now()}`, symbol, displaySymbol:PAIR_LABELS[symbol]||symbol.replace('_','/'),
       direction, quality:qt, pattern:pm[mom.type]||`${dl} PA Pullback`, timeframe:tf,
-      currentPrice:cp, entry:cp, stopLoss:sl, tp1, tp2, tp3, rrRatio:rr,
+      currentPrice:cp, entry:cp, sl, tp1, tp2, tp3, rrRatio:rr,
       rr2:parseFloat((Math.abs(tp2-cp)/risk).toFixed(1)), rr3:parseFloat((Math.abs(tp3-cp)/risk).toFixed(1)),
       confluences:confs, session:getSession(), scannedAt:new Date().toISOString()
     };
@@ -708,7 +708,7 @@
       <div class="current-price">Price: <span>${fmt(s.currentPrice,s.symbol)}</span></div>
       <div class="levels-grid">
         <div class="level-box"><div class="level-label entry">Entry</div><div class="level-price entry">${fmt(s.entry,s.symbol)}</div></div>
-        <div class="level-box sl"><div class="level-label sl">Stop Loss</div><div class="level-price sl">${fmt(s.stopLoss,s.symbol)}</div></div>
+        <div class="level-box sl"><div class="level-label sl">Stop Loss</div><div class="level-price sl">${fmt(s.sl,s.symbol)}</div></div>
         <div class="level-box tp1"><div class="level-label tp1">TP1 · ${fmtRR(s.rrRatio)}</div><div class="level-price tp1">${fmt(s.tp1,s.symbol)}</div></div>
       </div>
       <div class="levels-grid-ext">
@@ -976,7 +976,7 @@
         </div>
         <div class="journal-levels">
           <div class="level-box"><div class="level-label entry">Entry</div><div class="level-price entry">${fmtP(e.entry)}</div></div>
-          <div class="level-box sl"><div class="level-label sl">Stop Loss</div><div class="level-price sl">${fmtP(e.stopLoss)}</div></div>
+          <div class="level-box sl"><div class="level-label sl">Stop Loss</div><div class="level-price sl">${fmtP(e.sl || e.stopLoss)}</div></div>
           <div class="level-box tp1"><div class="level-label tp1">TP1 · ${(parseFloat(e.rr1) || 0).toFixed(1)}:1</div><div class="level-price tp1">${fmtP(e.tp1)}</div></div>
         </div>
         <div class="journal-outcome-row">
@@ -1050,7 +1050,7 @@
     if (!setup) { btn.textContent = 'Not found'; console.error('[SendToBot] setup not found at idx', idx); return; }
     try {
       console.log('[SendToBot] posting setup:', JSON.stringify(setup));
-    console.log('[SendToBot] sl field check — sl:', setup.sl, 'stopLoss:', setup.stopLoss, 'stop_loss:', setup.stop_loss);
+    console.log('[SendToBot] sl field check — sl:', setup.sl);
       const res = await fetch('/api/approvals/manual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1087,7 +1087,7 @@
           pattern: setup.pattern,
           timeframe: setup.timeframe,
           entry: setup.entry,
-          stopLoss: setup.stopLoss,
+          stopLoss: setup.sl || setup.stopLoss,
           tp1: setup.tp1,
           tp2: setup.tp2,
           tp3: setup.tp3,
