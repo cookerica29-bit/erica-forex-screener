@@ -200,8 +200,8 @@ app.post('/api/approvals/:id/execute', async (req, res) => {
   const setup = pendingApprovals.find(p => p.id === req.params.id);
   if (!setup) return res.status(404).json({ error: 'Setup not found' });
 
-  const botUrl = process.env.BOT_URL || 'http://localhost:8000';
-  const webhookSecret = process.env.WEBHOOK_SECRET || 'change-me';
+  const botUrl = process.env.BOT_URL || 'https://erica-forex-bot-production.up.railway.app';
+  const webhookSecret = process.env.WEBHOOK_SECRET || 'erica-bot-2026';
 
   try {
     const payload = {
