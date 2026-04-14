@@ -135,6 +135,22 @@ function detectMomentum(c: Candle, p: Candle, dir: string, atr: number, structur
   return null;
 }
 
+function getPDHL(candles: Candle[]): { pdh: number; pdl: number } | null {
+  const byDate = new Map<string, Candle[]>();
+  for (const c of candles) {
+    const date = c.t.slice(0, 10); // 'YYYY-MM-DD'
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date)!.push(c);
+  }
+  const dates = [...byDate.keys()].sort();
+  if (dates.length < 2) return null;
+  const prev = byDate.get(dates[dates.length - 2])!;
+  return {
+    pdh: Math.max(...prev.map(c => c.h)),
+    pdl: Math.min(...prev.map(c => c.l)),
+  };
+}
+
 function getSession(): string {
   const h = new Date().getUTCHours();
   if (h>=22||h<8)  return 'Asia';
@@ -154,6 +170,7 @@ function analyzeCandles(
   const recent = candles.slice(-80);
   const atr = calcATR(recent);
   detail.atr = atr;
+  const pdhl = getPDHL(candles);
 
   // ATR minimum — reject dead/illiquid markets
   const ATR_MIN: Record<string,number> = {
@@ -199,6 +216,12 @@ function analyzeCandles(
     structureLevel = highs[highs.length-1].price;
   }
   detail.structureLevel = structureLevel;
+
+  // Liquidity sweep: wick through structure in last 5 candles, then closed back inside
+  const sweepWindow = recent.slice(-6, -1);
+  const liquiditySweep = trend === 'LONG'
+    ? sweepWindow.some(c => c.l < structureLevel && c.c > structureLevel)
+    : sweepWindow.some(c => c.h > structureLevel && c.c < structureLevel);
 
   // Look back up to 3 candles for a valid momentum signal
   let momentum = null;
@@ -247,10 +270,28 @@ function analyzeCandles(
     tp1 = trend==='LONG' ? price+2*risk : price-2*risk;
   }
 
+  // PDH/PDL: check confluence with structure level, adjust TP1 if PDH/PDL is an obstacle
+  let pdhlConfluence = false;
+  if (pdhl) {
+    if (trend === 'LONG') {
+      if (Math.abs(structureLevel - pdhl.pdl) <= 0.5 * atr) pdhlConfluence = true;
+      if (pdhl.pdh > price && pdhl.pdh < tp1) tp1 = pdhl.pdh - 0.1 * atr;
+    } else {
+      if (Math.abs(structureLevel - pdhl.pdh) <= 0.5 * atr) pdhlConfluence = true;
+      if (pdhl.pdl < price && pdhl.pdl > tp1) tp1 = pdhl.pdl + 0.1 * atr;
+    }
+  }
+
   const tp2 = trend==='LONG' ? price+3*risk : price-3*risk;
   const tp3 = trend==='LONG' ? price+4*risk : price-4*risk;
   const rrRatio = Math.abs(tp1-price)/risk;
   if (rrRatio < minRR) return { setup: null, reason: `RR too low (${rrRatio.toFixed(2)} < ${minRR})`, detail };
+
+  // TP path obstruction: count swing levels between entry and TP1
+  const tpPathSwings = trend === 'LONG'
+    ? highs.filter(s => s.price > price && s.price < tp1)
+    : lows.filter(s => s.price < price && s.price > tp1);
+  const clutteredPath = tpPathSwings.length >= 2;
 
   // Volume confirmation — compare momentum candle volume to recent average
   const avgVol = recent.slice(-20).reduce((s,c)=>s+c.v, 0) / 20;
@@ -272,6 +313,12 @@ function analyzeCandles(
   // Session quality bonus/penalty
   if (session === 'London' || session === 'New York') score += 10;
   if (session === 'Asia') score -= 15;
+  // Liquidity sweep bonus
+  if (liquiditySweep) score += 20;
+  // PDH/PDL confluence bonus
+  if (pdhlConfluence) score += 15;
+  // TP path obstruction penalty
+  if (clutteredPath) score -= 15;
 
   const confluence: string[] = [];
   if (momentum.type==='ENGULFING')    confluence.push('Engulfing candle');
@@ -282,6 +329,9 @@ function analyzeCandles(
   if (atr>0)      confluence.push('ATR structure');
   if (volRatio >= 1.2) confluence.push('Volume surge');
   if (session === 'London' || session === 'New York') confluence.push(`${session} session`);
+  if (liquiditySweep) confluence.push('Liquidity sweep');
+  if (pdhlConfluence) confluence.push('PDH/PDL confluence');
+  if (clutteredPath)  confluence.push('Cluttered TP path');
 
   const quality: 'PREMIUM'|'STRONG'|'DEVELOPING' =
     score>=95 ? 'PREMIUM' : score>=75 ? 'STRONG' : 'DEVELOPING';
