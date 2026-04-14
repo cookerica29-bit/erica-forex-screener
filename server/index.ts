@@ -67,7 +67,10 @@ function queueSetups(setups: Setup[]) {
             text: text,
             parse_mode: 'Markdown',
           }),
-        }).catch((e: any) => console.error('Telegram notify failed:', e.message));
+        }).then(r => r.json()).then((data: any) => {
+          if (!data.ok) console.error('[Telegram] API error:', JSON.stringify(data));
+          else console.log(`[Telegram] Alert sent for ${setup.pair} ${setup.quality}`);
+        }).catch((e: any) => console.error('[Telegram] fetch failed:', e.message));
       }
     }
   }
@@ -223,6 +226,20 @@ app.post('/api/approvals/:id/execute', async (req, res) => {
   } catch(e: any) {
     return res.status(500).json({ error: e.message });
   }
+});
+
+// ─── TEST ENDPOINTS ───────────────────────────────────────────────────────────
+app.get('/api/test-telegram', async (_req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return res.json({ error: 'Telegram not configured' });
+  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text: '🔔 Telegram test from scanner', parse_mode: 'Markdown' }),
+  });
+  const data = await r.json();
+  return res.json(data);
 });
 
 // ─── STATIC ───────────────────────────────────────────────────────────────────
