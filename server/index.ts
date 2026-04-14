@@ -52,8 +52,8 @@ function queueSetups(setups: Setup[]) {
         }).then(() => console.log(`[Slack] Notification sent for ${setup.pair}`))
           .catch((e: any) => console.error('Slack DM failed:', e.message));
       }
-      const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
-      const telegramChatId = process.env.TELEGRAM_CHAT_ID;
+      const telegramToken = process.env.TELEGRAM_BOT_TOKEN || '8666767904:AAFamLcmXF6_0Ap0-N7ylgX0gptmzZtGaWs';
+      const telegramChatId = process.env.TELEGRAM_CHAT_ID || '7394371711';
       if (telegramToken && telegramChatId) {
         const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
         const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
@@ -230,8 +230,8 @@ app.post('/api/approvals/:id/execute', async (req, res) => {
 
 // ─── TEST ENDPOINTS ───────────────────────────────────────────────────────────
 app.get('/api/test-telegram', async (_req, res) => {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const token = process.env.TELEGRAM_BOT_TOKEN || '8666767904:AAFamLcmXF6_0Ap0-N7ylgX0gptmzZtGaWs';
+  const chatId = process.env.TELEGRAM_CHAT_ID || '7394371711';
   if (!token || !chatId) return res.json({ error: 'Telegram not configured' });
   const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
