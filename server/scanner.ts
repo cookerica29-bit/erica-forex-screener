@@ -73,7 +73,7 @@ function calcATR(candles: Candle[], period=14): number {
   return trs.reduce((a,b)=>a+b,0) / trs.length;
 }
 
-function findSwings(candles: Candle[], margin=3): Swing[] {
+function findSwings(candles: Candle[], margin=5): Swing[] {
   const swings: Swing[] = [];
   for (let i=margin; i<candles.length-margin; i++) {
     const c = candles[i];
@@ -100,10 +100,12 @@ function getTrend(swings: Swing[]): 'LONG'|'SHORT'|null {
   return null;
 }
 
-function detectMomentum(c: Candle, p: Candle, dir: string): {type:string;strength:number}|null {
+function detectMomentum(c: Candle, p: Candle, dir: string, atr: number): {type:string;strength:number}|null {
   const body=Math.abs(c.c-c.o), range=c.h-c.l, bodyRatio=range>0?body/range:0;
   const uw=c.h-Math.max(c.c,c.o), lw=Math.min(c.c,c.o)-c.l;
   const pBody=Math.abs(p.c-p.o), pHigh=Math.max(p.c,p.o), pLow=Math.min(p.c,p.o);
+  // Candle too small to be meaningful — filter out noise
+  if (body < 0.3 * atr) return null;
   if (dir==='LONG'&&c.c>c.o&&Math.min(c.o,c.c)<=pLow&&Math.max(c.o,c.c)>=pHigh&&body>pBody*0.9)
     return {type:'ENGULFING',strength:80};
   if (dir==='SHORT'&&c.c<c.o&&Math.max(c.o,c.c)>=pHigh&&Math.min(c.o,c.c)<=pLow&&body>pBody*0.9)
@@ -112,10 +114,10 @@ function detectMomentum(c: Candle, p: Candle, dir: string): {type:string;strengt
     return {type:'PIN_BAR',strength:70};
   if (dir==='SHORT'&&uw>body*2&&uw>lw*1.5&&bodyRatio<0.4)
     return {type:'PIN_BAR',strength:70};
-  if (dir==='LONG'&&c.c>c.o&&bodyRatio>0.65&&c.c>p.c)
-    return {type:'STRONG_CLOSE',strength:50};
-  if (dir==='SHORT'&&c.c<c.o&&bodyRatio>0.65&&c.c<p.c)
-    return {type:'STRONG_CLOSE',strength:50};
+  if (dir==='LONG'&&c.c>c.o&&bodyRatio>0.65&&c.c>p.h)
+    return {type:'STRONG_CLOSE',strength:65};
+  if (dir==='SHORT'&&c.c<c.o&&bodyRatio>0.65&&c.c<p.l)
+    return {type:'STRONG_CLOSE',strength:65};
   return null;
 }
 
@@ -153,9 +155,15 @@ function analyzeCandles(
   const price = last.c;
   detail.price = price;
 
-  const momentum = detectMomentum(last, prev, trend);
+  // Look back up to 3 candles for a valid momentum signal
+  let momentum = null;
+  let momentumCandle = last;
+  for (let i = recent.length - 1; i >= recent.length - 3; i--) {
+    const m = detectMomentum(recent[i], recent[i-1], trend, atr);
+    if (m) { momentum = m; momentumCandle = recent[i]; break; }
+  }
   detail.momentum = momentum?.type ?? null;
-  if (!momentum) return { setup: null, reason: 'No momentum candle (need engulfing, pin bar, or strong close on last candle)', detail };
+  if (!momentum) return { setup: null, reason: 'No momentum candle (need engulfing, pin bar, or strong close in last 3 candles)', detail };
 
   const lows  = swings.filter(s=>s.type==='low');
   const highs = swings.filter(s=>s.type==='high');
@@ -181,7 +189,9 @@ function analyzeCandles(
     if (last.c > (last.o + last.h + last.l)/3) return { setup: null, reason: 'Candle closing bullishly (above avg price) — no bearish conviction', detail };
   }
 
-  const sl   = trend==='LONG' ? structureLevel - 0.5*atr : structureLevel + 0.5*atr;
+  const sl   = trend==='LONG'
+    ? Math.min(momentumCandle.l, structureLevel) - 0.3*atr
+    : Math.max(momentumCandle.h, structureLevel) + 0.3*atr;
   if (trend === 'LONG' && sl >= price) return { setup: null, reason: 'Inverted SL: sl >= entry for LONG', detail };
   if (trend === 'SHORT' && sl <= price) return { setup: null, reason: 'Inverted SL: sl <= entry for SHORT', detail };
   const risk = Math.abs(price - sl);
@@ -215,6 +225,8 @@ function analyzeCandles(
   if (htfTrend===trend)  confluence.push('HTF aligned');
   if (rrRatio>=3) confluence.push('R:R ≥3');
   if (atr>0)      confluence.push('ATR structure');
+  const session = getSession();
+  if (session === 'London' || session === 'New York') confluence.push(`${session} session`);
 
   let score = momentum.strength;
   // HTF conflict is a hard block — no counter-trend trades
@@ -223,6 +235,10 @@ function analyzeCandles(
   if (htfTrend === trend) score += 15;
   if (rrRatio>=3) score += 10;
   if (rrRatio>=2) score += 5;
+  // Session quality bonus/penalty
+  const session = getSession();
+  if (session === 'London' || session === 'New York') score += 10;
+  if (session === 'Asia') score -= 15;
 
   const quality: 'PREMIUM'|'STRONG'|'DEVELOPING' =
     score>=95 ? 'PREMIUM' : score>=75 ? 'STRONG' : 'DEVELOPING';
@@ -241,7 +257,7 @@ function analyzeCandles(
     confluence,
     scannedAt: new Date().toISOString(),
     timeframe: granularity,
-    session: getSession(),
+    session,
   };
 
   return { setup, reason: 'OK', detail };
