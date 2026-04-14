@@ -984,7 +984,18 @@
           <button class="outcome-btn loss ${outcome === 'loss' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'LOSS')">LOSS</button>
           <button class="outcome-btn be ${outcome === 'breakeven' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'BREAKEVEN')">BE</button>
           <button class="outcome-btn pending ${outcome === 'pending' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'PENDING')">PENDING</button>
+          <button class="journal-edit-btn" onclick="toggleJournalEdit(${e.id})">✏️ Edit</button>
           <button class="journal-edit-btn" onclick="deleteJournalCard(${e.id})">🗑 Delete</button>
+        </div>
+        <div class="journal-edit-panel" id="jedit-${e.id}" style="display:none;">
+          <div class="pnl-row">
+            <span class="outcome-label">P&amp;L $</span>
+            <input type="number" class="pnl-input" id="jpnl-${e.id}" placeholder="e.g. 124.50" step="0.01" value="${e.pnl || ''}" onchange="saveJournalPnl(${e.id})" />
+          </div>
+          <div class="notes-row">
+            <span class="outcome-label">Notes</span>
+            <textarea class="notes-input" id="jnotes-${e.id}" placeholder="Add notes..." onchange="saveJournalNotes(${e.id})">${e.notes || ''}</textarea>
+          </div>
         </div>
         ${notesHtml}
         <div class="journal-date">Pushed: ${date} · ${e.session || ''}</div>
@@ -1004,6 +1015,31 @@
   async function deleteJournalCard(id) {
     if (!confirm('Delete this journal entry?')) return;
     await fetch('/api/journal/' + id, { method: 'DELETE' });
+    await loadJournal();
+  }
+
+  function toggleJournalEdit(id) {
+    const panel = document.getElementById('jedit-' + id);
+    if (panel) panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  }
+
+  async function saveJournalPnl(id) {
+    const val = document.getElementById('jpnl-' + id)?.value;
+    await fetch('/api/journal/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pnl: parseFloat(val) }),
+    });
+    await loadJournal();
+  }
+
+  async function saveJournalNotes(id) {
+    const val = document.getElementById('jnotes-' + id)?.value;
+    await fetch('/api/journal/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: val }),
+    });
     await loadJournal();
   }
 
