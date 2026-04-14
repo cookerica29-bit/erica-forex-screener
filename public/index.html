@@ -1050,6 +1050,7 @@
     if (!setup) { btn.textContent = 'Not found'; console.error('[SendToBot] setup not found at idx', idx); return; }
     try {
       console.log('[SendToBot] posting setup:', JSON.stringify(setup));
+    console.log('[SendToBot] sl field check — sl:', setup.sl, 'stopLoss:', setup.stopLoss, 'stop_loss:', setup.stop_loss);
       const res = await fetch('/api/approvals/manual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

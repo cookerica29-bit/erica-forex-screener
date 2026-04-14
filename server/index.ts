@@ -207,11 +207,11 @@ app.post('/api/approvals/:id/execute', async (req, res) => {
     const payload = {
       secret: webhookSecret,
       action: setup.direction === 'LONG' ? 'buy' : 'sell',
-      symbol: setup.pair.replace('_', ''),
+      symbol: (setup.pair || (setup as any).symbol || '').replace('_', ''),
       entry: setup.entry,
-      sl: setup.sl,
-      tp: setup.tp1,
-      comment: `Auto-${setup.quality}-${setup.pattern}`,
+      sl: setup.sl || (setup as any).stopLoss || (setup as any).stop_loss || 0,
+      tp: setup.tp1 || (setup as any).tp || 0,
+      comment: `${setup.quality}-${setup.pattern}`,
     };
 
     const response = await fetch(`${botUrl}/webhook`, {
