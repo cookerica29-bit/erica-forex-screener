@@ -451,7 +451,7 @@
 
   function isJpy(s) { return s.includes('JPY')||s.includes('XAU')||s.includes('XAG'); }
   function fmt(n,s) { if(n==null||isNaN(n)) return '—'; return isJpy(s) ? Number(n).toFixed(3) : Number(n).toFixed(5); }
-  function fmtRR(r) { return Number(r).toFixed(1)+':1'; }
+  function fmtRR(r) { const n = Number(r); return (isNaN(n) ? '0.0' : n.toFixed(1))+':1'; }
   function getSession() { const h=new Date().getUTCHours(); if(h<8) return 'Asian'; if(h<13) return 'London'; if(h<17) return 'NY'; return 'NY/London Close'; }
 
   function calcEMA(vals, period) {
@@ -953,7 +953,7 @@
       const rrClass = parseFloat(e.rr1) >= 3 ? 'rr-great' : parseFloat(e.rr1) >= 2 ? 'rr-good' : 'rr-ok';
       const fmtP = (n) => n ? (isJpy(e.symbol) ? parseFloat(n).toFixed(3) : parseFloat(n).toFixed(5)) : '—';
       const pnlVal = parseFloat(e.pnl);
-      const pnlHtml = e.pnl ? `<span class="journal-pnl ${pnlVal >= 0 ? 'positive' : 'negative'}">${pnlVal >= 0 ? '+' : ''}$${Math.abs(pnlVal).toFixed(2)}</span>` : '';
+      const pnlHtml = e.pnl ? `<span class="journal-pnl ${pnlVal >= 0 ? 'positive' : 'negative'}">${pnlVal >= 0 ? '+' : ''}$${Math.abs(pnlVal || 0).toFixed(2)}</span>` : '';
       const notesHtml = e.notes ? `<div class="journal-notes-text">📝 ${e.notes}</div>` : '';
       const date = new Date(e.pushedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -970,14 +970,14 @@
             <div class="pattern-name">${e.pattern}</div>
           </div>
           <div>
-            <div class="journal-rr ${rrClass}">${parseFloat(e.rr1).toFixed(1)}:1</div>
+            <div class="journal-rr ${rrClass}">${(parseFloat(e.rr1) || 0).toFixed(1)}:1</div>
             ${pnlHtml}
           </div>
         </div>
         <div class="journal-levels">
           <div class="level-box"><div class="level-label entry">Entry</div><div class="level-price entry">${fmtP(e.entry)}</div></div>
           <div class="level-box sl"><div class="level-label sl">Stop Loss</div><div class="level-price sl">${fmtP(e.stopLoss)}</div></div>
-          <div class="level-box tp1"><div class="level-label tp1">TP1 · ${parseFloat(e.rr1).toFixed(1)}:1</div><div class="level-price tp1">${fmtP(e.tp1)}</div></div>
+          <div class="level-box tp1"><div class="level-label tp1">TP1 · ${(parseFloat(e.rr1) || 0).toFixed(1)}:1</div><div class="level-price tp1">${fmtP(e.tp1)}</div></div>
         </div>
         <div class="journal-outcome-row">
           <span class="outcome-label">Outcome:</span>
@@ -1339,7 +1339,7 @@
           <span style="font-weight:700;font-size:13px;min-width:72px;">${s.pair.replace('_','/')}</span>
           <span style="color:${dc};font-size:10px;font-weight:700;min-width:40px;">${s.direction}</span>
           <span style="font-size:9px;padding:2px 7px;border-radius:99px;border:1px solid ${qc};color:${qc};background:transparent;">${s.quality}</span>
-          <span style="font-size:10px;color:var(--slate-dim);">R:R ${s.rrRatio} · E:${s.entry} · SL:${s.sl.toFixed(5)} · TP:${s.tp1.toFixed(5)}</span>
+          <span style="font-size:10px;color:var(--slate-dim);">R:R ${s.rrRatio} · E:${s.entry} · SL:${(s.sl ?? 0).toFixed(5)} · TP:${(s.tp1 ?? 0).toFixed(5)}</span>
           <span style="margin-left:auto;display:flex;gap:6px;">
             <button onclick="dismissSetup('${s.id}')" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--slate-dim);font-size:10px;font-family:inherit;cursor:pointer;">Dismiss</button>
             <button onclick="executeSetup('${s.id}')" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(0,255,136,0.4);background:rgba(0,255,136,0.1);color:var(--green);font-size:10px;font-family:inherit;cursor:pointer;font-weight:700;">Execute</button>
