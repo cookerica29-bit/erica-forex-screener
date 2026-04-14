@@ -41,6 +41,8 @@ export interface DebugResult {
     momentum?: string | null;
     distToLevel?: number;
     atr?: number;
+    baselineATR?: number;
+    recentATR?: number;
     price?: number;
     structureLevel?: number;
   };
@@ -161,6 +163,15 @@ function analyzeCandles(
   };
   const atrMin = ATR_MIN[pair] ?? 0.0003;
   if (atr < atrMin) return { setup: null, reason: `ATR too low (${atr.toFixed(5)} < min ${atrMin}) — market inactive`, detail };
+
+  // Post-news chop filter
+  const baselineATR = calcATR(recent.slice(-60, -20));
+  const recentATR   = calcATR(recent.slice(-10));
+  detail.baselineATR = baselineATR;
+  detail.recentATR   = recentATR;
+  const spikeInWindow = recent.slice(-20).some(c => (c.h - c.l) > 3 * baselineATR);
+  if (spikeInWindow) return { setup: null, reason: 'Post-news spike in last 20 candles — chop window', detail };
+  if (recentATR > 1.8 * baselineATR) return { setup: null, reason: `Elevated volatility regime — recent ATR ${recentATR.toFixed(5)} > 1.8× baseline ${baselineATR.toFixed(5)}`, detail };
 
   const swings = findSwings(recent);
   const trend = getTrend(swings);
