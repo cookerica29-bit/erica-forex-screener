@@ -228,6 +228,21 @@ app.post('/api/approvals/:id/execute', async (req, res) => {
   }
 });
 
+app.post('/api/approvals/manual', (req, res) => {
+  const setup = req.body;
+  if (!setup || !setup.pair || !setup.direction) {
+    return res.status(400).json({ error: 'Invalid setup data' });
+  }
+  const exists = pendingApprovals.some(
+    p => p.pair === setup.pair && p.timeframe === setup.timeframe &&
+    Math.abs(p.entry - setup.entry) < (setup.pair.includes('JPY') ? 0.1 : 0.001)
+  );
+  if (!exists) {
+    pendingApprovals.push({ ...setup, id: `${setup.pair}-manual-${Date.now()}` });
+  }
+  return res.json({ success: true, queued: !exists });
+});
+
 // ─── TEST ENDPOINTS ───────────────────────────────────────────────────────────
 app.get('/api/test-telegram', async (_req, res) => {
   const token = process.env.TELEGRAM_BOT_TOKEN || '8666767904:AAFamLcmXF6_0Ap0-N7ylgX0gptmzZtGaWs';
