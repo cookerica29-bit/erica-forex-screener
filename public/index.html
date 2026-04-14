@@ -1046,14 +1046,18 @@
 
   async function sendToBot(btn, idx) {
     const setup = allSetups[idx];
-    if (!setup) { btn.textContent = 'Not found'; return; }
+    console.log('[SendToBot] idx:', idx, 'setup:', setup);
+    if (!setup) { btn.textContent = 'Not found'; console.error('[SendToBot] setup not found at idx', idx); return; }
     try {
+      console.log('[SendToBot] posting setup:', JSON.stringify(setup));
       const res = await fetch('/api/approvals/manual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(setup),
       });
+      console.log('[SendToBot] response status:', res.status);
       const data = await res.json();
+      console.log('[SendToBot] response data:', data);
       if (data.success) {
         btn.textContent = data.queued ? '✓ Queued' : '✓ Already queued';
         btn.style.color = 'var(--green)';
@@ -1063,7 +1067,7 @@
       }
     } catch(e) {
       btn.textContent = 'Error';
-      console.error('sendToBot error:', e);
+      console.error('[SendToBot] catch error:', e);
     }
   }
 
