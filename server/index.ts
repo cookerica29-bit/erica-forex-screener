@@ -230,9 +230,12 @@ app.post('/api/approvals/:id/execute', async (req, res) => {
 
 app.post('/api/approvals/manual', (req, res) => {
   const setup = req.body;
-  if (!setup || !setup.pair || !setup.direction) {
+  if (!setup || (!setup.pair && !setup.symbol) || !setup.direction) {
     return res.status(400).json({ error: 'Invalid setup data' });
   }
+  // Normalize - ensure pair field exists
+  if (!setup.pair && setup.symbol) setup.pair = setup.symbol;
+
   const exists = pendingApprovals.some(
     p => p.pair === setup.pair && p.timeframe === setup.timeframe &&
     Math.abs(p.entry - setup.entry) < (setup.pair.includes('JPY') ? 0.1 : 0.001)
