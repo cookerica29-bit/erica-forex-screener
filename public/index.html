@@ -681,10 +681,10 @@
     if(!all.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">📡</div><div>Hit Scan to fetch live OANDA data</div></div>';document.getElementById('resultCount').textContent='';return;}
     document.getElementById('resultCount').innerHTML=`Showing <span>${filtered.length}</span> setup${filtered.length!==1?'s':''} · min ${minRR}:1 RR`;
     if(!filtered.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No setups match your filters</div></div>';return;}
-    main.innerHTML='<div class="setup-grid">'+filtered.map(renderCard).join('')+'</div>';
+    main.innerHTML='<div class="setup-grid">'+filtered.map(s => renderCard(s, allSetups.indexOf(s))).join('')+'</div>';
   }
 
-  function renderCard(s) {
+  function renderCard(s, idx) {
     const isL=s.direction==='LONG', qc=s.quality.toLowerCase();
     const rrc=s.rrRatio>=3?'rr-great':s.rrRatio>=2?'rr-good':'rr-ok';
     const cf=s.confluences.length?`<div class="conf-section"><div class="conf-title">Confluences</div><div class="conf-tags">${s.confluences.map(c=>`<span class="conf-tag">${c}</span>`).join('')}</div></div>`:'';
@@ -719,7 +719,7 @@
       <div class="scanned-at">Scanned: ${new Date(s.scannedAt).toLocaleTimeString()} · Live data via Oanda v20 API</div>
       <div class="card-actions">
         <button class="push-btn" onclick="pushToJournal('${s.id}')" id="push-${s.id}">📓 Push to Journal</button>
-        <button class="push-btn" onclick="sendToBot(this,'${s.id}')" style="border-color:rgba(96,165,250,0.4);background:rgba(96,165,250,0.08);color:var(--blue);">🤖 Send to Bot</button>
+        <button class="push-btn" onclick="sendToBot(this,${idx})" style="border-color:rgba(96,165,250,0.4);background:rgba(96,165,250,0.08);color:var(--blue);">🤖 Send to Bot</button>
       </div>
       <div class="journal-panel" id="journal-${s.id}" style="display:none;">
         <div class="outcome-row">
@@ -1044,9 +1044,9 @@
     await loadJournal();
   }
 
-  async function sendToBot(btn, setupId) {
-    const setup = allSetups.find(s => s.id === setupId);
-    if (!setup) return;
+  async function sendToBot(btn, idx) {
+    const setup = allSetups[idx];
+    if (!setup) { btn.textContent = 'Not found'; return; }
     try {
       const res = await fetch('/api/approvals/manual', {
         method: 'POST',
@@ -1058,9 +1058,12 @@
         btn.textContent = data.queued ? '✓ Queued' : '✓ Already queued';
         btn.style.color = 'var(--green)';
         btn.style.borderColor = 'rgba(0,255,136,0.4)';
+      } else {
+        btn.textContent = 'Failed';
       }
     } catch(e) {
-      btn.textContent = 'Failed';
+      btn.textContent = 'Error';
+      console.error('sendToBot error:', e);
     }
   }
 
