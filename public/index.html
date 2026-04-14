@@ -1372,6 +1372,15 @@
   function renderChallenge(c) {
     const el = document.getElementById('bot-challenge');
     if (!el || !c) return;
+    // Guard all numeric fields
+    c.current_profit = c.current_profit ?? 0;
+    c.profit_needed = c.profit_needed ?? 0;
+    c.progress_pct = c.progress_pct ?? 0;
+    c.drawdown_remaining = c.drawdown_remaining ?? 1000;
+    c.drawdown_from_peak = c.drawdown_from_peak ?? 0;
+    c.drawdown_used_pct = c.drawdown_used_pct ?? 0;
+    c.peak_balance = c.peak_balance ?? 0;
+    c.target_balance = c.target_balance ?? 0;
     const progressColor = c.danger ? 'var(--red)' : c.warning ? 'var(--gold)' : 'var(--green)';
     const drawdownColor = c.danger ? 'var(--red)' : c.warning ? 'var(--gold)' : 'var(--green)';
     el.innerHTML = `
@@ -1379,26 +1388,26 @@
         <div>
           <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Profit progress</div>
           <div style="font-size:18px;font-weight:700;color:${c.current_profit>=0?'var(--green)':'var(--red)'};">${c.current_profit>=0?'+':''}$${Math.abs(c.current_profit).toFixed(2)}</div>
-          <div style="font-size:10px;color:var(--slate-dim);">Target: +$${c.profit_needed.toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--slate-dim);">Target: +$${(c.profit_needed ?? 0).toFixed(2)}</div>
           <div style="margin-top:8px;height:6px;background:var(--border);border-radius:99px;overflow:hidden;">
             <div style="height:100%;width:${c.progress_pct}%;background:${progressColor};border-radius:99px;"></div>
           </div>
-          <div style="font-size:10px;color:var(--slate-dim);margin-top:3px;">${c.progress_pct.toFixed(1)}% complete</div>
+          <div style="font-size:10px;color:var(--slate-dim);margin-top:3px;">${(c.progress_pct ?? 0).toFixed(1)}% complete</div>
         </div>
         <div>
           <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Drawdown cushion</div>
-          <div style="font-size:18px;font-weight:700;color:${drawdownColor};">$${c.drawdown_remaining.toFixed(2)}</div>
-          <div style="font-size:10px;color:var(--slate-dim);">Used: $${c.drawdown_from_peak.toFixed(2)} of $1,000</div>
+          <div style="font-size:18px;font-weight:700;color:${drawdownColor};">$${(c.drawdown_remaining ?? 0).toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--slate-dim);">Used: $${(c.drawdown_from_peak ?? 0).toFixed(2)} of $1,000</div>
           <div style="margin-top:8px;height:6px;background:var(--border);border-radius:99px;overflow:hidden;">
             <div style="height:100%;width:${c.drawdown_used_pct}%;background:${drawdownColor};border-radius:99px;"></div>
           </div>
-          <div style="font-size:10px;color:var(--slate-dim);margin-top:3px;">${c.drawdown_used_pct.toFixed(1)}% used</div>
+          <div style="font-size:10px;color:var(--slate-dim);margin-top:3px;">${(c.drawdown_used_pct ?? 0).toFixed(1)}% used</div>
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <div style="font-size:10px;padding:3px 10px;border-radius:99px;border:1px solid;color:${c.safe?'var(--green)':'var(--red)'};border-color:${c.safe?'rgba(0,255,136,0.4)':'rgba(255,59,92,0.4)'};background:${c.safe?'rgba(0,255,136,0.07)':'rgba(255,59,92,0.07)'};">${c.safe?'● Trading allowed':'● Circuit breaker ON'}</div>
-        <div style="font-size:10px;color:var(--slate-dim);">Peak: $${c.peak_balance.toFixed(2)}</div>
-        <div style="font-size:10px;color:var(--slate-dim);">Target: $${c.target_balance.toFixed(2)}</div>
+        <div style="font-size:10px;color:var(--slate-dim);">Peak: $${(c.peak_balance ?? 0).toFixed(2)}</div>
+        <div style="font-size:10px;color:var(--slate-dim);">Target: $${(c.target_balance ?? 0).toFixed(2)}</div>
       </div>`;
   }
 
