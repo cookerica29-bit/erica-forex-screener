@@ -90,17 +90,22 @@ function findSwings(candles: Candle[], margin=5): Swing[] {
 function getTrend(swings: Swing[]): 'LONG'|'SHORT'|null {
   const highs = swings.filter(s=>s.type==='high');
   const lows  = swings.filter(s=>s.type==='low');
-  if (highs.length<2 || lows.length<2) return null;
-  const hh = highs[highs.length-1].price > highs[highs.length-2].price;
-  const hl = lows[lows.length-1].price  > lows[lows.length-2].price;
-  const lh = highs[highs.length-1].price < highs[highs.length-2].price;
-  const ll = lows[lows.length-1].price  < lows[lows.length-2].price;
-  if (hh && hl) return 'LONG';
-  if (lh && ll) return 'SHORT';
+  if (highs.length<3 || lows.length<3) return null;
+  // Require 2 consecutive confirmations for trend
+  const hh  = highs[highs.length-1].price > highs[highs.length-2].price;
+  const hh2 = highs[highs.length-2].price > highs[highs.length-3].price;
+  const hl  = lows[lows.length-1].price   > lows[lows.length-2].price;
+  const hl2 = lows[lows.length-2].price   > lows[lows.length-3].price;
+  const lh  = highs[highs.length-1].price < highs[highs.length-2].price;
+  const lh2 = highs[highs.length-2].price < highs[highs.length-3].price;
+  const ll  = lows[lows.length-1].price   < lows[lows.length-2].price;
+  const ll2 = lows[lows.length-2].price   < lows[lows.length-3].price;
+  if ((hh || hh2) && (hl || hl2) && (hh || hl)) return 'LONG';
+  if ((lh || lh2) && (ll || ll2) && (lh || ll)) return 'SHORT';
   return null;
 }
 
-function detectMomentum(c: Candle, p: Candle, dir: string, atr: number): {type:string;strength:number}|null {
+function detectMomentum(c: Candle, p: Candle, dir: string, atr: number, structureLevel: number): {type:string;strength:number}|null {
   const body=Math.abs(c.c-c.o), range=c.h-c.l, bodyRatio=range>0?body/range:0;
   const uw=c.h-Math.max(c.c,c.o), lw=Math.min(c.c,c.o)-c.l;
   const pBody=Math.abs(p.c-p.o), pHigh=Math.max(p.c,p.o), pLow=Math.min(p.c,p.o);
@@ -110,10 +115,17 @@ function detectMomentum(c: Candle, p: Candle, dir: string, atr: number): {type:s
     return {type:'ENGULFING',strength:80};
   if (dir==='SHORT'&&c.c<c.o&&Math.max(c.o,c.c)>=pHigh&&Math.min(c.o,c.c)<=pLow&&body>pBody*0.9)
     return {type:'ENGULFING',strength:80};
-  if (dir==='LONG'&&lw>body*2&&lw>uw*1.5&&bodyRatio<0.4)
-    return {type:'PIN_BAR',strength:70};
-  if (dir==='SHORT'&&uw>body*2&&uw>lw*1.5&&bodyRatio<0.4)
-    return {type:'PIN_BAR',strength:70};
+  // Pin bar must form near structure level (wick within 0.5×ATR of level)
+  if (dir==='LONG'&&lw>body*2&&lw>uw*1.5&&bodyRatio<0.4) {
+    const wickTip = Math.min(c.o, c.c) - lw; // = c.l
+    if (Math.abs(wickTip - structureLevel) <= 0.5 * atr)
+      return {type:'PIN_BAR',strength:70};
+  }
+  if (dir==='SHORT'&&uw>body*2&&uw>lw*1.5&&bodyRatio<0.4) {
+    const wickTip = Math.max(c.o, c.c) + uw; // = c.h
+    if (Math.abs(wickTip - structureLevel) <= 0.5 * atr)
+      return {type:'PIN_BAR',strength:70};
+  }
   if (dir==='LONG'&&c.c>c.o&&bodyRatio>0.65&&c.c>p.h)
     return {type:'STRONG_CLOSE',strength:65};
   if (dir==='SHORT'&&c.c<c.o&&bodyRatio>0.65&&c.c<p.l)
@@ -141,47 +153,59 @@ function analyzeCandles(
   const atr = calcATR(recent);
   detail.atr = atr;
 
+  // ATR minimum — reject dead/illiquid markets
+  const ATR_MIN: Record<string,number> = {
+    XAU_USD: 0.8, XAG_USD: 0.015, GBP_JPY: 0.05,
+    USD_JPY: 0.03, AUD_JPY: 0.03, GBP_USD: 0.0004,
+    EUR_USD: 0.0003, AUD_USD: 0.0002, NZD_USD: 0.0002,
+  };
+  const atrMin = ATR_MIN[pair] ?? 0.0003;
+  if (atr < atrMin) return { setup: null, reason: `ATR too low (${atr.toFixed(5)} < min ${atrMin}) — market inactive`, detail };
+
   const swings = findSwings(recent);
   const trend = getTrend(swings);
   detail.trend = trend;
   if (!trend) return { setup: null, reason: 'No clear swing structure trend (need HH+HL or LH+LL)', detail };
 
-  const htfSwings = findSwings(htf.slice(-50));
+  const htfSwings = findSwings(htf.slice(-100));
   const htfTrend  = getTrend(htfSwings);
   detail.htfTrend = htfTrend;
 
   const last  = recent[recent.length-1];
-  const prev  = recent[recent.length-2];
   const price = last.c;
   detail.price = price;
+
+  const lows  = swings.filter(s=>s.type==='low');
+  const highs = swings.filter(s=>s.type==='high');
+
+  // Compute structure level early so pin bar check can use it
+  let structureLevel: number;
+  if (trend==='LONG') {
+    if (!lows.length) return { setup: null, reason: 'LONG trend but no swing lows found', detail };
+    structureLevel = lows[lows.length-1].price;
+  } else {
+    if (!highs.length) return { setup: null, reason: 'SHORT trend but no swing highs found', detail };
+    structureLevel = highs[highs.length-1].price;
+  }
+  detail.structureLevel = structureLevel;
 
   // Look back up to 3 candles for a valid momentum signal
   let momentum = null;
   let momentumCandle = last;
   for (let i = recent.length - 1; i >= recent.length - 3; i--) {
-    const m = detectMomentum(recent[i], recent[i-1], trend, atr);
+    const m = detectMomentum(recent[i], recent[i-1], trend, atr, structureLevel);
     if (m) { momentum = m; momentumCandle = recent[i]; break; }
   }
   detail.momentum = momentum?.type ?? null;
   if (!momentum) return { setup: null, reason: 'No momentum candle (need engulfing, pin bar, or strong close in last 3 candles)', detail };
 
-  const lows  = swings.filter(s=>s.type==='low');
-  const highs = swings.filter(s=>s.type==='high');
-
-  let structureLevel: number;
   if (trend==='LONG') {
-    if (!lows.length) return { setup: null, reason: 'LONG trend but no swing lows found', detail };
-    structureLevel = lows[lows.length-1].price;
-    detail.structureLevel = structureLevel;
     const distToLevel = price - structureLevel;
     detail.distToLevel = distToLevel;
     if (distToLevel < 0) return { setup: null, reason: `Price broke below structure level (${price.toFixed(5)} < support ${structureLevel.toFixed(5)}) — structure invalidated`, detail };
     if (distToLevel > 1.5*atr) return { setup: null, reason: `Price too far above structure level (${distToLevel.toFixed(5)} > 1.5×ATR ${(1.5*atr).toFixed(5)}) — mid-move`, detail };
     if (last.c < (last.o + last.h + last.l)/3) return { setup: null, reason: 'Candle closing bearishly (below avg price) — no bullish conviction', detail };
   } else {
-    if (!highs.length) return { setup: null, reason: 'SHORT trend but no swing highs found', detail };
-    structureLevel = highs[highs.length-1].price;
-    detail.structureLevel = structureLevel;
     const distToLevel = structureLevel - price;
     detail.distToLevel = distToLevel;
     if (distToLevel < 0) return { setup: null, reason: `Price broke above structure level (${price.toFixed(5)} > resistance ${structureLevel.toFixed(5)}) — structure invalidated`, detail };
@@ -217,7 +241,27 @@ function analyzeCandles(
   const rrRatio = Math.abs(tp1-price)/risk;
   if (rrRatio < minRR) return { setup: null, reason: `RR too low (${rrRatio.toFixed(2)} < ${minRR})`, detail };
 
-  // Confluence + scoring — HTF conflict is now a penalty, not a blocker
+  // Volume confirmation — compare momentum candle volume to recent average
+  const avgVol = recent.slice(-20).reduce((s,c)=>s+c.v, 0) / 20;
+  const volRatio = avgVol > 0 ? momentumCandle.v / avgVol : 1;
+
+  // HTF conflict is a hard block — no counter-trend trades
+  if (htfTrend && htfTrend !== trend) return { setup: null, reason: 'HTF conflict — counter-trend setup rejected', detail };
+
+  const session = getSession();
+  let score = momentum.strength;
+  // HTF aligned bonus
+  if (htfTrend === trend) score += 15;
+  if (rrRatio>=3) score += 10;
+  if (rrRatio>=2) score += 5;
+  // Volume confirmation bonus/penalty
+  if (volRatio >= 1.5) score += 20;
+  else if (volRatio >= 1.2) score += 15;
+  else if (volRatio < 0.8) score -= 15;
+  // Session quality bonus/penalty
+  if (session === 'London' || session === 'New York') score += 10;
+  if (session === 'Asia') score -= 15;
+
   const confluence: string[] = [];
   if (momentum.type==='ENGULFING')    confluence.push('Engulfing candle');
   if (momentum.type==='PIN_BAR')      confluence.push('Pin bar');
@@ -225,20 +269,8 @@ function analyzeCandles(
   if (htfTrend===trend)  confluence.push('HTF aligned');
   if (rrRatio>=3) confluence.push('R:R ≥3');
   if (atr>0)      confluence.push('ATR structure');
-  const session = getSession();
+  if (volRatio >= 1.2) confluence.push('Volume surge');
   if (session === 'London' || session === 'New York') confluence.push(`${session} session`);
-
-  let score = momentum.strength;
-  // HTF conflict is a hard block — no counter-trend trades
-  if (htfTrend && htfTrend !== trend) return { setup: null, reason: 'HTF conflict — counter-trend setup rejected', detail };
-  // HTF aligned bonus
-  if (htfTrend === trend) score += 15;
-  if (rrRatio>=3) score += 10;
-  if (rrRatio>=2) score += 5;
-  // Session quality bonus/penalty
-  const session = getSession();
-  if (session === 'London' || session === 'New York') score += 10;
-  if (session === 'Asia') score -= 15;
 
   const quality: 'PREMIUM'|'STRONG'|'DEVELOPING' =
     score>=95 ? 'PREMIUM' : score>=75 ? 'STRONG' : 'DEVELOPING';
@@ -270,7 +302,7 @@ export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
     try {
       const [candles, htf] = await Promise.all([
         fetchCandles(pair, granularity, 200),
-        fetchCandles(pair, htfGran, 100),
+        fetchCandles(pair, htfGran, 150),
       ]);
       const { setup } = analyzeCandles(candles, htf, pair, granularity, minRR);
       if (setup) results.push(setup);
@@ -292,7 +324,7 @@ export async function debugScan(granularity='H1', minRR=1.5): Promise<DebugResul
     try {
       const [candles, htf] = await Promise.all([
         fetchCandles(pair, granularity, 200),
-        fetchCandles(pair, htfGran, 100),
+        fetchCandles(pair, htfGran, 150),
       ]);
       const { setup, reason, detail } = analyzeCandles(candles, htf, pair, granularity, minRR, true);
       results.push({
