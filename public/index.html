@@ -749,7 +749,24 @@
       if (!res.ok) return;
       const data = await res.json();
       if (!data.setups || data.setups.length === 0) return;
-      allSetups = data.setups;
+      // Normalize server Setup objects to match client-side shape
+      allSetups = data.setups.map((s, i) => {
+        const sym = s.symbol || s.pair;
+        const entry = s.entry;
+        const sl = s.sl || s.stopLoss;
+        const risk = sl ? Math.abs(entry - sl) : 0;
+        return {
+          ...s,
+          id:            s.id || `${sym}-${s.timeframe}-server-${i}`,
+          symbol:        sym,
+          displaySymbol: s.displaySymbol || (PAIR_LABELS[sym] || sym.replace('_', '/')),
+          currentPrice:  s.currentPrice || entry,
+          sl:            sl,
+          confluences:   s.confluences || s.confluence || [],
+          rr2:           s.rr2 || (risk > 0 ? parseFloat((Math.abs(s.tp2 - entry) / risk).toFixed(1)) : 0),
+          rr3:           s.rr3 || (risk > 0 ? parseFloat((Math.abs(s.tp3 - entry) / risk).toFixed(1)) : 0),
+        };
+      });
       document.getElementById('lastScan').textContent =
         `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
       renderSetups();
