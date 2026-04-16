@@ -156,9 +156,30 @@ app.get('/api/journal', async (_req, res) => {
 
 app.post('/api/journal', async (req, res) => {
   try {
-    await createJournalEntry(req.body);
-    return res.json({ success: true });
+    const b = req.body;
+    // Normalize field names — scanner uses pair/sl/rrRatio; client form uses symbol/stopLoss/rr1
+    const normalized = {
+      symbol:        b.symbol      || b.pair,
+      displaySymbol: b.displaySymbol || (b.pair ? b.pair.replace('_', '/') : undefined),
+      direction:     b.direction,
+      quality:       b.quality,
+      pattern:       b.pattern,
+      timeframe:     b.timeframe,
+      entry:         b.entry,
+      stopLoss:      b.stopLoss    || b.sl,
+      tp1:           b.tp1,
+      tp2:           b.tp2,
+      tp3:           b.tp3,
+      rr1:           b.rr1         || b.rrRatio,
+      rr2:           b.rr2,
+      rr3:           b.rr3,
+      confluences:   b.confluences || b.confluence,
+      session:       b.session,
+    };
+    const id = await createJournalEntry(normalized);
+    return res.json({ success: true, id });
   } catch (err) {
+    console.error('[Journal] POST error:', err);
     return res.status(500).json({ error: 'Failed to create journal entry' });
   }
 });

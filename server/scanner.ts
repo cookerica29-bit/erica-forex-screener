@@ -248,8 +248,8 @@ function analyzeCandles(
   }
 
   const sl   = trend==='LONG'
-    ? Math.min(momentumCandle.l, structureLevel) - 0.3*atr
-    : Math.max(momentumCandle.h, structureLevel) + 0.3*atr;
+    ? Math.min(momentumCandle.l, structureLevel) - 0.5*atr
+    : Math.max(momentumCandle.h, structureLevel) + 0.5*atr;
   if (trend === 'LONG' && sl >= price) return { setup: null, reason: 'Inverted SL: sl >= entry for LONG', detail };
   if (trend === 'SHORT' && sl <= price) return { setup: null, reason: 'Inverted SL: sl <= entry for SHORT', detail };
   const risk = Math.abs(price - sl);

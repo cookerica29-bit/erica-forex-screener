@@ -41,10 +41,10 @@ export async function createJournalEntry(data: {
   rr3?: number;
   confluences?: string[];
   session?: string;
-}) {
+}): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
-  await db.insert(journalEntries).values({
+  const result = await db.insert(journalEntries).values({
     symbol: data.symbol,
     displaySymbol: data.displaySymbol,
     direction: data.direction,
@@ -62,7 +62,8 @@ export async function createJournalEntry(data: {
     confluences: data.confluences ? JSON.stringify(data.confluences) : null,
     session: data.session,
     outcome: 'PENDING',
-  });
+  }).$returningId();
+  return result[0].id;
 }
 
 export async function updateJournalEntry(id: number, data: {
