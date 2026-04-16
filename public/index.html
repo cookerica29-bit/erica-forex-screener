@@ -471,26 +471,46 @@
     return trs.reduce((a,b)=>a+b,0)/trs.length;
   }
 
-  // Stricter momentum detection for pure price action
-  function detectMomentum(c,p,dir) {
+  function calcRSI(candles, period=14) {
+    if (candles.length < period * 2) return 50;
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= period; i++) {
+      const diff = candles[i].c - candles[i-1].c;
+      if (diff >= 0) gains += diff; else losses -= diff;
+    }
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+    for (let i = period + 1; i < candles.length; i++) {
+      const diff = candles[i].c - candles[i-1].c;
+      avgGain = (avgGain * (period-1) + (diff > 0 ? diff : 0)) / period;
+      avgLoss = (avgLoss * (period-1) + (diff < 0 ? -diff : 0)) / period;
+    }
+    if (avgLoss === 0) return 100;
+    return 100 - (100 / (1 + avgGain / avgLoss));
+  }
+
+  function detectMomentum(c, p, dir, atr, emaLevel) {
     const body=Math.abs(c.c-c.o), range=c.h-c.l, bodyRatio=range>0?body/range:0;
     const uw=c.h-Math.max(c.c,c.o), lw=Math.min(c.c,c.o)-c.l;
     const pBody=Math.abs(p.c-p.o), pHigh=Math.max(p.c,p.o), pLow=Math.min(p.c,p.o);
+    if (body < 0.3 * atr) return null;
     // Engulfing: current body fully engulfs previous body
     if(dir==='LONG'&&c.c>c.o&&Math.min(c.o,c.c)<=pLow&&Math.max(c.o,c.c)>=pHigh&&body>pBody*0.9)
       return {type:'ENGULFING',strength:80};
     if(dir==='SHORT'&&c.c<c.o&&Math.max(c.o,c.c)>=pHigh&&Math.min(c.o,c.c)<=pLow&&body>pBody*0.9)
       return {type:'ENGULFING',strength:80};
-    // Pin bar: long wick at least 2x body, small body (<40% range), wick dominant in one direction
-    if(dir==='LONG'&&lw>body*2&&lw>uw*1.5&&bodyRatio<0.4)
-      return {type:'PIN_BAR',strength:70};
-    if(dir==='SHORT'&&uw>body*2&&uw>lw*1.5&&bodyRatio<0.4)
-      return {type:'PIN_BAR',strength:70};
-    // Strong close: large body breaking through prior candle close (weaker signal)
-    if(dir==='LONG'&&c.c>c.o&&bodyRatio>0.65&&c.c>p.c)
-      return {type:'STRONG_CLOSE',strength:50};
-    if(dir==='SHORT'&&c.c<c.o&&bodyRatio>0.65&&c.c<p.c)
-      return {type:'STRONG_CLOSE',strength:50};
+    // Pin bar: long wick, small body, wick must touch within 0.5×ATR of EMA level
+    if(dir==='LONG'&&lw>body*2&&lw>uw*1.5&&bodyRatio<0.4) {
+      if(Math.abs(c.l - emaLevel) <= 0.5 * atr) return {type:'PIN_BAR',strength:70};
+    }
+    if(dir==='SHORT'&&uw>body*2&&uw>lw*1.5&&bodyRatio<0.4) {
+      if(Math.abs(c.h - emaLevel) <= 0.5 * atr) return {type:'PIN_BAR',strength:70};
+    }
+    // Strong close: large body closing past prior high/low
+    if(dir==='LONG'&&c.c>c.o&&bodyRatio>0.65&&c.c>p.h)
+      return {type:'STRONG_CLOSE',strength:65};
+    if(dir==='SHORT'&&c.c<c.o&&bodyRatio>0.65&&c.c<p.l)
+      return {type:'STRONG_CLOSE',strength:65};
     return null;
   }
 
@@ -522,96 +542,198 @@
     return null;
   }
 
-  function analyzeCandles(candles,htfCandles,symbol) {
-    if(candles.length<80) return null;
-    const atr=calcATR(candles);
-    const li=candles.length-1;
-    const last=candles[li], prev=candles[li-1];
-    const cp=last.c;
+  function analyzeCandles(candles, htfCandles, symbol) {
+    if (candles.length < 210) return null;
 
-    // 1. Determine trend from swing structure on recent 80 candles
-    const recentCandles=candles.slice(-80);
-    const swings=findSwings(recentCandles,3);
-    const direction=getTrend(swings);
-    if(!direction) return null;
+    const atr = calcATR(candles.slice(-50));
+    const closes = candles.map(c => c.c);
 
-    // 2. Find structural pullback level: most recent swing low (LONG) or swing high (SHORT)
-    const pullbackSwings=direction==='LONG'
-      ?swings.filter(s=>s.type==='low')
-      :swings.filter(s=>s.type==='high');
-    if(pullbackSwings.length<1) return null;
-    const pullbackLevel=pullbackSwings[pullbackSwings.length-1].price;
+    // EMAs on full candle set
+    const ema20arr  = calcEMA(closes, 20);
+    const ema50arr  = calcEMA(closes, 50);
+    const ema200arr = calcEMA(closes, 200);
 
-    // 3. Price must be AT the structural level — reject mid-move entries
-    // The entry candle's wick must be touching within 1.5 ATR of the level
-    const distToLevel=direction==='LONG'
-      ?Math.abs(last.l-pullbackLevel)
-      :Math.abs(last.h-pullbackLevel);
-    if(distToLevel>atr*1.5) return null;
+    const li     = candles.length - 1;
+    const last   = candles[li];
+    const cp     = last.c;
+    const ema20  = ema20arr[li];
+    const ema50  = ema50arr[li];
+    const ema200 = ema200arr[li];
 
-    // 4. Entry candle must be closing in the trend direction (not stalling mid-wick)
-    const midPoint=(last.h+last.l)/2;
-    if(direction==='LONG'&&last.c<midPoint) return null;
-    if(direction==='SHORT'&&last.c>midPoint) return null;
+    if (!ema20 || !ema50 || !ema200) return null;
 
-    // 5. Require a momentum confirmation candle (engulfing or pin bar)
-    const mom=detectMomentum(last,prev,direction);
-    if(!mom) return null;
+    // 1. Trend: price must be above both EMA50 + EMA200 (LONG) or below both (SHORT)
+    let direction = null;
+    if (cp > ema50 && cp > ema200)      direction = 'LONG';
+    else if (cp < ema50 && cp < ema200) direction = 'SHORT';
+    if (!direction) return null;
 
-    // 6. SL below/above the structural level with ATR buffer
-    const sl=direction==='LONG'
-      ?pullbackLevel-atr*0.5
-      :pullbackLevel+atr*0.5;
-    const risk=Math.abs(cp-sl);
-    if(risk===0||risk<atr*0.3) return null;
-
-    // 7. TP at next opposing swing with minimum 1.5:1 RR
-    const targetSwings=direction==='LONG'
-      ?swings.filter(s=>s.type==='high')
-      :swings.filter(s=>s.type==='low');
-    const swT=targetSwings.length>0?targetSwings[targetSwings.length-1].price:null;
-    let tp1;
-    if(swT!==null){const srr=Math.abs(swT-cp)/risk; tp1=srr>=1.5?swT:(direction==='LONG'?cp+risk*2:cp-risk*2);}
-    else tp1=direction==='LONG'?cp+risk*2:cp-risk*2;
-    const tp2=direction==='LONG'?cp+risk*3:cp-risk*3;
-    const tp3=direction==='LONG'?cp+risk*4:cp-risk*4;
-    const rr=Math.abs(tp1-cp)/risk;
-    if(rr<minRR) return null;
-
-    // 8. Confluences
-    const confs=[];
-    confs.push('Swing Structure Trend');
-    confs.push(mom.type==='ENGULFING'?'Bullish Engulfing at Level':mom.type==='PIN_BAR'?'Pin Bar Rejection':'Strong Close');
-    if(swT!==null) confs.push('Prior Swing Target');
-    if(rr>=3) confs.push(rr.toFixed(1)+':1 Risk-Reward');
-    if(distToLevel<atr*0.5) confs.push('Precise Level Touch');
-
-    // HTF alignment via swing structure
-    if(htfCandles&&htfCandles.length>=40){
-      const htfSwings=findSwings(htfCandles.slice(-60),3);
-      const htfTrend=getTrend(htfSwings);
-      if(htfTrend===direction) confs.push('HTF Trend Aligned');
+    // 2. HTF hard block
+    if (htfCandles && htfCandles.length >= 40) {
+      const htfSwings = findSwings(htfCandles.slice(-100), 5);
+      const htfTrend  = getTrend(htfSwings);
+      if (htfTrend && htfTrend !== direction) return null;
     }
 
-    // 9. Quality score
-    let qs=3; // swing structure base
-    if(mom.type==='ENGULFING') qs+=3;
-    else if(mom.type==='PIN_BAR') qs+=3;
-    else qs+=1;
-    if(mom.strength>=70) qs+=2;
-    if(distToLevel<atr*0.5) qs+=2; // precise level touch
-    if(swT!==null) qs+=1;
-    if(rr>=3) qs+=2; else if(rr>=2) qs+=1;
-    if(confs.includes('HTF Trend Aligned')) qs+=3;
-    const qt=qs>=12?'PREMIUM':qs>=7?'STRONG':'DEVELOPING';
-    const dl=direction==='LONG'?'Bullish':'Bearish';
-    const pm={ENGULFING:`${dl} Engulfing at Swing Level`,PIN_BAR:`${dl} Pin Bar Rejection`,STRONG_CLOSE:`${dl} Strong Close at Structure`};
+    // 3. RSI filter
+    const rsi = calcRSI(candles);
+    if (direction === 'LONG') {
+      if (rsi > 70 || rsi < 40 || rsi > 68) return null;
+    } else {
+      if (rsi < 30 || rsi < 35 || rsi > 60) return null;
+    }
+
+    // 4. 20 EMA slope: must be rising (LONG) or falling (SHORT) vs 3 candles ago
+    const ema20_3ago = ema20arr[li - 3];
+    const emaSlope   = ema20 - ema20_3ago;
+    if (direction === 'LONG'  && emaSlope <= 0) return null;
+    if (direction === 'SHORT' && emaSlope >= 0) return null;
+    const emaSlopeStrong = Math.abs(emaSlope) > 0.5 * atr;
+
+    // 5. Pullback: one of last 3 candles must have touched within 0.5×ATR of 20 EMA
+    let pullbackCandle = null, pullbackIdx = -1, pullbackEma = null;
+    for (let i = li; i >= li - 2; i--) {
+      const c   = candles[i];
+      const ema = ema20arr[i];
+      if (!ema) continue;
+      const touchDist = direction === 'LONG' ? Math.abs(c.l - ema) : Math.abs(c.h - ema);
+      if (touchDist <= 0.5 * atr) { pullbackCandle = c; pullbackIdx = i; pullbackEma = ema; break; }
+    }
+    if (!pullbackCandle) return null;
+
+    // 6. Rejection pattern at 20 EMA
+    const prev = candles[pullbackIdx - 1];
+    const mom  = detectMomentum(pullbackCandle, prev, direction, atr, pullbackEma);
+    let patternType = mom ? mom.type : null;
+    if (!patternType) {
+      if (direction === 'LONG'  && pullbackCandle.l <= pullbackEma + 0.5 * atr && pullbackCandle.c > pullbackEma)
+        patternType = 'EMA_BOUNCE';
+      else if (direction === 'SHORT' && pullbackCandle.h >= pullbackEma - 0.5 * atr && pullbackCandle.c < pullbackEma)
+        patternType = 'EMA_BOUNCE';
+    }
+    if (!patternType) return null;
+
+    // 7. Stop loss: swing high/low of last 5 candles ± 0.3×ATR
+    const window5 = candles.slice(li - 4, li + 1);
+    const sl = direction === 'LONG'
+      ? Math.min(...window5.map(c => c.l)) - 0.3 * atr
+      : Math.max(...window5.map(c => c.h)) + 0.3 * atr;
+    if (direction === 'LONG'  && sl >= cp) return null;
+    if (direction === 'SHORT' && sl <= cp) return null;
+    const risk = Math.abs(cp - sl);
+    if (risk <= 0) return null;
+
+    // 8. Take profit: nearest opposing swing ≥2R, fallback 2R
+    const recent80  = candles.slice(-80);
+    const swings    = findSwings(recent80, 5);
+    const swingHighs = swings.filter(s => s.type === 'high');
+    const swingLows  = swings.filter(s => s.type === 'low');
+    const opposing  = direction === 'LONG'
+      ? swingHighs.filter(s => s.price > cp)
+      : swingLows.filter(s => s.price < cp);
+
+    let tp1;
+    if (opposing.length) {
+      const nearest = direction === 'LONG'
+        ? Math.min(...opposing.map(s => s.price))
+        : Math.max(...opposing.map(s => s.price));
+      tp1 = Math.abs(nearest - cp) / risk >= minRR
+        ? nearest
+        : (direction === 'LONG' ? cp + 2 * risk : cp - 2 * risk);
+    } else {
+      tp1 = direction === 'LONG' ? cp + 2 * risk : cp - 2 * risk;
+    }
+    const tp2 = direction === 'LONG' ? cp + 3 * risk : cp - 3 * risk;
+    const tp3 = direction === 'LONG' ? cp + 4 * risk : cp - 4 * risk;
+    const rr  = Math.abs(tp1 - cp) / risk;
+    if (rr < minRR) return null;
+
+    // 9. TP path obstruction
+    const tpPathSwings = direction === 'LONG'
+      ? swingHighs.filter(s => s.price > cp && s.price < tp1)
+      : swingLows.filter(s => s.price < cp && s.price > tp1);
+    const clutteredPath = tpPathSwings.length >= 2;
+
+    // 10. Volume & liquidity sweep
+    const avgVol = candles.slice(-20).reduce((s,c) => s + c.v, 0) / 20;
+    const volRatio = avgVol > 0 ? pullbackCandle.v / avgVol : 1;
+    const sweepWindow = candles.slice(li - 5, li);
+    const liquiditySweep = direction === 'LONG'
+      ? sweepWindow.some(c => c.l < ema20 && c.c > ema20)
+      : sweepWindow.some(c => c.h > ema20 && c.c < ema20);
+
+    // 11. HTF alignment tag
+    let htfAligned = false;
+    if (htfCandles && htfCandles.length >= 40) {
+      const htfSwings = findSwings(htfCandles.slice(-100), 5);
+      htfAligned = getTrend(htfSwings) === direction;
+    }
+
+    // 12. PDH/PDL (reuse existing logic inline)
+    const byDate = {};
+    for (const c of candles) {
+      const d = c.t.slice(0,10);
+      if (!byDate[d]) byDate[d] = [];
+      byDate[d].push(c);
+    }
+    const dates = Object.keys(byDate).sort();
+    let pdhlConfluence = false;
+    if (dates.length >= 2) {
+      const prev2 = byDate[dates[dates.length - 2]];
+      const pdh = Math.max(...prev2.map(c => c.h));
+      const pdl = Math.min(...prev2.map(c => c.l));
+      if (direction === 'LONG'  && Math.abs(ema20 - pdl) <= 0.5 * atr) pdhlConfluence = true;
+      if (direction === 'SHORT' && Math.abs(ema20 - pdh) <= 0.5 * atr) pdhlConfluence = true;
+    }
+
+    // 13. Scoring
+    let score = 60;
+    if (emaSlopeStrong)                                                           score += 15;
+    if (htfAligned)                                                               score += 15;
+    const rsiIdeal = direction === 'LONG' ? (rsi >= 45 && rsi <= 60) : (rsi >= 40 && rsi <= 55);
+    if (rsiIdeal)                                                                 score += 10;
+    if (volRatio >= 1.2)                                                          score += 10;
+    if (Math.abs(pullbackCandle.c - pullbackCandle.o) > 0.5 * atr)               score += 10;
+    if (pdhlConfluence)                                                           score += 10;
+    if (liquiditySweep)                                                           score += 15;
+    if (clutteredPath)                                                            score -= 15;
+    if (getSession() === 'Asia')                                                  score -= 15;
+    if (getSession() === 'London' || getSession() === 'New York')                 score += 10;
+
+    const qt = score >= 95 ? 'PREMIUM' : score >= 75 ? 'STRONG' : 'DEVELOPING';
+
+    // 14. Confluences
+    const confs = ['EMA 20/50/200 aligned'];
+    if (patternType === 'ENGULFING')    confs.push('Engulfing at 20 EMA');
+    if (patternType === 'PIN_BAR')      confs.push('Pin bar at 20 EMA');
+    if (patternType === 'STRONG_CLOSE') confs.push('Strong close off 20 EMA');
+    if (patternType === 'EMA_BOUNCE')   confs.push('EMA bounce close');
+    if (htfAligned)                     confs.push('HTF aligned');
+    if (emaSlopeStrong)                 confs.push('Strong EMA slope');
+    if (rsiIdeal)                       confs.push('RSI ideal zone');
+    if (volRatio >= 1.2)                confs.push('Volume surge');
+    if (liquiditySweep)                 confs.push('Liquidity sweep');
+    if (pdhlConfluence)                 confs.push('PDH/PDL confluence');
+    if (clutteredPath)                  confs.push('Cluttered TP path');
+    const s = getSession();
+    if (s === 'London' || s === 'New York') confs.push(`${s} session`);
+
+    const dl = direction === 'LONG' ? 'Bullish' : 'Bearish';
+    const pm = {
+      ENGULFING:    `${dl} Engulfing at 20 EMA`,
+      PIN_BAR:      `${dl} Pin Bar off 20 EMA`,
+      STRONG_CLOSE: `${dl} Strong Close off 20 EMA`,
+      EMA_BOUNCE:   `${dl} EMA 20 Pullback`,
+    };
+
     return {
-      id:`${symbol}-${tf}-${Date.now()}`, symbol, displaySymbol:PAIR_LABELS[symbol]||symbol.replace('_','/'),
-      direction, quality:qt, pattern:pm[mom.type]||`${dl} PA Pullback`, timeframe:tf,
-      currentPrice:cp, entry:cp, sl, tp1, tp2, tp3, rrRatio:rr,
-      rr2:parseFloat((Math.abs(tp2-cp)/risk).toFixed(1)), rr3:parseFloat((Math.abs(tp3-cp)/risk).toFixed(1)),
-      confluences:confs, session:getSession(), scannedAt:new Date().toISOString()
+      id: `${symbol}-${tf}-${Date.now()}`,
+      symbol, displaySymbol: PAIR_LABELS[symbol] || symbol.replace('_','/'),
+      direction, quality: qt, pattern: pm[patternType] || 'EMA Pullback', timeframe: tf,
+      currentPrice: cp, entry: cp, sl, tp1, tp2, tp3, rrRatio: rr,
+      rr2: parseFloat((Math.abs(tp2-cp)/risk).toFixed(1)),
+      rr3: parseFloat((Math.abs(tp3-cp)/risk).toFixed(1)),
+      confluences: confs, session: getSession(), scannedAt: new Date().toISOString(),
     };
   }
 
@@ -643,7 +765,7 @@
     const results=[];
     for(const pair of PAIRS){
       try{
-        const [c,h]=await Promise.all([fetchCandles(pair,gran,200),fetchCandles(pair,htfGran,100)]);
+        const [c,h]=await Promise.all([fetchCandles(pair,gran,250),fetchCandles(pair,htfGran,100)]);
         const s=analyzeCandles(c,h,pair);
         if(s) results.push(s);
       }catch(e){console.error(`Skip ${pair}:`,e.message);}
