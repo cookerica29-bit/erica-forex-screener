@@ -273,7 +273,7 @@ function analyzeCandles(
   // ── RSI FILTER ───────────────────────────────────────────────────────────────
   if (direction === 'LONG') {
     if (rsi > 70) return { setup: null, reason: `RSI overbought for LONG (${rsi.toFixed(1)} > 70)`, detail };
-    if (rsi < 40 || rsi > 65) return { setup: null, reason: `RSI outside LONG zone (${rsi.toFixed(1)}, need 40–65)`, detail };
+    if (rsi < 40 || rsi > 68) return { setup: null, reason: `RSI outside LONG zone (${rsi.toFixed(1)}, need 40–68)`, detail };
   } else {
     if (rsi < 30) return { setup: null, reason: `RSI oversold for SHORT (${rsi.toFixed(1)} < 30)`, detail };
     if (rsi < 35 || rsi > 60) return { setup: null, reason: `RSI outside SHORT zone (${rsi.toFixed(1)}, need 35–60)`, detail };
