@@ -6,7 +6,7 @@ const OANDA_BASE = OANDA_ACCOUNT_TYPE === 'live'
 
 export const PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
 
-const HTF_MAP: Record<string,string> = { M15:'H1', M30:'H4', H1:'H4', H4:'D', D:'W' };
+const HTF_MAP: Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };
 
 interface Candle { t:string; o:number; h:number; l:number; c:number; v:number; }
 interface Swing  { index:number; price:number; type:'high'|'low'; }
