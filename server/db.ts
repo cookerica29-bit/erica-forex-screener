@@ -8,9 +8,14 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const connection = await mysql.createConnection(process.env.DATABASE_URL);
-      _db = drizzle(connection);
-      await initSchema(connection);
+      const pool = mysql.createPool({
+        uri: process.env.DATABASE_URL,
+        waitForConnections: true,
+        connectionLimit: 5,
+        queueLimit: 0,
+      });
+      _db = drizzle(pool);
+      await initSchema(pool);
     } catch (error) {
       console.warn('[Database] Failed to connect:', error);
       _db = null;
@@ -19,7 +24,7 @@ export async function getDb() {
   return _db;
 }
 
-async function initSchema(connection: mysql.Connection) {
+async function initSchema(pool: mysql.Pool) {
   await connection.execute(`
     CREATE TABLE IF NOT EXISTS journal_entries (
       id INT AUTO_INCREMENT PRIMARY KEY,
