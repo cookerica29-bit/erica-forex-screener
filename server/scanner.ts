@@ -362,16 +362,19 @@ function analyzeCandles(
       : b.price - a.price   // descending — nearest first for SHORT
   );
 
-  // Find up to 3 swing levels that each clear minRR, skipping trivially close ones
-  const MIN_TP_RR = Math.max(minRR, 1.8);
+  // Walk swing levels in order. TP1 = first swing that clears minRR.
+  // TP2/TP3 = next distinct levels beyond TP1 (each at least 0.5R further).
+  // Never skip a nearby swing to chase RR — always respect nearest structure.
   const structureTPs: number[] = [];
   for (const s of opposingSwings) {
-    const rr = Math.abs(s.price - price) / risk;
-    if (rr < MIN_TP_RR) continue;  // too close — skip
-    // Each subsequent TP must be meaningfully beyond the last (at least 0.8R further)
-    const lastTP = structureTPs[structureTPs.length - 1];
-    if (lastTP !== undefined && Math.abs(s.price - lastTP) / risk < 0.8) continue;
-    structureTPs.push(s.price);
+    if (structureTPs.length === 0) {
+      // TP1: must clear minRR
+      if (Math.abs(s.price - price) / risk >= minRR) structureTPs.push(s.price);
+    } else {
+      // TP2/TP3: must be meaningfully beyond the previous TP
+      const prev = structureTPs[structureTPs.length - 1];
+      if (Math.abs(s.price - prev) / risk >= 0.5) structureTPs.push(s.price);
+    }
     if (structureTPs.length === 3) break;
   }
 
@@ -380,15 +383,11 @@ function analyzeCandles(
   if (pdhl) {
     if (direction === 'LONG' && Math.abs(ema20 - pdhl.pdl) <= 0.5 * atr) pdhlConfluence = true;
     if (direction === 'SHORT' && Math.abs(ema20 - pdhl.pdh) <= 0.5 * atr) pdhlConfluence = true;
-    // Trim TP1 if PDH/PDL sits in path (only if it would reduce a structure TP)
-    if (pdhl.pdh > price && direction === 'LONG') {
-      if (structureTPs[0] !== undefined && pdhl.pdh < structureTPs[0])
-        structureTPs[0] = pdhl.pdh - 0.1 * atr;
-    }
-    if (pdhl.pdl < price && direction === 'SHORT') {
-      if (structureTPs[0] !== undefined && pdhl.pdl > structureTPs[0])
-        structureTPs[0] = pdhl.pdl + 0.1 * atr;
-    }
+    // Trim TP1 back if PDH/PDL is an obstacle between entry and TP1
+    if (direction === 'LONG' && pdhl.pdh > price && structureTPs[0] !== undefined && pdhl.pdh < structureTPs[0])
+      structureTPs[0] = pdhl.pdh - 0.1 * atr;
+    if (direction === 'SHORT' && pdhl.pdl < price && structureTPs[0] !== undefined && pdhl.pdl > structureTPs[0])
+      structureTPs[0] = pdhl.pdl + 0.1 * atr;
   }
 
   // Use structure TPs where found; fall back to R-multiples
