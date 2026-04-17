@@ -352,35 +352,49 @@ function analyzeCandles(
   const swingHighs   = recentSwings.filter(s => s.type === 'high');
   const swingLows    = recentSwings.filter(s => s.type === 'low');
 
-  const opposingSwings = direction === 'LONG'
+  // Sort opposing swings by distance from entry (nearest first)
+  const opposingSwings = (direction === 'LONG'
     ? swingHighs.filter(s => s.price > price)
-    : swingLows.filter(s => s.price < price);
+    : swingLows.filter(s => s.price < price)
+  ).sort((a, b) =>
+    direction === 'LONG'
+      ? a.price - b.price   // ascending — nearest first for LONG
+      : b.price - a.price   // descending — nearest first for SHORT
+  );
 
-  let tp1: number;
-  if (opposingSwings.length) {
-    const nearest = direction === 'LONG'
-      ? Math.min(...opposingSwings.map(s => s.price))
-      : Math.max(...opposingSwings.map(s => s.price));
-    const potentialRR = Math.abs(nearest - price) / risk;
-    tp1 = potentialRR >= minRR ? nearest : (direction === 'LONG' ? price + 2 * risk : price - 2 * risk);
-  } else {
-    tp1 = direction === 'LONG' ? price + 2 * risk : price - 2 * risk;
+  // Find up to 3 swing levels that each clear minRR, skipping trivially close ones
+  const MIN_TP_RR = Math.max(minRR, 1.8);
+  const structureTPs: number[] = [];
+  for (const s of opposingSwings) {
+    const rr = Math.abs(s.price - price) / risk;
+    if (rr < MIN_TP_RR) continue;  // too close — skip
+    // Each subsequent TP must be meaningfully beyond the last (at least 0.8R further)
+    const lastTP = structureTPs[structureTPs.length - 1];
+    if (lastTP !== undefined && Math.abs(s.price - lastTP) / risk < 0.8) continue;
+    structureTPs.push(s.price);
+    if (structureTPs.length === 3) break;
   }
 
-  // PDH/PDL obstacle adjustment for TP1
+  // PDH/PDL obstacle check
   let pdhlConfluence = false;
   if (pdhl) {
-    if (direction === 'LONG') {
-      if (Math.abs(ema20 - pdhl.pdl) <= 0.5 * atr) pdhlConfluence = true;
-      if (pdhl.pdh > price && pdhl.pdh < tp1) tp1 = pdhl.pdh - 0.1 * atr;
-    } else {
-      if (Math.abs(ema20 - pdhl.pdh) <= 0.5 * atr) pdhlConfluence = true;
-      if (pdhl.pdl < price && pdhl.pdl > tp1) tp1 = pdhl.pdl + 0.1 * atr;
+    if (direction === 'LONG' && Math.abs(ema20 - pdhl.pdl) <= 0.5 * atr) pdhlConfluence = true;
+    if (direction === 'SHORT' && Math.abs(ema20 - pdhl.pdh) <= 0.5 * atr) pdhlConfluence = true;
+    // Trim TP1 if PDH/PDL sits in path (only if it would reduce a structure TP)
+    if (pdhl.pdh > price && direction === 'LONG') {
+      if (structureTPs[0] !== undefined && pdhl.pdh < structureTPs[0])
+        structureTPs[0] = pdhl.pdh - 0.1 * atr;
+    }
+    if (pdhl.pdl < price && direction === 'SHORT') {
+      if (structureTPs[0] !== undefined && pdhl.pdl > structureTPs[0])
+        structureTPs[0] = pdhl.pdl + 0.1 * atr;
     }
   }
 
-  const tp2 = direction === 'LONG' ? price + 3 * risk : price - 3 * risk;
-  const tp3 = direction === 'LONG' ? price + 4 * risk : price - 4 * risk;
+  // Use structure TPs where found; fall back to R-multiples
+  const tp1 = structureTPs[0] ?? (direction === 'LONG' ? price + 2 * risk : price - 2 * risk);
+  const tp2 = structureTPs[1] ?? (direction === 'LONG' ? price + 3 * risk : price - 3 * risk);
+  const tp3 = structureTPs[2] ?? (direction === 'LONG' ? price + 4 * risk : price - 4 * risk);
   const rrRatio = Math.abs(tp1 - price) / risk;
   if (rrRatio < minRR) return { setup: null, reason: `RR too low (${rrRatio.toFixed(2)} < ${minRR})`, detail };
 
