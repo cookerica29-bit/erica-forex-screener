@@ -84,9 +84,17 @@ function queueSetups(setups: Setup[]) {
 async function scheduledScan() {
   console.log(`[Scanner] Running scheduled scan at ${new Date().toISOString()}`);
   try {
-    latestSetups = await runScan('H1', 1.5);
+    const [m30, h1, h4] = await Promise.all([
+      runScan('M30', 1.5),
+      runScan('H1', 1.5),
+      runScan('H4', 1.5),
+    ]);
+    const ord: Record<string,number> = { PREMIUM: 0, STRONG: 1, DEVELOPING: 2 };
+    latestSetups = [...m30, ...h1, ...h4].sort((a, b) =>
+      ord[a.quality] - ord[b.quality] || b.rrRatio - a.rrRatio
+    );
     lastScanTime = new Date().toISOString();
-    console.log(`[Scanner] Found ${latestSetups.length} setups (${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium)`);
+    console.log(`[Scanner] Found ${latestSetups.length} setups across M30/H1/H4 (${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium)`);
     queueSetups(latestSetups);
   } catch(e: any) {
     console.error('[Scanner] Scan failed:', e.message);
