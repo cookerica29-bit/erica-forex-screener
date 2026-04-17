@@ -56,11 +56,24 @@ async function initSchema(pool: mysql.Pool) {
     ALTER TABLE journal_entries
     MODIFY COLUMN outcome ENUM('WIN','LOSS','BREAKEVEN','PENDING') DEFAULT 'PENDING'
   `);
-  // Add news_risk column if it doesn't exist yet
+  // Add news_risk column if it doesn't exist yet (IF NOT EXISTS not supported in all MySQL versions)
   await pool.execute(`
-    ALTER TABLE journal_entries
-    ADD COLUMN IF NOT EXISTS news_risk TINYINT(1) NOT NULL DEFAULT 0
+    SET @col_exists = (
+      SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'journal_entries'
+        AND COLUMN_NAME = 'news_risk'
+    )
   `);
+  await pool.execute(`
+    SET @sql = IF(@col_exists = 0,
+      'ALTER TABLE journal_entries ADD COLUMN news_risk BOOLEAN DEFAULT FALSE',
+      'SELECT 1'
+    )
+  `);
+  await pool.execute(`PREPARE stmt FROM @sql`);
+  await pool.execute(`EXECUTE stmt`);
+  await pool.execute(`DEALLOCATE PREPARE stmt`);
   console.log('[Database] Schema ready');
 }
 
