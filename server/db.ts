@@ -10,12 +10,43 @@ export async function getDb() {
     try {
       const connection = await mysql.createConnection(process.env.DATABASE_URL);
       _db = drizzle(connection);
+      await initSchema(connection);
     } catch (error) {
       console.warn('[Database] Failed to connect:', error);
       _db = null;
     }
   }
   return _db;
+}
+
+async function initSchema(connection: mysql.Connection) {
+  await connection.execute(`
+    CREATE TABLE IF NOT EXISTS journal_entries (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      symbol VARCHAR(20) NOT NULL,
+      display_symbol VARCHAR(20) NOT NULL,
+      direction ENUM('LONG','SHORT') NOT NULL,
+      quality ENUM('PREMIUM','STRONG','DEVELOPING') NOT NULL,
+      pattern VARCHAR(100) NOT NULL,
+      timeframe VARCHAR(10) NOT NULL,
+      entry DECIMAL(10,5) NOT NULL,
+      stop_loss DECIMAL(10,5) NOT NULL,
+      tp1 DECIMAL(10,5) NOT NULL,
+      tp2 DECIMAL(10,5),
+      tp3 DECIMAL(10,5),
+      rr1 DECIMAL(4,1),
+      rr2 DECIMAL(4,1),
+      rr3 DECIMAL(4,1),
+      outcome ENUM('WIN','LOSS','BREAKEVEN','PENDING') DEFAULT 'PENDING',
+      pnl DECIMAL(10,2),
+      notes TEXT,
+      confluences TEXT,
+      session VARCHAR(30),
+      pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+  console.log('[Database] Schema ready');
 }
 
 export async function getJournalEntries() {
