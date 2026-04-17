@@ -1,13 +1,24 @@
 // Maps OANDA pair names to the currency codes to check for news events.
 // Metals use only USD since their news is driven by USD events.
 const PAIR_CURRENCIES: Record<string, string[]> = {
+  // Majors
   EUR_USD: ['EUR', 'USD'],
   GBP_USD: ['GBP', 'USD'],
   USD_JPY: ['USD', 'JPY'],
-  GBP_JPY: ['GBP', 'JPY'],
+  USD_CAD: ['USD', 'CAD'],
+  USD_CHF: ['USD', 'CHF'],
   AUD_USD: ['AUD', 'USD'],
-  AUD_JPY: ['AUD', 'JPY'],
   NZD_USD: ['NZD', 'USD'],
+  // JPY crosses
+  EUR_JPY: ['EUR', 'JPY'],
+  GBP_JPY: ['GBP', 'JPY'],
+  AUD_JPY: ['AUD', 'JPY'],
+  NZD_JPY: ['NZD', 'JPY'],
+  CAD_JPY: ['CAD', 'JPY'],
+  // Other crosses
+  EUR_GBP: ['EUR', 'GBP'],
+  EUR_AUD: ['EUR', 'AUD'],
+  // Metals — driven by USD events
   XAU_USD: ['USD'],
   XAG_USD: ['USD'],
 };

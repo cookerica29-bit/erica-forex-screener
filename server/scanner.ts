@@ -6,7 +6,18 @@ const OANDA_BASE = OANDA_ACCOUNT_TYPE === 'live'
   ? 'https://api-fxtrade.oanda.com'
   : 'https://api-fxpractice.oanda.com';
 
-export const PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
+export const PAIRS = [
+  // Majors
+  'EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF',
+  // Commodity currencies
+  'AUD_USD','NZD_USD',
+  // JPY crosses
+  'EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY',
+  // Other crosses
+  'EUR_GBP','EUR_AUD',
+  // Metals
+  'XAU_USD','XAG_USD',
+];
 
 const HTF_MAP: Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };
 
@@ -210,9 +221,16 @@ function analyzeCandles(
 
   // ATR minimum — reject dead/illiquid markets
   const ATR_MIN: Record<string,number> = {
-    XAU_USD: 0.8, XAG_USD: 0.015, GBP_JPY: 0.05,
-    USD_JPY: 0.03, AUD_JPY: 0.03, GBP_USD: 0.0004,
-    EUR_USD: 0.0003, AUD_USD: 0.0002, NZD_USD: 0.0002,
+    // Metals
+    XAU_USD: 0.8,   XAG_USD: 0.015,
+    // JPY pairs
+    USD_JPY: 0.03,  EUR_JPY: 0.04,  GBP_JPY: 0.05,
+    AUD_JPY: 0.03,  NZD_JPY: 0.03,  CAD_JPY: 0.03,
+    // USD majors
+    GBP_USD: 0.0004, EUR_USD: 0.0003, AUD_USD: 0.0002,
+    NZD_USD: 0.0002, USD_CAD: 0.0003, USD_CHF: 0.0003,
+    // Crosses
+    EUR_GBP: 0.0002, EUR_AUD: 0.0003,
   };
   const atrMin = ATR_MIN[pair] ?? 0.0003;
   if (atr < atrMin) return { setup: null, reason: `ATR too low (${atr.toFixed(5)} < min ${atrMin}) — market inactive`, detail };
