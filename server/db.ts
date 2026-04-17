@@ -56,6 +56,11 @@ async function initSchema(pool: mysql.Pool) {
     ALTER TABLE journal_entries
     MODIFY COLUMN outcome ENUM('WIN','LOSS','BREAKEVEN','PENDING') DEFAULT 'PENDING'
   `);
+  // Add news_risk column if it doesn't exist yet
+  await pool.execute(`
+    ALTER TABLE journal_entries
+    ADD COLUMN IF NOT EXISTS news_risk TINYINT(1) NOT NULL DEFAULT 0
+  `);
   console.log('[Database] Schema ready');
 }
 
@@ -82,6 +87,7 @@ export async function createJournalEntry(data: {
   rr3?: number;
   confluences?: string[];
   session?: string;
+  newsRisk?: boolean;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
@@ -102,6 +108,7 @@ export async function createJournalEntry(data: {
     rr3: data.rr3 ? String(data.rr3) : null,
     confluences: data.confluences ? JSON.stringify(data.confluences) : null,
     session: data.session,
+    newsRisk: data.newsRisk ?? false,
     outcome: 'PENDING',
   }).$returningId();
   return result[0].id;

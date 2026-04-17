@@ -38,7 +38,8 @@ function queueSetups(setups: Setup[]) {
         const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
         const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
         const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
-        const text = `${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
+        const newsPrefix = setup.newsRisk ? '⚠️ NEWS RISK\n' : '';
+        const text = `${newsPrefix}${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
         fetch('https://slack.com/api/chat.postMessage', {
           method: 'POST',
           headers: {
@@ -58,7 +59,8 @@ function queueSetups(setups: Setup[]) {
         const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
         const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
         const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
-        const text = `${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
+        const newsPrefix = setup.newsRisk ? '⚠️ NEWS RISK\n' : '';
+        const text = `${newsPrefix}${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
         fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -175,6 +177,7 @@ app.post('/api/journal', async (req, res) => {
       rr3:           b.rr3,
       confluences:   b.confluences || b.confluence,
       session:       b.session,
+      newsRisk:      b.newsRisk ?? b.news_risk ?? false,
     };
     const id = await createJournalEntry(normalized);
     return res.json({ success: true, id });

@@ -1,3 +1,5 @@
+import { checkNewsRisk } from './newsFilter.js';
+
 const OANDA_API_KEY = process.env.OANDA_API_KEY || '';
 const OANDA_ACCOUNT_TYPE = process.env.OANDA_ACCOUNT_TYPE || 'practice';
 const OANDA_BASE = OANDA_ACCOUNT_TYPE === 'live'
@@ -26,6 +28,7 @@ export interface Setup {
   scannedAt: string;
   timeframe: string;
   session: string;
+  newsRisk?: boolean;
   approved?: boolean;
   approvedAt?: string;
 }
@@ -469,7 +472,10 @@ export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
         fetchCandles(pair, htfGran, 150),
       ]);
       const { setup } = analyzeCandles(candles, htf, pair, granularity, minRR);
-      if (setup) results.push(setup);
+      if (setup) {
+        setup.newsRisk = await checkNewsRisk(pair);
+        results.push(setup);
+      }
     } catch(e: any) {
       console.error(`Skip ${pair}:`, e.message);
     }

@@ -1,4 +1,4 @@
-import { mysqlTable, int, varchar, decimal, text, timestamp, mysqlEnum } from 'drizzle-orm/mysql-core';
+import { mysqlTable, int, varchar, decimal, text, timestamp, mysqlEnum, boolean } from 'drizzle-orm/mysql-core';
 
 export const journalEntries = mysqlTable('journal_entries', {
   id: int('id').autoincrement().primaryKey(),
@@ -21,6 +21,7 @@ export const journalEntries = mysqlTable('journal_entries', {
   notes: text('notes'),
   confluences: text('confluences'),
   session: varchar('session', { length: 30 }),
+  newsRisk: boolean('news_risk').default(false),
   pushedAt: timestamp('pushed_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
 });

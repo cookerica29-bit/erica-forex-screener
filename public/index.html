@@ -155,6 +155,7 @@
     .journal-outcome-badge.loss { color: var(--red); border-color: rgba(255,59,92,0.4); background: rgba(255,59,92,0.08); }
     .journal-outcome-badge.breakeven { color: var(--blue); border-color: rgba(96,165,250,0.4); background: rgba(96,165,250,0.08); }
     .journal-outcome-badge.pending { color: var(--slate); border-color: rgba(148,163,184,0.3); background: rgba(148,163,184,0.05); }
+    .news-risk-pill { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:99px; border:1px solid rgba(251,191,36,0.5); background:rgba(251,191,36,0.1); color:#fbbf24; }
     .journal-edit-btn { font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--slate-dim); cursor: pointer; font-family: inherit; }
     .journal-edit-btn:hover { color: var(--text); border-color: var(--slate); }
     .journal-edit-panel { margin-top: 10px; padding: 10px; background: var(--inner); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
@@ -366,6 +367,14 @@
 
 <div id="content-analytics" class="tab-content">
   <div class="journal-page">
+
+    <!-- Analytics Controls -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--slate);cursor:pointer;">
+        <input type="checkbox" id="excludeNewsRisk" onchange="reloadAnalytics()" style="accent-color:#fbbf24;width:14px;height:14px;">
+        <span>Exclude ⚠️ news-risk trades from analytics</span>
+      </label>
+    </div>
 
     <!-- Overview Stats -->
     <div class="journal-stats" style="grid-template-columns: repeat(5,1fr); margin-bottom:16px;">
@@ -840,6 +849,7 @@
               <span class="badge ${isL?'long':'short'}">${s.direction}</span>
               <span class="badge tf">${s.timeframe}</span>
               ${s.session?`<span class="badge session">${s.session}</span>`:''}
+              ${s.newsRisk?`<span class="news-risk-pill">⚠️ NEWS RISK</span>`:''}
             </div>
             <div class="pattern-name">${s.pattern}</div>
           </div>
@@ -907,14 +917,20 @@
     }
   }
 
+  let _analyticsEntries = [];
   async function loadAnalytics() {
     try {
       const res = await fetch('/api/journal');
-      const entries = await res.json();
-      renderAnalytics(entries);
+      _analyticsEntries = await res.json();
+      reloadAnalytics();
     } catch(e) {
       console.error('Failed to load analytics:', e);
     }
+  }
+  function reloadAnalytics() {
+    const excludeNews = document.getElementById('excludeNewsRisk')?.checked;
+    const entries = excludeNews ? _analyticsEntries.filter(e => !e.newsRisk) : _analyticsEntries;
+    renderAnalytics(entries);
   }
 
   function renderAnalytics(entries) {
@@ -1096,6 +1112,7 @@
               <span class="badge ${isLong ? 'long' : 'short'}">${e.direction}</span>
               <span class="badge tf">${e.timeframe}</span>
               <span class="badge ${(e.quality || '').toLowerCase()}">${e.quality}</span>
+              ${e.newsRisk ? `<span class="news-risk-pill">⚠️ NEWS RISK</span>` : ''}
             </div>
             <div class="pattern-name">${e.pattern}</div>
           </div>
@@ -1226,6 +1243,7 @@
           rr3: setup.rr3,
           confluences: setup.confluences,
           session: setup.session,
+          newsRisk: setup.newsRisk ?? false,
         }),
       });
       const data = await res.json();
