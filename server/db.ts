@@ -25,7 +25,7 @@ export async function getDb() {
 }
 
 async function initSchema(pool: mysql.Pool) {
-  await connection.execute(`
+  await pool.execute(`
     CREATE TABLE IF NOT EXISTS journal_entries (
       id INT AUTO_INCREMENT PRIMARY KEY,
       symbol VARCHAR(20) NOT NULL,
@@ -50,6 +50,11 @@ async function initSchema(pool: mysql.Pool) {
       pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
+  `);
+  // Ensure BREAKEVEN is in the enum (handles tables created before this value was added)
+  await pool.execute(`
+    ALTER TABLE journal_entries
+    MODIFY COLUMN outcome ENUM('WIN','LOSS','BREAKEVEN','PENDING') DEFAULT 'PENDING'
   `);
   console.log('[Database] Schema ready');
 }

@@ -419,6 +419,7 @@
       <div class="stat-box"><div class="stat-value" id="j-total" style="color:var(--text)">—</div><div class="stat-label">Total</div></div>
       <div class="stat-box"><div class="stat-value" id="j-wins" style="color:var(--green)">—</div><div class="stat-label">Wins</div></div>
       <div class="stat-box"><div class="stat-value" id="j-losses" style="color:var(--red)">—</div><div class="stat-label">Losses</div></div>
+      <div class="stat-box"><div class="stat-value" id="j-be" style="color:var(--blue)">—</div><div class="stat-label">Break Even</div></div>
       <div class="stat-box"><div class="stat-value" id="j-winrate" style="color:var(--blue)">—</div><div class="stat-label">Win Rate</div></div>
       <div class="stat-box"><div class="stat-value" id="j-pnl" style="color:var(--green)">—</div><div class="stat-label">Total P&L</div></div>
     </div>
@@ -427,6 +428,7 @@
         <button class="pill active" onclick="setJFilter('outcome','ALL')" id="jf-ALL">All</button>
         <button class="pill" onclick="setJFilter('outcome','WIN')" id="jf-WIN">Win</button>
         <button class="pill" onclick="setJFilter('outcome','LOSS')" id="jf-LOSS">Loss</button>
+        <button class="pill" onclick="setJFilter('outcome','BREAKEVEN')" id="jf-BREAKEVEN">Break Even</button>
         <button class="pill" onclick="setJFilter('outcome','PENDING')" id="jf-PENDING">Pending</button>
       </div>
     </div>
@@ -865,7 +867,7 @@
           <span class="outcome-label">Outcome:</span>
           <button class="outcome-btn win" onclick="setOutcome('${s.id}','WIN')">WIN</button>
           <button class="outcome-btn loss" onclick="setOutcome('${s.id}','LOSS')">LOSS</button>
-          <button class="outcome-btn be" onclick="setOutcome('${s.id}','BE')">BE</button>
+          <button class="outcome-btn be" onclick="setOutcome('${s.id}','BREAKEVEN')">BE</button>
           <button class="outcome-btn pending active-outcome" onclick="setOutcome('${s.id}','PENDING')">PENDING</button>
         </div>
         <div class="pnl-row">
@@ -917,127 +919,114 @@
 
   function renderAnalytics(entries) {
     const total = entries.length;
-    const closed = entries.filter(e => e.outcome === 'WIN' || e.outcome === 'LOSS');
     const wins = entries.filter(e => e.outcome === 'WIN').length;
     const losses = entries.filter(e => e.outcome === 'LOSS').length;
+    const bes = entries.filter(e => e.outcome === 'BREAKEVEN').length;
     const pending = entries.filter(e => e.outcome === 'PENDING').length;
-    const winRate = closed.length > 0 ? Math.round((wins / closed.length) * 100) : 0;
+    const closed = wins + losses; // BE excluded from win rate denominator
+    const winRate = closed > 0 ? Math.round((wins / closed) * 100) : 0;
     const totalPnl = entries.reduce((sum, e) => sum + (parseFloat(e.pnl) || 0), 0);
     const avgRR = entries.length > 0 ? (entries.reduce((sum, e) => sum + (parseFloat(e.rr1) || 0), 0) / entries.length).toFixed(1) : 0;
 
     document.getElementById('a-total').textContent = total || '—';
-    document.getElementById('a-winrate').textContent = closed.length > 0 ? winRate + '%' : '—';
+    document.getElementById('a-winrate').textContent = closed > 0 ? winRate + '%' : '—';
     document.getElementById('a-avgrr').textContent = avgRR > 0 ? avgRR + ':1' : '—';
     document.getElementById('a-pending').textContent = pending || '—';
     const pnlEl = document.getElementById('a-pnl');
     pnlEl.textContent = totalPnl !== 0 ? (totalPnl >= 0 ? '+$' : '-$') + Math.abs(totalPnl).toFixed(2) : '—';
     pnlEl.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
 
+    // Helper: build a breakdown map tracking wins/losses/bes
+    function buildMap(key) {
+      const map = {};
+      entries.forEach(e => {
+        const k = key(e);
+        if (!map[k]) map[k] = { wins: 0, losses: 0, bes: 0, total: 0 };
+        map[k].total++;
+        if (e.outcome === 'WIN') map[k].wins++;
+        if (e.outcome === 'LOSS') map[k].losses++;
+        if (e.outcome === 'BREAKEVEN') map[k].bes++;
+      });
+      return map;
+    }
+    function breakdownWR(stats) {
+      const closed = stats.wins + stats.losses;
+      return closed > 0 ? Math.round((stats.wins / closed) * 100) : 0;
+    }
+    function wrColor(wr) {
+      return wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+    }
+
     // Pattern breakdown
-    const patternMap = {};
-    entries.forEach(e => {
-      if (!patternMap[e.pattern]) patternMap[e.pattern] = { wins: 0, losses: 0, total: 0 };
-      patternMap[e.pattern].total++;
-      if (e.outcome === 'WIN') patternMap[e.pattern].wins++;
-      if (e.outcome === 'LOSS') patternMap[e.pattern].losses++;
-    });
+    const patternMap = buildMap(e => e.pattern);
     document.getElementById('a-patterns').innerHTML = Object.keys(patternMap).length
       ? Object.entries(patternMap).sort((a,b) => b[1].total - a[1].total).map(([pattern, stats]) => {
-          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
-          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          const wr = breakdownWR(stats);
           return `<div class="breakdown-row">
             <div class="breakdown-label" title="${pattern}">${pattern}</div>
             <div class="breakdown-bar-wrap"><div class="breakdown-bar win" style="width:${wr}%"></div></div>
-            <div class="breakdown-stat">${stats.total} trades</div>
-            <div class="breakdown-winrate" style="color:${wrColor}">${wr}%</div>
+            <div class="breakdown-stat">${stats.wins}W ${stats.losses}L${stats.bes ? ' ' + stats.bes + 'BE' : ''}</div>
+            <div class="breakdown-winrate" style="color:${wrColor(wr)}">${wr}%</div>
           </div>`;
         }).join('')
       : '<div class="no-data">No data yet</div>';
 
     // Timeframe breakdown
-    const tfMap = {};
-    entries.forEach(e => {
-      if (!tfMap[e.timeframe]) tfMap[e.timeframe] = { wins: 0, losses: 0, total: 0 };
-      tfMap[e.timeframe].total++;
-      if (e.outcome === 'WIN') tfMap[e.timeframe].wins++;
-      if (e.outcome === 'LOSS') tfMap[e.timeframe].losses++;
-    });
+    const tfMap = buildMap(e => e.timeframe);
     document.getElementById('a-timeframes').innerHTML = Object.keys(tfMap).length
       ? Object.entries(tfMap).sort((a,b) => b[1].total - a[1].total).map(([tf, stats]) => {
-          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
-          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          const wr = breakdownWR(stats);
           return `<div class="breakdown-row">
             <div class="breakdown-label">${tf}</div>
             <div class="breakdown-bar-wrap"><div class="breakdown-bar win" style="width:${wr}%"></div></div>
-            <div class="breakdown-stat">${stats.total} trades</div>
-            <div class="breakdown-winrate" style="color:${wrColor}">${wr}%</div>
+            <div class="breakdown-stat">${stats.wins}W ${stats.losses}L${stats.bes ? ' ' + stats.bes + 'BE' : ''}</div>
+            <div class="breakdown-winrate" style="color:${wrColor(wr)}">${wr}%</div>
           </div>`;
         }).join('')
       : '<div class="no-data">No data yet</div>';
 
     // Pair breakdown
-    const pairMap = {};
-    entries.forEach(e => {
-      if (!pairMap[e.displaySymbol]) pairMap[e.displaySymbol] = { wins: 0, losses: 0, total: 0 };
-      pairMap[e.displaySymbol].total++;
-      if (e.outcome === 'WIN') pairMap[e.displaySymbol].wins++;
-      if (e.outcome === 'LOSS') pairMap[e.displaySymbol].losses++;
-    });
+    const pairMap = buildMap(e => e.displaySymbol);
     document.getElementById('a-pairs').innerHTML = Object.keys(pairMap).length
       ? Object.entries(pairMap).sort((a,b) => b[1].total - a[1].total).map(([pair, stats]) => {
-          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
-          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          const wr = breakdownWR(stats);
           return `<div class="pair-card">
             <div class="pair-card-symbol">${pair}</div>
             <div class="pair-card-stats">
               <span>${stats.total} trades</span>
               <span style="color:var(--green)">${stats.wins}W</span>
               <span style="color:var(--red)">${stats.losses}L</span>
-              <span class="pair-card-wr" style="color:${wrColor}">${wr}% WR</span>
+              ${stats.bes ? `<span style="color:var(--blue)">${stats.bes}BE</span>` : ''}
+              <span class="pair-card-wr" style="color:${wrColor(wr)}">${wr}% WR</span>
             </div>
           </div>`;
         }).join('')
       : '<div class="no-data">No data yet</div>';
 
     // Direction breakdown
-    const dirMap = {};
-    entries.forEach(e => {
-      if (!dirMap[e.direction]) dirMap[e.direction] = { wins: 0, losses: 0, total: 0 };
-      dirMap[e.direction].total++;
-      if (e.outcome === 'WIN') dirMap[e.direction].wins++;
-      if (e.outcome === 'LOSS') dirMap[e.direction].losses++;
-    });
+    const dirMap = buildMap(e => e.direction);
     document.getElementById('a-directions').innerHTML = Object.keys(dirMap).length
       ? Object.entries(dirMap).map(([dir, stats]) => {
-          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
-          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          const wr = breakdownWR(stats);
           return `<div class="breakdown-row">
             <div class="breakdown-label">${dir}</div>
             <div class="breakdown-bar-wrap"><div class="breakdown-bar win" style="width:${wr}%"></div></div>
-            <div class="breakdown-stat">${stats.total} trades</div>
-            <div class="breakdown-winrate" style="color:${wrColor}">${wr}%</div>
+            <div class="breakdown-stat">${stats.wins}W ${stats.losses}L${stats.bes ? ' ' + stats.bes + 'BE' : ''}</div>
+            <div class="breakdown-winrate" style="color:${wrColor(wr)}">${wr}%</div>
           </div>`;
         }).join('')
       : '<div class="no-data">No data yet</div>';
 
     // Session breakdown
-    const sessMap = {};
-    entries.forEach(e => {
-      const sess = e.session || 'Unknown';
-      if (!sessMap[sess]) sessMap[sess] = { wins: 0, losses: 0, total: 0 };
-      sessMap[sess].total++;
-      if (e.outcome === 'WIN') sessMap[sess].wins++;
-      if (e.outcome === 'LOSS') sessMap[sess].losses++;
-    });
+    const sessMap = buildMap(e => e.session || 'Unknown');
     document.getElementById('a-sessions').innerHTML = Object.keys(sessMap).length
       ? Object.entries(sessMap).sort((a,b) => b[1].total - a[1].total).map(([sess, stats]) => {
-          const wr = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
-          const wrColor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--gold)' : 'var(--red)';
+          const wr = breakdownWR(stats);
           return `<div class="breakdown-row">
             <div class="breakdown-label">${sess}</div>
             <div class="breakdown-bar-wrap"><div class="breakdown-bar win" style="width:${wr}%"></div></div>
-            <div class="breakdown-stat">${stats.total} trades</div>
-            <div class="breakdown-winrate" style="color:${wrColor}">${wr}%</div>
+            <div class="breakdown-stat">${stats.wins}W ${stats.losses}L${stats.bes ? ' ' + stats.bes + 'BE' : ''}</div>
+            <div class="breakdown-winrate" style="color:${wrColor(wr)}">${wr}%</div>
           </div>`;
         }).join('')
       : '<div class="no-data">No data yet</div>';
@@ -1068,6 +1057,7 @@
     const total = journalEntries.length;
     const wins = journalEntries.filter(e => e.outcome === 'WIN').length;
     const losses = journalEntries.filter(e => e.outcome === 'LOSS').length;
+    const bes = journalEntries.filter(e => e.outcome === 'BREAKEVEN').length;
     const closed = wins + losses;
     const winRate = closed > 0 ? Math.round((wins / closed) * 100) : 0;
     const totalPnl = journalEntries.reduce((sum, e) => sum + (parseFloat(e.pnl) || 0), 0);
@@ -1075,6 +1065,7 @@
     document.getElementById('j-total').textContent = total || '—';
     document.getElementById('j-wins').textContent = wins || '—';
     document.getElementById('j-losses').textContent = losses || '—';
+    document.getElementById('j-be').textContent = bes || '—';
     document.getElementById('j-winrate').textContent = closed > 0 ? winRate + '%' : '—';
     const pnlEl = document.getElementById('j-pnl');
     pnlEl.textContent = totalPnl !== 0 ? (totalPnl > 0 ? '+$' : '-$') + Math.abs(totalPnl).toFixed(2) : '—';
