@@ -38,12 +38,13 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .stats-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
     .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
-    .stat-value { font-size: 20px; font-weight: 700; }
+    .stat-value { font-size: 24px; font-weight: 800; }
     .stat-label { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; margin-top: 2px; letter-spacing: 0.5px; }
-    .setup-grid { padding: 16px 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; }
+    .setup-grid { padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
     .setup-card { background: linear-gradient(135deg, #0D1117 0%, #0a0f16 100%); border-radius: 14px; border: 1px solid #1e2530; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
     .setup-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-    .setup-card.premium { border-color: rgba(245,166,35,0.4); box-shadow: 0 0 20px rgba(245,166,35,0.06); }
+    @keyframes premiumPulse { 0%, 100% { box-shadow: 0 0 20px rgba(245,166,35,0.06); } 50% { box-shadow: 0 0 30px rgba(245,166,35,0.15); } }
+    .setup-card.premium { border-color: rgba(245,166,35,0.4); animation: premiumPulse 3s ease-in-out infinite; }
     .setup-card.premium::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(245,166,35,0.6), transparent); }
     .setup-card.strong { border-color: rgba(96,165,250,0.3); }
     .setup-card.strong::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(96,165,250,0.5), transparent); }
@@ -53,7 +54,7 @@
     .dir-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
     .dir-icon.long { background: rgba(0,255,136,0.12); border: 1px solid rgba(0,255,136,0.2); border-radius: 10px; }
     .dir-icon.short { background: rgba(255,59,92,0.12); border: 1px solid rgba(255,59,92,0.2); border-radius: 10px; }
-    .symbol { font-size: 16px; font-weight: 700; color: var(--text); }
+    .symbol { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; color: var(--text); }
     .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
     .badge { font-size: 9px; padding: 2px 6px; border-radius: 99px; border: 1px solid; }
     .badge.premium { color: var(--gold); border-color: rgba(245,166,35,0.4); background: rgba(245,166,35,0.08); }
@@ -70,16 +71,16 @@
     .rr-main.rr-good { color: var(--blue); }
     .rr-main.rr-ok { color: var(--slate); }
     .rr-sub { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; }
-    .current-price { font-size: 11px; color: var(--slate-dim); margin-bottom: 10px; }
-    .current-price span { color: var(--slate); }
+    .current-price { font-size: 13px; color: var(--blue); font-weight: 700; letter-spacing: 0.5px; margin-bottom: 12px; }
+    .current-price span { color: var(--blue); }
     .levels-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 6px; }
     .levels-grid-ext { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
     .level-box { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.06); transition: background 0.15s; }
     .level-box:hover { background: rgba(255,255,255,0.05); }
-    .level-box.sl { border-color: rgba(255,59,92,0.25); }
-    .level-box.tp1 { border-color: rgba(0,255,136,0.2); }
-    .level-box.tp2 { border-color: rgba(0,255,136,0.12); }
-    .level-box.tp3 { border-color: rgba(0,255,136,0.08); }
+    .level-box.sl { border-color: rgba(255,59,92,0.25); border-left: 3px solid rgba(255,59,92,0.5); }
+    .level-box.tp1 { border-color: rgba(0,255,136,0.2); border-left: 3px solid rgba(0,255,136,0.5); }
+    .level-box.tp2 { border-color: rgba(0,255,136,0.12); border-left: 3px solid rgba(0,255,136,0.35); }
+    .level-box.tp3 { border-color: rgba(0,255,136,0.08); border-left: 3px solid rgba(0,255,136,0.2); }
     .level-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
     .level-label.entry { color: var(--slate-dim); }
     .level-label.sl { color: rgba(255,59,92,0.7); }
@@ -906,7 +907,7 @@
           <div>
             <div class="symbol">${s.displaySymbol}</div>
             <div class="badges">
-              <span class="badge ${qc}">⚡ ${s.quality}</span>
+              <span class="badge ${qc}">${s.quality==='PREMIUM'?'⭐':'⚡'} ${s.quality}</span>
               <span class="badge ${isL?'long':'short'}">${s.direction}</span>
               <span class="badge tf">${s.timeframe}</span>
               ${s.session?`<span class="badge session">${s.session}</span>`:''}
