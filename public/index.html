@@ -41,15 +41,18 @@
     .stat-value { font-size: 20px; font-weight: 700; }
     .stat-label { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; margin-top: 2px; letter-spacing: 0.5px; }
     .setup-grid { padding: 16px 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; }
-    .setup-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
-    .setup-card.premium { border-color: rgba(245,166,35,0.35); box-shadow: 0 0 12px rgba(245,166,35,0.08); }
+    .setup-card { background: linear-gradient(135deg, #0D1117 0%, #0a0f16 100%); border-radius: 14px; border: 1px solid #1e2530; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
+    .setup-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    .setup-card.premium { border-color: rgba(245,166,35,0.4); box-shadow: 0 0 20px rgba(245,166,35,0.06); }
+    .setup-card.premium::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(245,166,35,0.6), transparent); }
     .setup-card.strong { border-color: rgba(96,165,250,0.3); }
+    .setup-card.strong::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(96,165,250,0.5), transparent); }
     .card-body { padding: 14px; }
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
     .card-left { display: flex; align-items: center; gap: 10px; }
     .dir-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-    .dir-icon.long { background: rgba(0,255,136,0.1); }
-    .dir-icon.short { background: rgba(255,59,92,0.1); }
+    .dir-icon.long { background: rgba(0,255,136,0.12); border: 1px solid rgba(0,255,136,0.2); border-radius: 10px; }
+    .dir-icon.short { background: rgba(255,59,92,0.12); border: 1px solid rgba(255,59,92,0.2); border-radius: 10px; }
     .symbol { font-size: 16px; font-weight: 700; color: var(--text); }
     .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
     .badge { font-size: 9px; padding: 2px 6px; border-radius: 99px; border: 1px solid; }
@@ -62,7 +65,7 @@
     .badge.session { color: #64748b; border-color: rgba(71,85,105,0.3); background: transparent; }
     .pattern-name { font-size: 11px; color: var(--slate-dim); margin-top: 3px; }
     .rr-block { text-align: right; }
-    .rr-main { font-size: 22px; font-weight: 700; }
+    .rr-main { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
     .rr-main.rr-great { color: var(--green); }
     .rr-main.rr-good { color: var(--blue); }
     .rr-main.rr-ok { color: var(--slate); }
@@ -71,7 +74,8 @@
     .current-price span { color: var(--slate); }
     .levels-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 6px; }
     .levels-grid-ext { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
-    .level-box { background: var(--inner); border-radius: 8px; padding: 8px 10px; border: 1px solid var(--border); }
+    .level-box { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.06); transition: background 0.15s; }
+    .level-box:hover { background: rgba(255,255,255,0.05); }
     .level-box.sl { border-color: rgba(255,59,92,0.25); }
     .level-box.tp1 { border-color: rgba(0,255,136,0.2); }
     .level-box.tp2 { border-color: rgba(0,255,136,0.12); }
@@ -92,12 +96,15 @@
     .conf-section { margin-top: 8px; }
     .conf-title { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .conf-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-    .conf-tag { font-size: 10px; padding: 2px 8px; border-radius: 99px; background: var(--slate-dark); color: var(--slate); border: 1px solid rgba(71,85,105,0.4); }
+    .conf-tag { font-size: 10px; padding: 3px 10px; border-radius: 99px; background: rgba(255,255,255,0.04); color: var(--slate); border: 1px solid rgba(255,255,255,0.08); transition: all 0.15s; }
+    .conf-tag:hover { background: rgba(255,255,255,0.08); color: var(--text); }
     .scanned-at { font-size: 9px; color: #334155; margin-top: 8px; }
     .card-actions { margin-top: 10px; display: flex; gap: 8px; }
     .push-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(245,166,35,0.4); background: rgba(245,166,35,0.08); color: var(--gold); font-size: 11px; font-family: inherit; cursor: pointer; transition: all 0.15s; }
     .push-btn:hover { background: rgba(245,166,35,0.15); }
     .push-btn.pushed { border-color: rgba(0,255,136,0.4); background: rgba(0,255,136,0.08); color: var(--green); }
+    .send-bot-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(96,165,250,0.4); background: rgba(96,165,250,0.08); color: var(--blue); font-size: 11px; font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 600; }
+    .send-bot-btn:hover { background: rgba(96,165,250,0.18); transform: scale(1.02); }
     .journal-panel { margin-top: 10px; padding: 10px; background: var(--inner); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
     .outcome-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .outcome-label { font-size: 10px; color: var(--slate-dim); text-transform: uppercase; min-width: 50px; }
@@ -924,7 +931,7 @@
       <div class="scanned-at">Scanned: ${new Date(s.scannedAt).toLocaleTimeString()} · Live data via Oanda v20 API</div>
       <div class="card-actions">
         <button class="push-btn" onclick="pushToJournal('${s.id}')" id="push-${s.id}">📓 Push to Journal</button>
-        <button class="push-btn" onclick="sendToBot(this,${idx})" style="border-color:rgba(96,165,250,0.4);background:rgba(96,165,250,0.08);color:var(--blue);">🤖 Send to Bot</button>
+        <button class="send-bot-btn" onclick="sendToBot(this,${idx})">🤖 Send to Bot</button>
       </div>
       <div class="journal-panel" id="journal-${s.id}" style="display:none;">
         <div class="outcome-row">
