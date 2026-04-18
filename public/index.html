@@ -14,11 +14,11 @@
       --slate: #94a3b8; --slate-dim: #475569; --slate-dark: #1e293b; --text: #f1f5f9;
     }
     body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; min-height: 100vh; }
-    .header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .header { background: rgba(13,17,23,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; position: sticky; top: 0; z-index: 100; }
     .header-left { display: flex; align-items: center; gap: 10px; }
     .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-    .header-title { font-size: 18px; font-weight: 700; color: var(--text); }
+    .header-title { font-size: 20px; font-weight: 800; background: linear-gradient(135deg, #f1f5f9 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: -0.3px; }
     .header-sub { font-size: 11px; color: var(--slate-dim); text-transform: uppercase; letter-spacing: 1px; }
     .oanda-badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; border: 1px solid rgba(96,165,250,0.4); color: var(--blue); background: rgba(96,165,250,0.08); }
     .controls { padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-bottom: 1px solid var(--border); }
@@ -31,9 +31,9 @@
     .pill.active.red { background: rgba(255,59,92,0.15); color: var(--red); }
     .pill.active.gold { background: rgba(245,166,35,0.15); color: var(--gold); }
     .pill.active.blue { background: rgba(96,165,250,0.15); color: var(--blue); }
-    .scan-btn { padding: 7px 18px; border-radius: 8px; border: 1px solid rgba(96,165,250,0.4); background: rgba(96,165,250,0.12); color: var(--blue); font-size: 12px; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
-    .scan-btn:hover { background: rgba(96,165,250,0.2); }
-    .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .scan-btn { padding: 8px 20px; border-radius: 8px; border: 1px solid rgba(96,165,250,0.4); background: rgba(96,165,250,0.1); color: var(--blue); font-size: 13px; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; font-weight: 600; }
+    .scan-btn:hover { background: rgba(96,165,250,0.2); border-color: rgba(96,165,250,0.6); transform: scale(1.02); }
+    .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .spin { animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .stats-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
@@ -132,10 +132,10 @@
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
       .setup-grid { grid-template-columns: 1fr; padding: 10px; }
     }
-    .tab-nav { display: flex; background: var(--card); border-bottom: 1px solid var(--border); padding: 0 20px; }
-    .tab-btn { padding: 12px 20px; font-size: 12px; font-family: inherit; border: none; background: transparent; color: var(--slate-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
+    .tab-btn { padding: 14px 20px; font-size: 12px; font-family: inherit; border: none; background: transparent; color: var(--slate-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; font-weight: 500; letter-spacing: 0.3px; }
+    .tab-btn:hover { color: var(--slate); }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--blue); background: rgba(96,165,250,0.05); border-radius: 6px 6px 0 0; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     .journal-page { padding: 16px 20px; }
@@ -224,6 +224,10 @@
       <div class="header-sub">Live OANDA · Price Action</div>
     </div>
     <span class="oanda-badge">OANDA v20</span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#22c55e;font-weight:600;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;display:inline-block;"></span>
+      LIVE
+    </span>
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
     <span id="lastScan" style="font-size:10px;color:var(--slate-dim)"></span>
