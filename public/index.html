@@ -9,16 +9,16 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0A0D12; --card: #0D1117; --inner: #080B10; --border: #1e2530;
+      --bg: #060810; --card: #0C1018; --inner: #080B10; --border: #1e2530;
       --green: #00FF88; --red: #FF3B5C; --gold: #F5A623; --blue: #60A5FA;
       --slate: #94a3b8; --slate-dim: #475569; --slate-dark: #1e293b; --text: #f1f5f9;
     }
-    body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; min-height: 100vh; }
+    body { background: var(--bg); background-image: radial-gradient(rgba(96,165,250,0.03) 1px, transparent 1px); background-size: 32px 32px; color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; min-height: 100vh; }
     .header { background: rgba(13,17,23,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; position: sticky; top: 0; z-index: 100; }
     .header-left { display: flex; align-items: center; gap: 10px; }
     .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-    .header-title { font-size: 20px; font-weight: 800; background: linear-gradient(135deg, #f1f5f9 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: -0.3px; }
+    .header-title { font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #f1f5f9 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: -0.3px; }
     .header-sub { font-size: 11px; color: var(--slate-dim); text-transform: uppercase; letter-spacing: 1px; }
     .oanda-badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; border: 1px solid rgba(96,165,250,0.4); color: var(--blue); background: rgba(96,165,250,0.08); }
     .controls { padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-bottom: 1px solid var(--border); }
@@ -37,7 +37,7 @@
     .spin { animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .stats-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
-    .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
+    .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; border-top: 2px solid rgba(96,165,250,0.3); border-radius: 0 0 8px 8px; }
     .stat-value { font-size: 24px; font-weight: 800; }
     .stat-label { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; margin-top: 2px; letter-spacing: 0.5px; }
     .setup-grid { padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
@@ -215,12 +215,13 @@
   </style>
 </head>
 <body>
+<div style="height:3px;background:linear-gradient(90deg,#60A5FA,#00FF88,#F5A623,#FF3B5C);position:fixed;top:0;left:0;right:0;z-index:999;"></div>
 
 <div class="header">
   <div class="header-left">
     <div class="pulse"></div>
     <div>
-      <div class="header-title">Forex Scanner</div>
+      <div class="header-title">🔥 Forex Scanner</div>
       <div class="header-sub">Live OANDA · Price Action</div>
     </div>
     <span class="oanda-badge">OANDA v20</span>
@@ -292,8 +293,9 @@
 
 <div id="mainContent">
   <div class="empty-state" id="initState">
-    <div style="font-size:32px;opacity:0.3">📡</div>
+    <div style="font-size:48px;opacity:0.4">📡</div>
     <div style="color:var(--slate-dim);font-size:13px;">Hit Scan to fetch live OANDA data</div>
+    <div style="color:var(--slate-dim);font-size:11px;opacity:0.6;">Scanning 16 pairs across all sessions</div>
   </div>
 </div>
 
@@ -894,7 +896,7 @@
     document.getElementById('s-long').textContent=all.filter(s=>s.direction==='LONG').length||'—';
     document.getElementById('s-short').textContent=all.filter(s=>s.direction==='SHORT').length||'—';
     const main=document.getElementById('mainContent');
-    if(!all.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">📡</div><div>Hit Scan to fetch live OANDA data</div></div>';document.getElementById('resultCount').textContent='';return;}
+    if(!all.length){main.innerHTML='<div class="empty-state"><div style="font-size:48px;opacity:0.4">📡</div><div>Hit Scan to fetch live OANDA data</div><div style="font-size:11px;opacity:0.6;">Scanning 16 pairs across all sessions</div></div>';document.getElementById('resultCount').textContent='';return;}
     document.getElementById('resultCount').innerHTML=`Showing <span>${filtered.length}</span> setup${filtered.length!==1?'s':''} · min ${minRR}:1 RR`;
     if(!filtered.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No setups match your filters</div></div>';return;}
     main.innerHTML='<div class="setup-grid">'+filtered.map(s => renderCard(s, allSetups.indexOf(s))).join('')+'</div>';
