@@ -192,6 +192,18 @@
     .nm-dir.short { color: var(--red); background: rgba(255,59,92,0.08); border: 1px solid rgba(255,59,92,0.25); }
     .nm-reason { font-size: 11px; color: var(--slate-dim); margin-bottom: 5px; line-height: 1.4; }
     .nm-stats { font-size: 10px; color: #334155; }
+    @media (max-width: 768px) {
+      .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
+      #bot-challenge > div:first-child { grid-template-columns: 1fr !important; }
+      .tbl-wrap { overflow-x: auto; }
+      #bot-positions-body td { font-size: 11px; padding: 8px 6px; }
+      #bot-signals-list .sig-row { flex-wrap: wrap; gap: 6px; }
+      .conn-bar { flex-direction: column; align-items: stretch; }
+      .conn-bar input { max-width: 100% !important; }
+      .conn-bar button { width: 100%; }
+      #bot-approvals-list > div { flex-wrap: wrap; gap: 8px; }
+      #bot-approvals-list button { padding: 8px 16px !important; font-size: 12px !important; flex: 1; }
+    }
   </style>
 </head>
 <body>
@@ -1559,7 +1571,7 @@
 
 <div id="content-bot" class="tab-content">
   <div class="journal-page">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+    <div class="conn-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
       <div class="conn-dot-bot" style="width:7px;height:7px;border-radius:50%;background:var(--slate-dim);flex-shrink:0"></div>
       <input id="botUrl" class="pnl-input" style="flex:1;min-width:180px;max-width:320px;font-size:11px;padding:6px 10px;" placeholder="https://erica-forex-bot-production.up.railway.app" value="https://erica-forex-bot-production.up.railway.app" oninput="saveBotUrl()" />
       <button class="scan-btn" onclick="refreshBot()" id="botRefreshBtn"><span id="botRefreshIcon">↻</span> Refresh</button>
@@ -1594,8 +1606,8 @@
       <div style="padding:24px;text-align:center;color:var(--slate-dim);font-size:12px;">No setups pending approval</div>
     </div>
     <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">Open positions</div>
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:18px;">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <div class="tbl-wrap" style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:18px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:520px;">
         <thead><tr style="border-bottom:1px solid var(--border);">
           <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-dim);">Symbol</th>
           <th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-dim);">Side</th>
