@@ -230,6 +230,15 @@
       LIVE
     </span>
   </div>
+  <div id="header-challenge" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;">E8 Challenge</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:120px;height:4px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden;">
+        <div id="header-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#60A5FA,#00FF88);border-radius:99px;transition:width .5s;"></div>
+      </div>
+      <span id="header-progress-text" style="font-size:11px;color:var(--slate);font-weight:600;">—</span>
+    </div>
+  </div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
     <span id="lastScan" style="font-size:10px;color:var(--slate-dim)"></span>
     <button class="scan-btn" onclick="runScan()" id="scanBtn">
@@ -947,6 +956,7 @@
       <div class="card-actions">
         <button class="push-btn" onclick="pushToJournal('${s.id}')" id="push-${s.id}">📓 Push to Journal</button>
         <button class="send-bot-btn" onclick="sendToBot(this,${idx})">🤖 Send to Bot</button>
+        <button class="push-btn" onclick="fillCalculator(${idx})" style="border-color:rgba(148,163,184,0.3);background:rgba(148,163,184,0.05);color:var(--slate);">📊 Calculate</button>
       </div>
       <div class="journal-panel" id="journal-${s.id}" style="display:none;">
         <div class="outcome-row">
@@ -966,6 +976,28 @@
         </div>
       </div>
     </div></div>`;
+  }
+
+  function fillCalculator(idx) {
+    const setup = allSetups[idx];
+    if (!setup) return;
+    const pairMap = {
+      'EUR_USD':'EURUSD','GBP_USD':'GBPUSD','USD_JPY':'USDJPY',
+      'USD_CAD':'USDCAD','USD_CHF':'USDCHF','AUD_USD':'AUDUSD',
+      'NZD_USD':'NZDUSD','GBP_JPY':'GBPJPY','AUD_JPY':'AUDJPY',
+      'NZD_JPY':'NZDJPY','CAD_JPY':'CADJPY','EUR_JPY':'EURJPY',
+      'EUR_GBP':'EURGBP','EUR_AUD':'EURAUD','XAU_USD':'XAUUSD','XAG_USD':'XAGUSD'
+    };
+    const pair = pairMap[setup.symbol || setup.pair] || 'EURUSD';
+    document.getElementById('calc-pair').value = pair;
+    document.getElementById('calc-entry').value = setup.entry || '';
+    document.getElementById('calc-sl').value = setup.sl || setup.stopLoss || '';
+    document.getElementById('calc-tp1').value = setup.tp1 || '';
+    document.getElementById('calc-tp2').value = setup.tp2 || '';
+    document.getElementById('calc-tp3').value = setup.tp3 || '';
+    switchTab('calculator');
+    calcPosition();
+    window.scrollTo(0, 0);
   }
 
   function renderNearMisses() {
@@ -1594,6 +1626,15 @@
     document.getElementById('calc-rr3').textContent = r3 ? r3.rr + ':1 RR' : '';
   }
 
+  function updateHeaderChallenge(balance) {
+    const start = 25233.27, target = 26747.27;
+    const pct = Math.max(0, Math.min(100, ((balance - start) / (target - start)) * 100));
+    const bar = document.getElementById('header-progress-bar');
+    const text = document.getElementById('header-progress-text');
+    if (bar) bar.style.width = pct.toFixed(1) + '%';
+    if (text) text.textContent = pct.toFixed(1) + '% to pass';
+  }
+
   // Populate scanner immediately on page load, then refresh every 15 min
   fetchLatestSetups();
   autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
@@ -1702,6 +1743,7 @@
       const signals=sigRes.ok?await sigRes.json():[];
       const bal=s.balance!=null?'$'+Number(s.balance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
       document.getElementById('bot-balance').textContent=bal;
+      if (s.balance) updateHeaderChallenge(s.balance);
       const pnlEl=document.getElementById('bot-pnl');
       if(s.daily_pnl_pct!=null){const sign=s.daily_pnl_pct>=0?'+':'';pnlEl.textContent=sign+Number(s.daily_pnl_pct).toFixed(2)+'%';pnlEl.style.color=s.daily_pnl_pct>=0?'var(--green)':'var(--red)';}
       document.getElementById('bot-open').textContent=s.open_positions!=null?`${s.open_positions} / ${s.max_open_trades??'?'}`:'—';
