@@ -5,8 +5,8 @@ import cors from 'cors';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry } from './db.js';
-import { runScan, debugScan, Setup } from './scanner.js';
+import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, getPatternStats } from './db.js';
+import { debugScan, Setup, JournalStats } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -17,6 +17,8 @@ const server = createServer(app);
 app.use(express.json());
 
 let latestSetups: Setup[] = [];
+let latestRejected: Array<{ pair: string; reason: string; detail: any; granularity: string }> = [];
+let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
 
@@ -84,17 +86,31 @@ function queueSetups(setups: Setup[]) {
 async function scheduledScan() {
   console.log(`[Scanner] Running scheduled scan at ${new Date().toISOString()}`);
   try {
-    const [m30, h1, h4] = await Promise.all([
-      runScan('M30', 1.5),
-      runScan('H1', 1.5),
-      runScan('H4', 1.5),
+    // Refresh journal stats for historical edge/weakness scoring
+    try { cachedJournalStats = await getPatternStats(); } catch { /* non-fatal */ }
+
+    const [m30Debug, h1Debug, h4Debug] = await Promise.all([
+      debugScan('M30', 1.5, cachedJournalStats),
+      debugScan('H1', 1.5, cachedJournalStats),
+      debugScan('H4', 1.5, cachedJournalStats),
     ]);
+
     const ord: Record<string,number> = { PREMIUM: 0, STRONG: 1, DEVELOPING: 2 };
-    latestSetups = [...m30, ...h1, ...h4].sort((a, b) =>
-      ord[a.quality] - ord[b.quality] || b.rrRatio - a.rrRatio
-    );
+    latestSetups = [
+      ...m30Debug.filter(r => r.result === 'SETUP' && r.setup).map(r => r.setup!),
+      ...h1Debug.filter(r => r.result === 'SETUP' && r.setup).map(r => r.setup!),
+      ...h4Debug.filter(r => r.result === 'SETUP' && r.setup).map(r => r.setup!),
+    ].sort((a, b) => ord[a.quality] - ord[b.quality] || b.rrRatio - a.rrRatio);
+
+    // Near-misses: rejected pairs that had a trend direction detected
+    latestRejected = [
+      ...m30Debug.filter(r => r.result === 'REJECTED' && r.detail?.trend).map(r => ({ pair: r.pair, reason: r.reason ?? '', detail: r.detail, granularity: 'M30' })),
+      ...h1Debug.filter(r => r.result === 'REJECTED' && r.detail?.trend).map(r => ({ pair: r.pair, reason: r.reason ?? '', detail: r.detail, granularity: 'H1' })),
+      ...h4Debug.filter(r => r.result === 'REJECTED' && r.detail?.trend).map(r => ({ pair: r.pair, reason: r.reason ?? '', detail: r.detail, granularity: 'H4' })),
+    ];
+
     lastScanTime = new Date().toISOString();
-    console.log(`[Scanner] Found ${latestSetups.length} setups across M30/H1/H4 (${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium)`);
+    console.log(`[Scanner] Found ${latestSetups.length} setups across M30/H1/H4 (${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium), ${latestRejected.length} near-misses`);
     queueSetups(latestSetups);
   } catch(e: any) {
     console.error('[Scanner] Scan failed:', e.message);
@@ -119,11 +135,15 @@ app.get('/api/debug', async (req, res) => {
   const granularity = (req.query.tf as string) || 'H1';
   const minRR = parseFloat((req.query.minRR as string) || '1.5');
   try {
-    const results = await debugScan(granularity, minRR);
+    const results = await debugScan(granularity, minRR, cachedJournalStats);
     res.json(results);
   } catch(e: any) {
     res.status(500).json({ error: e.message });
   }
+});
+
+app.get('/api/near-misses', (_req, res) => {
+  res.json(latestRejected);
 });
 
 const OANDA_API_KEY = process.env.OANDA_API_KEY || '';

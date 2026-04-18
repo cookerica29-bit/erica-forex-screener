@@ -44,6 +44,8 @@ export interface Setup {
   approvedAt?: string;
 }
 
+export type JournalStats = Record<string, { wins: number; losses: number }>;
+
 export interface DebugResult {
   pair: string;
   result: 'SETUP' | 'REJECTED' | 'ERROR';
@@ -208,7 +210,8 @@ function getSession(): string {
 
 function analyzeCandles(
   candles: Candle[], htf: Candle[], pair: string,
-  granularity='H1', minRR=1.5, _debug=false
+  granularity='H1', minRR=1.5, _debug=false,
+  journalStats: JournalStats = {}
 ): { setup: Setup|null; reason: string; detail: DebugResult['detail'] } {
   const detail: DebugResult['detail'] = {};
 
@@ -462,6 +465,32 @@ function analyzeCandles(
   if (pdhlConfluence)                 confluence.push('PDH/PDL confluence');
   if (clutteredPath)                  confluence.push('Cluttered TP path');
 
+  // ── JOURNAL-WEIGHTED SCORING ──────────────────────────────────────────────────
+  if (patternType && Object.keys(journalStats).length > 0) {
+    const dl2 = direction === 'LONG' ? 'Bullish' : 'Bearish';
+    const ptName: Record<string, string> = {
+      ENGULFING:    `${dl2} Engulfing at 20 EMA`,
+      PIN_BAR:      `${dl2} Pin Bar off 20 EMA`,
+      STRONG_CLOSE: `${dl2} Strong Close off 20 EMA`,
+      EMA_BOUNCE:   `${dl2} EMA 20 Pullback`,
+    };
+    const histKey = `${ptName[patternType] || 'EMA Pullback'}|||${granularity}`;
+    const hist = journalStats[histKey];
+    if (hist) {
+      const closed = hist.wins + hist.losses;
+      if (closed >= 5) {
+        const wr = hist.wins / closed;
+        if (wr >= 0.65) {
+          score += 10;
+          confluence.push(`Historical edge (${Math.round(wr * 100)}% WR)`);
+        } else if (wr <= 0.40) {
+          score -= 10;
+          confluence.push(`Historical weakness (${Math.round(wr * 100)}% WR)`);
+        }
+      }
+    }
+  }
+
   const quality: 'PREMIUM'|'STRONG'|'DEVELOPING' =
     score >= 95 ? 'PREMIUM' : score >= 75 ? 'STRONG' : 'DEVELOPING';
 
@@ -518,7 +547,9 @@ export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
   return results;
 }
 
-export async function debugScan(granularity='H1', minRR=1.5): Promise<DebugResult[]> {
+export async function debugScan(
+  granularity='H1', minRR=1.5, journalStats: JournalStats = {}
+): Promise<DebugResult[]> {
   const htfGran = HTF_MAP[granularity] || 'D';
   const results: DebugResult[] = [];
   for (const pair of PAIRS) {
@@ -527,7 +558,10 @@ export async function debugScan(granularity='H1', minRR=1.5): Promise<DebugResul
         fetchCandles(pair, granularity, 250),
         fetchCandles(pair, htfGran, 150),
       ]);
-      const { setup, reason, detail } = analyzeCandles(candles, htf, pair, granularity, minRR, true);
+      const { setup, reason, detail } = analyzeCandles(candles, htf, pair, granularity, minRR, true, journalStats);
+      if (setup) {
+        setup.newsRisk = await checkNewsRisk(pair);
+      }
       results.push({
         pair,
         result: setup ? 'SETUP' : 'REJECTED',

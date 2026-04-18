@@ -174,6 +174,24 @@
     .pair-card-stats { display: flex; gap: 8px; font-size: 10px; color: var(--slate-dim); }
     .pair-card-wr { font-weight: 700; }
     .no-data { font-size: 11px; color: var(--slate-dim); font-style: italic; }
+    .conf-tag.edge { background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.35); color: var(--green); }
+    .conf-tag.weakness { background: rgba(255,59,92,0.1); border-color: rgba(255,59,92,0.35); color: var(--red); }
+    .near-miss-section { padding: 0 20px 20px; }
+    .near-miss-header { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; user-select: none; }
+    .near-miss-title { font-size: 11px; font-weight: 700; color: var(--slate-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .near-miss-count { font-size: 10px; padding: 1px 7px; border-radius: 99px; background: rgba(148,163,184,0.1); border: 1px solid rgba(148,163,184,0.2); color: var(--slate-dim); }
+    .near-miss-chevron { font-size: 10px; color: var(--slate-dim); transition: transform 0.2s; }
+    .near-miss-chevron.open { transform: rotate(180deg); }
+    .near-miss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+    .nm-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; opacity: 0.75; }
+    .nm-card:hover { opacity: 1; }
+    .nm-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .nm-pair { font-size: 14px; font-weight: 700; color: var(--slate); }
+    .nm-dir { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; }
+    .nm-dir.long { color: var(--green); background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.25); }
+    .nm-dir.short { color: var(--red); background: rgba(255,59,92,0.08); border: 1px solid rgba(255,59,92,0.25); }
+    .nm-reason { font-size: 11px; color: var(--slate-dim); margin-bottom: 5px; line-height: 1.4; }
+    .nm-stats { font-size: 10px; color: #334155; }
   </style>
 </head>
 <body>
@@ -254,6 +272,8 @@
     <div style="color:var(--slate-dim);font-size:13px;">Hit Scan to fetch live OANDA data</div>
   </div>
 </div>
+
+<div id="nearMissContent"></div>
 
 </div>
 
@@ -463,8 +483,9 @@
 </div>
 
 <script>
-  let allSetups = [], tf = '30m', minRR = 1.5, dir = 'ALL', quality = 'ALL', scanning = false;
+  let allSetups = [], allNearMisses = [], tf = '30m', minRR = 1.5, dir = 'ALL', quality = 'ALL', scanning = false;
   let autoRefreshTimer = null;
+  let nearMissOpen = false;
 
   const PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
   const PAIR_LABELS = { XAG_USD:'XAG/USD', XAU_USD:'XAU/USD', GBP_JPY:'GBP/JPY', NZD_USD:'NZD/USD', AUD_USD:'AUD/USD', AUD_JPY:'AUD/JPY', USD_JPY:'USD/JPY', GBP_USD:'GBP/USD', EUR_USD:'EUR/USD' };
@@ -767,9 +788,12 @@
 
   async function fetchLatestSetups() {
     try {
-      const res = await fetch('/api/setups');
-      if (!res.ok) return;
-      const data = await res.json();
+      const [setupsRes, nmRes] = await Promise.all([
+        fetch('/api/setups'),
+        fetch('/api/near-misses'),
+      ]);
+      if (!setupsRes.ok) return;
+      const data = await setupsRes.json();
       if (!data.setups || data.setups.length === 0) return;
       // Normalize server Setup objects to match client-side shape
       allSetups = data.setups.map((s, i) => {
@@ -789,9 +813,11 @@
           rr3:           s.rr3 || (risk > 0 ? parseFloat((Math.abs(s.tp3 - entry) / risk).toFixed(1)) : 0),
         };
       });
+      allNearMisses = nmRes.ok ? await nmRes.json() : [];
       document.getElementById('lastScan').textContent =
         `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
       renderSetups();
+      renderNearMisses();
     } catch(e) {
       console.warn('Could not fetch latest setups:', e.message);
     }
@@ -813,9 +839,14 @@
     results.sort((a,b)=>ord[a.quality]-ord[b.quality]||b.rrRatio-a.rrRatio);
     allSetups=results; scanning=false; updateScanBtn(false);
     document.getElementById('lastScan').textContent=`Last scan: ${new Date().toLocaleTimeString()}`;
-    // Trigger backend queue for any strong/premium setups found
-    fetch('/api/scan', { method: 'POST' }).catch(e => console.warn('Backend scan failed:', e));
+    // Trigger backend scan (uses journal-weighted scoring) then fetch near-misses
+    try {
+      await fetch('/api/scan', { method: 'POST' });
+      const nmRes = await fetch('/api/near-misses');
+      allNearMisses = nmRes.ok ? await nmRes.json() : [];
+    } catch(e) { console.warn('Backend scan failed:', e); }
     renderSetups();
+    renderNearMisses();
   }
 
   function getFiltered() {
@@ -848,7 +879,7 @@
   function renderCard(s, idx) {
     const isL=s.direction==='LONG', qc=s.quality.toLowerCase();
     const rrc=s.rrRatio>=3?'rr-great':s.rrRatio>=2?'rr-good':'rr-ok';
-    const cf=s.confluences.length?`<div class="conf-section"><div class="conf-title">Confluences</div><div class="conf-tags">${s.confluences.map(c=>`<span class="conf-tag">${c}</span>`).join('')}</div></div>`:'';
+    const cf=s.confluences.length?`<div class="conf-section"><div class="conf-title">Confluences</div><div class="conf-tags">${s.confluences.map(c=>{const cls=c.startsWith('Historical edge')?'conf-tag edge':c.startsWith('Historical weakness')?'conf-tag weakness':'conf-tag';return`<span class="${cls}">${c}</span>`;}).join('')}</div></div>`:'';
     return `<div class="setup-card ${qc}"><div class="card-body">
       <div class="card-top">
         <div class="card-left">
@@ -901,6 +932,46 @@
         </div>
       </div>
     </div></div>`;
+  }
+
+  function renderNearMisses() {
+    const container = document.getElementById('nearMissContent');
+    if (!container || !allNearMisses.length) { if (container) container.innerHTML = ''; return; }
+    const fmt5 = (n, pair) => n == null ? '—' : (pair && (pair.includes('JPY')||pair.includes('XAU')||pair.includes('XAG')) ? Number(n).toFixed(3) : Number(n).toFixed(5));
+    const cards = allNearMisses.map(nm => {
+      const isLong = nm.detail?.trend === 'LONG';
+      const dirHtml = nm.detail?.trend
+        ? `<span class="nm-dir ${isLong?'long':'short'}">${isLong?'↑ LONG':'↓ SHORT'}</span>` : '';
+      const rsi = nm.detail?.rsi != null ? `RSI: ${Number(nm.detail.rsi).toFixed(1)}` : '';
+      const ema20 = nm.detail?.ema20 != null ? `EMA20: ${fmt5(nm.detail.ema20, nm.pair)}` : '';
+      const stats = [rsi, ema20].filter(Boolean).join(' · ');
+      return `<div class="nm-card">
+        <div class="nm-top">
+          <span class="nm-pair">${nm.pair.replace('_','/')}</span>
+          <span class="badge tf">${nm.granularity}</span>
+          ${dirHtml}
+        </div>
+        <div class="nm-reason">${nm.reason}</div>
+        ${stats ? `<div class="nm-stats">${stats}</div>` : ''}
+      </div>`;
+    }).join('');
+    container.innerHTML = `<div class="near-miss-section">
+      <div class="near-miss-header" onclick="toggleNearMisses()">
+        <span class="near-miss-title">Near Misses</span>
+        <span class="near-miss-count">${allNearMisses.length} rejected</span>
+        <span class="near-miss-chevron${nearMissOpen?' open':''}" id="nmChevron">▼</span>
+        <span style="font-size:10px;color:var(--slate-dim);margin-left:auto;">Pairs with trend detected but failing another filter</span>
+      </div>
+      <div id="nmGrid" style="display:${nearMissOpen?'grid':'none'}" class="near-miss-grid">${cards}</div>
+    </div>`;
+  }
+
+  function toggleNearMisses() {
+    nearMissOpen = !nearMissOpen;
+    const grid = document.getElementById('nmGrid');
+    const chev = document.getElementById('nmChevron');
+    if (grid) grid.style.display = nearMissOpen ? 'grid' : 'none';
+    if (chev) { chev.className = 'near-miss-chevron' + (nearMissOpen ? ' open' : ''); }
   }
 
   function setTf(v){tf=v;document.querySelectorAll('[id^="tf-"]').forEach(b=>b.classList.remove('active'));document.getElementById('tf-'+v).classList.add('active');}

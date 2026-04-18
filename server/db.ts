@@ -139,3 +139,24 @@ export async function deleteJournalEntry(id: number) {
   if (!db) throw new Error('Database not available');
   await db.delete(journalEntries).where(eq(journalEntries.id, id));
 }
+
+// Returns win/loss counts keyed by "pattern|||timeframe" for journal-weighted scoring
+export async function getPatternStats(): Promise<Record<string, { wins: number; losses: number }>> {
+  const db = await getDb();
+  if (!db) return {};
+  try {
+    const entries = await db.select().from(journalEntries);
+    const stats: Record<string, { wins: number; losses: number }> = {};
+    for (const e of entries) {
+      if (e.outcome !== 'WIN' && e.outcome !== 'LOSS') continue;
+      const key = `${e.pattern}|||${e.timeframe}`;
+      if (!stats[key]) stats[key] = { wins: 0, losses: 0 };
+      if (e.outcome === 'WIN') stats[key].wins++;
+      else stats[key].losses++;
+    }
+    return stats;
+  } catch (e) {
+    console.warn('[Database] getPatternStats failed:', e);
+    return {};
+  }
+}
