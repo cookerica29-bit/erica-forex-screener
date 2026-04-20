@@ -134,9 +134,11 @@ app.post('/api/scan', async (_req, res) => {
 app.get('/api/debug', async (req, res) => {
   const granularity = (req.query.tf as string) || 'H1';
   const minRR = parseFloat((req.query.minRR as string) || '1.5');
+  const pairFilter = (req.query.pair as string) || null;
   try {
     const results = await debugScan(granularity, minRR, cachedJournalStats);
-    res.json(results);
+    const filtered = pairFilter ? results.filter(r => r.pair === pairFilter) : results;
+    res.json(filtered);
   } catch(e: any) {
     res.status(500).json({ error: e.message });
   }
