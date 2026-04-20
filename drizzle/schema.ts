@@ -22,6 +22,7 @@ export const journalEntries = mysqlTable('journal_entries', {
   confluences: text('confluences'),
   session: varchar('session', { length: 30 }),
   newsRisk: boolean('news_risk').default(false),
+  tradeType: varchar('trade_type', { length: 10 }),
   pushedAt: timestamp('pushed_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
 });

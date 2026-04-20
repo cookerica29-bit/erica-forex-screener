@@ -219,7 +219,13 @@ app.post('/api/journal', async (req, res) => {
 
 app.patch('/api/journal/:id', async (req, res) => {
   try {
-    await updateJournalEntry(parseInt(req.params.id), req.body);
+    const b = req.body;
+    await updateJournalEntry(parseInt(req.params.id), {
+      outcome: b.outcome,
+      pnl: b.pnl,
+      notes: b.notes,
+      tradeType: b.trade_type ?? b.tradeType,
+    });
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update journal entry' });

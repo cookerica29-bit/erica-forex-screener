@@ -67,6 +67,17 @@ async function initSchema(pool: mysql.Pool) {
     await pool.execute(`ALTER TABLE journal_entries ADD COLUMN news_risk BOOLEAN DEFAULT FALSE`);
     console.log('[Database] Added news_risk column');
   }
+  // Add trade_type column if it doesn't exist
+  const [ttRows] = await pool.execute(`
+    SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'journal_entries'
+      AND COLUMN_NAME = 'trade_type'
+  `) as any[];
+  if (ttRows[0].cnt === 0) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN trade_type VARCHAR(10) DEFAULT NULL`);
+    console.log('[Database] Added trade_type column');
+  }
   console.log('[Database] Schema ready');
 }
 
@@ -124,6 +135,7 @@ export async function updateJournalEntry(id: number, data: {
   outcome?: 'WIN' | 'LOSS' | 'BREAKEVEN' | 'PENDING';
   pnl?: number;
   notes?: string;
+  tradeType?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
@@ -131,6 +143,7 @@ export async function updateJournalEntry(id: number, data: {
     ...(data.outcome && { outcome: data.outcome }),
     ...(data.pnl !== undefined && { pnl: String(data.pnl) }),
     ...(data.notes !== undefined && { notes: data.notes }),
+    ...(data.tradeType !== undefined && { tradeType: data.tradeType }),
   }).where(eq(journalEntries.id, id));
 }
 

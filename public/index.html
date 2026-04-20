@@ -147,6 +147,9 @@
     .journal-card.loss { border-color: rgba(255,59,92,0.3); }
     .journal-card.breakeven { border-color: rgba(96,165,250,0.3); }
     .journal-card.pending { border-color: var(--border); }
+    .type-btn { padding:3px 10px; border-radius:99px; border:1px solid rgba(255,255,255,0.1); background:transparent; color:var(--slate); font-size:11px; cursor:pointer; font-family:inherit; }
+    .active-live { border-color:rgba(0,255,136,0.4); color:var(--green); background:rgba(0,255,136,0.08); }
+    .active-paper { border-color:rgba(96,165,250,0.4); color:var(--blue); background:rgba(96,165,250,0.08); }
     .journal-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
     .journal-symbol { font-size: 16px; font-weight: 700; color: var(--text); }
     .journal-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
@@ -433,6 +436,12 @@
   <div class="journal-page">
 
     <!-- Analytics Controls -->
+    <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;">
+      <span style="font-size:11px;color:var(--slate-dim);">Show:</span>
+      <button onclick="setAnalyticsFilter('all')" class="type-btn active-live" id="filter-all">All</button>
+      <button onclick="setAnalyticsFilter('live')" class="type-btn" id="filter-live">💰 Live Only</button>
+      <button onclick="setAnalyticsFilter('paper')" class="type-btn" id="filter-paper">📝 Paper Only</button>
+    </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--slate);cursor:pointer;">
         <input type="checkbox" id="excludeNewsRisk" onchange="reloadAnalytics()" style="accent-color:#fbbf24;width:14px;height:14px;">
@@ -1076,9 +1085,23 @@
       console.error('Failed to load analytics:', e);
     }
   }
+  let _analyticsTypeFilter = 'all';
+
+  function setAnalyticsFilter(type) {
+    _analyticsTypeFilter = type;
+    ['all','live','paper'].forEach(t => {
+      const btn = document.getElementById('filter-' + t);
+      if (!btn) return;
+      btn.className = 'type-btn' + (t === type ? (t === 'live' ? ' active-live' : t === 'paper' ? ' active-paper' : ' active-live') : '');
+    });
+    reloadAnalytics();
+  }
+
   function reloadAnalytics() {
     const excludeNews = document.getElementById('excludeNewsRisk')?.checked;
-    const entries = excludeNews ? _analyticsEntries.filter(e => !e.newsRisk) : _analyticsEntries;
+    let entries = excludeNews ? _analyticsEntries.filter(e => !e.newsRisk) : _analyticsEntries;
+    if (_analyticsTypeFilter === 'live') entries = entries.filter(e => e.tradeType === 'live');
+    else if (_analyticsTypeFilter === 'paper') entries = entries.filter(e => e.tradeType === 'paper');
     renderAnalytics(entries);
     renderEquityCurve(entries);
   }
@@ -1398,6 +1421,11 @@
           <div class="level-box sl"><div class="level-label sl">Stop Loss</div><div class="level-price sl">${fmtP(e.sl || e.stopLoss)}</div></div>
           <div class="level-box tp1"><div class="level-label tp1">TP1 · ${(parseFloat(e.rr1) || 0).toFixed(1)}:1</div><div class="level-price tp1">${fmtP(e.tp1)}</div></div>
         </div>
+        <div style="margin-bottom:8px;">
+          <span style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;">Type:</span>
+          <button onclick="setTradeType(this,${e.id},'live')" class="type-btn ${e.tradeType==='live'?'active-live':''}" style="margin-left:6px;">💰 Live</button>
+          <button onclick="setTradeType(this,${e.id},'paper')" class="type-btn ${e.tradeType==='paper'?'active-paper':''}" style="margin-left:4px;">📝 Paper</button>
+        </div>
         <div class="journal-outcome-row">
           <span class="outcome-label">Outcome:</span>
           <button class="outcome-btn win ${outcome === 'win' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'WIN')">WIN</button>
@@ -1430,6 +1458,15 @@
       body: JSON.stringify({ outcome }),
     });
     await loadJournal();
+  }
+
+  async function setTradeType(btn, id, type) {
+    await fetch(`/api/journal/${id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({trade_type: type})
+    });
+    loadJournal();
   }
 
   async function deleteJournalCard(id) {
