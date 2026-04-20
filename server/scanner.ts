@@ -286,6 +286,18 @@ function analyzeCandles(
   };
   detail.trend = direction;
 
+  // Hard reject: price sandwiched between 20 and 50 EMA (no man's land)
+  if (direction === 'LONG') {
+    if (price < ema50 && price > ema20) {
+      return { setup: null, reason: `Price sandwiched between 20 and 50 EMA (${price.toFixed(5)} between ${ema20.toFixed(5)} and ${ema50.toFixed(5)}) — no man's land`, detail };
+    }
+  }
+  if (direction === 'SHORT') {
+    if (price > ema50 && price < ema20) {
+      return { setup: null, reason: `Price sandwiched between 20 and 50 EMA (${price.toFixed(5)} between ${ema50.toFixed(5)} and ${ema20.toFixed(5)}) — no man's land`, detail };
+    }
+  }
+
   // HTF hard block — no counter-trend trades
   const htfSwings = findSwings(htf.slice(-100));
   const htfTrend  = getTrend(htfSwings);

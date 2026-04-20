@@ -663,6 +663,14 @@
     else if (cp < ema50 && cp < ema200) direction = 'SHORT';
     if (!direction) return null;
 
+    // Hard reject: price sandwiched between 20 and 50 EMA (no man's land)
+    if (direction === 'LONG') {
+      if (cp < ema50 && cp > ema20) return null;
+    }
+    if (direction === 'SHORT') {
+      if (cp > ema50 && cp < ema20) return null;
+    }
+
     // 2. HTF hard block
     if (htfCandles && htfCandles.length >= 40) {
       const htfSwings = findSwings(htfCandles.slice(-100), 5);
