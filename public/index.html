@@ -512,6 +512,12 @@
 
 <div id="content-journal" class="tab-content">
   <div class="journal-page">
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
+      <button onclick="setJournalView('active')" id="journal-active-btn" class="type-btn active-live">📋 Active</button>
+      <button onclick="setJournalView('completed')" id="journal-completed-btn" class="type-btn">✅ Completed</button>
+      <button onclick="setJournalView('all')" id="journal-all-btn" class="type-btn">📊 All</button>
+      <button onclick="exportJournalCSV()" style="margin-left:auto;padding:6px 14px;border-radius:8px;border:1px solid rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);color:var(--green);font-size:11px;font-family:inherit;cursor:pointer;font-weight:600;">📥 Export CSV</button>
+    </div>
     <div class="journal-stats">
       <div class="stat-box"><div class="stat-value" id="j-total" style="color:var(--text)">—</div><div class="stat-label">Total</div></div>
       <div class="stat-box"><div class="stat-value" id="j-wins" style="color:var(--green)">—</div><div class="stat-label">Wins</div></div>
@@ -1105,7 +1111,9 @@
 
   const journalMap = {};
   let journalEntries = [];
+  let _journalEntries = [];
   let jFilter = 'ALL';
+  let journalView = 'active';
 
   async function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1393,11 +1401,61 @@
   async function loadJournal() {
     try {
       const res = await fetch('/api/journal');
-      journalEntries = await res.json();
-      renderJournal();
+      _journalEntries = await res.json();
+      applyJournalView();
     } catch(e) {
       console.error('Failed to load journal:', e);
     }
+  }
+
+  function applyJournalView() {
+    if (journalView === 'active') {
+      journalEntries = _journalEntries.filter(e => (e.outcome || 'PENDING') === 'PENDING');
+    } else if (journalView === 'completed') {
+      journalEntries = _journalEntries.filter(e => e.outcome === 'WIN' || e.outcome === 'LOSS' || e.outcome === 'BREAKEVEN');
+    } else {
+      journalEntries = _journalEntries;
+    }
+    renderJournal();
+  }
+
+  function setJournalView(view) {
+    journalView = view;
+    document.getElementById('journal-active-btn').className = view === 'active' ? 'type-btn active-live' : 'type-btn';
+    document.getElementById('journal-completed-btn').className = view === 'completed' ? 'type-btn active-live' : 'type-btn';
+    document.getElementById('journal-all-btn').className = view === 'all' ? 'type-btn active-live' : 'type-btn';
+    applyJournalView();
+  }
+
+  function exportJournalCSV() {
+    const entries = _journalEntries || [];
+    if (!entries.length) return;
+    const headers = ['Date','Pair','Direction','Quality','Pattern','Timeframe','Session','Entry','SL','TP1','RR','Outcome','PnL','Type','Notes'];
+    const rows = entries.map(e => [
+      new Date(e.createdAt || e.pushedAt).toLocaleDateString(),
+      e.displaySymbol || e.pair || e.symbol,
+      e.direction,
+      e.quality,
+      e.pattern,
+      e.timeframe,
+      e.session,
+      e.entry,
+      e.sl || e.stopLoss,
+      e.tp1,
+      e.rr1 || e.rrRatio,
+      e.outcome || 'PENDING',
+      e.pnl || '',
+      e.tradeType || 'paper',
+      (e.notes || '').replace(/,/g, ';'),
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `journal_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function setJFilter(type, val) {
