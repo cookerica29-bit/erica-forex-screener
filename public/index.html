@@ -268,14 +268,6 @@
 
 <div class="controls">
   <div class="control-group">
-    <span class="control-label">TF</span>
-    <button class="pill" onclick="setTf('15m')" id="tf-15m">15m</button>
-    <button class="pill active" onclick="setTf('30m')" id="tf-30m">30m</button>
-    <button class="pill" onclick="setTf('1H')" id="tf-1H">1H</button>
-    <button class="pill" onclick="setTf('4H')" id="tf-4H">4H</button>
-    <button class="pill" onclick="setTf('Daily')" id="tf-Daily">Daily</button>
-  </div>
-  <div class="control-group">
     <span class="control-label">Min RR</span>
     <button class="pill active gold" onclick="setRR(1.5)" id="rr-1.5">1.5:1</button>
     <button class="pill" onclick="setRR(2)" id="rr-2">2:1</button>
@@ -547,13 +539,12 @@
 </div>
 
 <script>
-  let allSetups = [], allNearMisses = [], tf = '30m', minRR = 1.5, dir = 'ALL', quality = 'ALL', scanning = false;
+  let allSetups = [], allNearMisses = [], minRR = 1.5, dir = 'ALL', quality = 'ALL', scanning = false;
   let autoRefreshTimer = null;
   let nearMissOpen = false;
 
   const PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
   const PAIR_LABELS = { XAG_USD:'XAG/USD', XAU_USD:'XAU/USD', GBP_JPY:'GBP/JPY', NZD_USD:'NZD/USD', AUD_USD:'AUD/USD', AUD_JPY:'AUD/JPY', USD_JPY:'USD/JPY', GBP_USD:'GBP/USD', EUR_USD:'EUR/USD' };
-  const TF_MAP = { '15m':'M15','30m':'M30','1H':'H1','4H':'H4','Daily':'D' };
   const HTF_MAP = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };
 
   function isJpy(s) { return s.includes('JPY')||s.includes('XAU')||s.includes('XAG'); }
@@ -1118,7 +1109,6 @@
     if (chev) { chev.className = 'near-miss-chevron' + (nearMissOpen ? ' open' : ''); }
   }
 
-  function setTf(v){tf=v;document.querySelectorAll('[id^="tf-"]').forEach(b=>b.classList.remove('active'));document.getElementById('tf-'+v).classList.add('active');}
   function setRR(v){minRR=v;document.querySelectorAll('[id^="rr-"]').forEach(b=>b.classList.remove('active','gold'));const b=document.getElementById('rr-'+v);b.classList.add('active','gold');renderSetups();}
   function setDir(v){dir=v;document.querySelectorAll('[id^="dir-"]').forEach(b=>b.classList.remove('active','green','red'));const b=document.getElementById('dir-'+v);b.classList.add('active');if(v==='LONG')b.classList.add('green');if(v==='SHORT')b.classList.add('red');renderSetups();}
   function setQuality(v){quality=v;document.querySelectorAll('[id^="q-"]').forEach(b=>b.classList.remove('active','gold','blue'));const b=document.getElementById('q-'+v);b.classList.add('active');if(v==='PREMIUM')b.classList.add('gold');if(v==='STRONG')b.classList.add('blue');renderSetups();}
