@@ -320,7 +320,7 @@ function analyzeCandles(
   const htfTrend  = getTrend(htfSwings);
   detail.htfTrend = htfTrend;
   if (htfTrend && htfTrend !== direction) {
-    return { setup: null, reason: 'HTF conflict — counter-trend setup rejected', detail };
+    return { setup: null, reason: `HTF conflict — Daily is ${htfTrend} but setup is ${direction}`, detail };
   }
 
   // ── RSI FILTER ───────────────────────────────────────────────────────────────

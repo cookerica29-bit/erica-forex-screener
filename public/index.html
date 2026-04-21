@@ -677,10 +677,10 @@
     }
 
     // 2. HTF hard block
+    let htfTrendResolved = null;
     if (htfCandles && htfCandles.length >= 40) {
-      const htfSwings = findSwings(htfCandles.slice(-100), 5);
-      const htfTrend  = getTrend(htfSwings);
-      if (htfTrend && htfTrend !== direction) return null;
+      htfTrendResolved = getTrend(findSwings(htfCandles.slice(-100), 5));
+      if (htfTrendResolved && htfTrendResolved !== direction) return null;
     }
 
     // 3. RSI filter
@@ -771,11 +771,7 @@
       : sweepWindow.some(c => c.h > ema20 && c.c < ema20);
 
     // 11. HTF alignment tag
-    let htfAligned = false;
-    if (htfCandles && htfCandles.length >= 40) {
-      const htfSwings = findSwings(htfCandles.slice(-100), 5);
-      htfAligned = getTrend(htfSwings) === direction;
-    }
+    const htfAligned = htfTrendResolved === direction;
 
     // 12. PDH/PDL (reuse existing logic inline)
     const byDate = {};
