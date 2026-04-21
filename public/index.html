@@ -252,6 +252,7 @@
     <button class="scan-btn" onclick="runScan()" id="scanBtn">
       <span id="scanIcon">↻</span> Scan
     </button>
+    <span id="scanTfLabel" style="font-size:10px;color:var(--slate-dim);"></span>
   </div>
 </div>
 
@@ -906,17 +907,31 @@
     }
   }
 
+  function isLondonOrNYOpen() {
+    const h = new Date().getUTCHours();
+    return (h >= 8 && h < 12) || (h >= 13 && h < 15);
+  }
+
+  function updateScanTfLabel() {
+    const el = document.getElementById('scanTfLabel');
+    if (el) el.textContent = isLondonOrNYOpen() ? 'Scanning 4H + 30M' : 'Scanning 4H only';
+  }
+
   async function runScan() {
     if(scanning) return;
-    scanning=true; updateScanBtn(true); showLoading();
-    const gran=TF_MAP[tf]||'H4', htfGran=HTF_MAP[gran]||'D';
+    scanning=true; updateScanBtn(true); showLoading(); updateScanTfLabel();
+    const include30M = isLondonOrNYOpen();
+    const tfsToScan = include30M ? ['H4','M30'] : ['H4'];
     const results=[];
-    for(const pair of PAIRS){
-      try{
-        const [c,h]=await Promise.all([fetchCandles(pair,gran,250),fetchCandles(pair,htfGran,100)]);
-        const s=analyzeCandles(c,h,pair);
-        if(s) results.push(s);
-      }catch(e){console.error(`Skip ${pair}:`,e.message);}
+    for(const gran of tfsToScan){
+      const htfGran = HTF_MAP[gran] || 'D';
+      for(const pair of PAIRS){
+        try{
+          const [c,h]=await Promise.all([fetchCandles(pair,gran,250),fetchCandles(pair,htfGran,100)]);
+          const s=analyzeCandles(c,h,pair);
+          if(s) results.push(s);
+        }catch(e){console.error(`Skip ${pair} ${gran}:`,e.message);}
+      }
     }
     const ord={PREMIUM:0,STRONG:1,DEVELOPING:2};
     results.sort((a,b)=>ord[a.quality]-ord[b.quality]||b.rrRatio-a.rrRatio);
@@ -1779,6 +1794,7 @@
   }
 
   // Populate scanner immediately on page load, then refresh every 15 min
+  updateScanTfLabel();
   fetchLatestSetups();
   autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
 </script>

@@ -83,34 +83,36 @@ function queueSetups(setups: Setup[]) {
   }
 }
 
+function isLondonOrNYOpen(): boolean {
+  const h = new Date().getUTCHours();
+  return (h >= 8 && h < 12) || (h >= 13 && h < 15);
+}
+
 async function scheduledScan() {
-  console.log(`[Scanner] Running scheduled scan at ${new Date().toISOString()}`);
+  const include30M = isLondonOrNYOpen();
+  const tfs = include30M ? '4H + 30M' : '4H only';
+  console.log(`[Scanner] Running scheduled scan at ${new Date().toISOString()} (${tfs})`);
   try {
     // Refresh journal stats for historical edge/weakness scoring
     try { cachedJournalStats = await getPatternStats(); } catch { /* non-fatal */ }
 
-    const [m30Debug, h1Debug, h4Debug] = await Promise.all([
-      debugScan('M30', 1.5, cachedJournalStats),
-      debugScan('H1', 1.5, cachedJournalStats),
-      debugScan('H4', 1.5, cachedJournalStats),
-    ]);
+    const h4Debug = await debugScan('H4', 1.5, cachedJournalStats);
+    const m30Debug = include30M ? await debugScan('M30', 1.5, cachedJournalStats) : [];
 
     const ord: Record<string,number> = { PREMIUM: 0, STRONG: 1, DEVELOPING: 2 };
     latestSetups = [
-      ...m30Debug.filter(r => r.result === 'SETUP' && r.setup).map(r => r.setup!),
-      ...h1Debug.filter(r => r.result === 'SETUP' && r.setup).map(r => r.setup!),
       ...h4Debug.filter(r => r.result === 'SETUP' && r.setup).map(r => r.setup!),
+      ...m30Debug.filter(r => r.result === 'SETUP' && r.setup).map(r => r.setup!),
     ].sort((a, b) => ord[a.quality] - ord[b.quality] || b.rrRatio - a.rrRatio);
 
     // Near-misses: rejected pairs that had a trend direction detected
     latestRejected = [
-      ...m30Debug.filter(r => r.result === 'REJECTED' && r.detail?.trend).map(r => ({ pair: r.pair, reason: r.reason ?? '', detail: r.detail, granularity: 'M30' })),
-      ...h1Debug.filter(r => r.result === 'REJECTED' && r.detail?.trend).map(r => ({ pair: r.pair, reason: r.reason ?? '', detail: r.detail, granularity: 'H1' })),
       ...h4Debug.filter(r => r.result === 'REJECTED' && r.detail?.trend).map(r => ({ pair: r.pair, reason: r.reason ?? '', detail: r.detail, granularity: 'H4' })),
+      ...m30Debug.filter(r => r.result === 'REJECTED' && r.detail?.trend).map(r => ({ pair: r.pair, reason: r.reason ?? '', detail: r.detail, granularity: 'M30' })),
     ];
 
     lastScanTime = new Date().toISOString();
-    console.log(`[Scanner] Found ${latestSetups.length} setups across M30/H1/H4 (${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium), ${latestRejected.length} near-misses`);
+    console.log(`[Scanner] Found ${latestSetups.length} setups (${tfs}), ${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium, ${latestRejected.length} near-misses`);
     queueSetups(latestSetups);
   } catch(e: any) {
     console.error('[Scanner] Scan failed:', e.message);
