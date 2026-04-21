@@ -439,6 +439,7 @@ function analyzeCandles(
   }
 
   // Use structure TPs where found; fall back to R-multiples
+  // LONG: TPs must be above entry. SHORT: TPs must be below entry.
   const tp1 = structureTPs[0] ?? (direction === 'LONG' ? price + 2 * risk : price - 2 * risk);
   const tp2 = structureTPs[1] ?? (direction === 'LONG' ? price + 3 * risk : price - 3 * risk);
   const tp3 = structureTPs[2] ?? (direction === 'LONG' ? price + 4 * risk : price - 4 * risk);

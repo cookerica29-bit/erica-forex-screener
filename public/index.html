@@ -753,6 +753,7 @@
     const tp1 = qualifying.length
       ? qualifying[0].price
       : (direction === 'LONG' ? cp + MIN_TP_RR * risk : cp - MIN_TP_RR * risk);
+    // LONG: higher than entry. SHORT: lower than entry.
     const tp2 = direction === 'LONG' ? cp + 3 * risk : cp - 3 * risk;
     const tp3 = direction === 'LONG' ? cp + 4 * risk : cp - 4 * risk;
     const rr  = Math.abs(tp1 - cp) / risk;
