@@ -24,6 +24,22 @@ const HTF_MAP: Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'
 interface Candle { t:string; o:number; h:number; l:number; c:number; v:number; }
 interface Swing  { index:number; price:number; type:'high'|'low'; }
 
+export interface SetupChecklist {
+  trendConfirmed: boolean;
+  emaSlope: boolean;
+  pullbackToEMA: boolean;
+  momentumCandle: boolean;
+  rsiInZone: boolean;
+  htfAligned: boolean;
+  notSandwiched: boolean;
+  minRR: boolean;
+  volumeSurge: boolean;
+  liquiditySweep: boolean;
+  pdhlConfluence: boolean;
+  goodSession: boolean;
+  historicalEdge: boolean;
+}
+
 export interface Setup {
   pair: string;
   direction: 'LONG'|'SHORT';
@@ -42,6 +58,7 @@ export interface Setup {
   newsRisk?: boolean;
   approved?: boolean;
   approvedAt?: string;
+  checklist?: SetupChecklist;
 }
 
 export type JournalStats = Record<string, { wins: number; losses: number }>;
@@ -503,6 +520,8 @@ function analyzeCandles(
     }
   }
 
+  const historicalEdge = confluence.some(c => c.startsWith('Historical edge'));
+
   const quality: 'PREMIUM'|'STRONG'|'DEVELOPING' =
     score >= 95 ? 'PREMIUM' : score >= 75 ? 'STRONG' : 'DEVELOPING';
 
@@ -512,6 +531,22 @@ function analyzeCandles(
     PIN_BAR:      `${dl} Pin Bar off 20 EMA`,
     STRONG_CLOSE: `${dl} Strong Close off 20 EMA`,
     EMA_BOUNCE:   `${dl} EMA 20 Pullback`,
+  };
+
+  const checklist: SetupChecklist = {
+    trendConfirmed: true,
+    emaSlope: true,
+    pullbackToEMA: true,
+    momentumCandle: true,
+    rsiInZone: true,
+    htfAligned: htfTrend === direction,
+    notSandwiched: true,
+    minRR: true,
+    volumeSurge: volRatio >= 1.5,
+    liquiditySweep,
+    pdhlConfluence,
+    goodSession: session === 'London' || session === 'New York',
+    historicalEdge,
   };
 
   const setup: Setup = {
@@ -529,6 +564,7 @@ function analyzeCandles(
     scannedAt: new Date().toISOString(),
     timeframe: granularity,
     session,
+    checklist,
   };
 
   return { setup, reason: 'OK', detail };
