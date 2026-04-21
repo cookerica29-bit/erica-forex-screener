@@ -731,30 +731,26 @@
     const risk = Math.abs(cp - sl);
     if (risk <= 0) return null;
 
-    // 8. Take profit: nearest opposing swing ≥2R, fallback 2R
+    // 8. Take profit: nearest opposing swing that achieves ≥2.0R, fallback 2R
+    const MIN_TP_RR = 2.0;
     const recent80  = candles.slice(-80);
     const swings    = findSwings(recent80, 5);
     const swingHighs = swings.filter(s => s.type === 'high');
     const swingLows  = swings.filter(s => s.type === 'low');
-    const opposing  = direction === 'LONG'
-      ? swingHighs.filter(s => s.price > cp)
-      : swingLows.filter(s => s.price < cp);
 
-    let tp1;
-    if (opposing.length) {
-      const nearest = direction === 'LONG'
-        ? Math.min(...opposing.map(s => s.price))
-        : Math.max(...opposing.map(s => s.price));
-      tp1 = Math.abs(nearest - cp) / risk >= minRR
-        ? nearest
-        : (direction === 'LONG' ? cp + 2 * risk : cp - 2 * risk);
-    } else {
-      tp1 = direction === 'LONG' ? cp + 2 * risk : cp - 2 * risk;
-    }
+    // Only consider swings that clear the 2.0R minimum — nearest first
+    const qualifying = (direction === 'LONG'
+      ? swingHighs.filter(s => s.price > cp && Math.abs(s.price - cp) / risk >= MIN_TP_RR)
+      : swingLows.filter(s => s.price < cp && Math.abs(s.price - cp) / risk >= MIN_TP_RR)
+    ).sort((a, b) => direction === 'LONG' ? a.price - b.price : b.price - a.price);
+
+    const tp1 = qualifying.length
+      ? qualifying[0].price
+      : (direction === 'LONG' ? cp + MIN_TP_RR * risk : cp - MIN_TP_RR * risk);
     const tp2 = direction === 'LONG' ? cp + 3 * risk : cp - 3 * risk;
     const tp3 = direction === 'LONG' ? cp + 4 * risk : cp - 4 * risk;
     const rr  = Math.abs(tp1 - cp) / risk;
-    if (rr < minRR) return null;
+    if (rr < MIN_TP_RR) return null;
 
     // 9. TP path obstruction
     const tpPathSwings = direction === 'LONG'

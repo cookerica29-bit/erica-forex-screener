@@ -402,26 +402,24 @@ function analyzeCandles(
   const swingHighs   = recentSwings.filter(s => s.type === 'high');
   const swingLows    = recentSwings.filter(s => s.type === 'low');
 
-  // Sort opposing swings by distance from entry (nearest first)
+  const MIN_TP_RR = 2.0;
+
+  // Only consider opposing swings that clear the 2.0R minimum — nearest first
   const opposingSwings = (direction === 'LONG'
-    ? swingHighs.filter(s => s.price > price)
-    : swingLows.filter(s => s.price < price)
+    ? swingHighs.filter(s => s.price > price && Math.abs(s.price - price) / risk >= MIN_TP_RR)
+    : swingLows.filter(s => s.price < price && Math.abs(s.price - price) / risk >= MIN_TP_RR)
   ).sort((a, b) =>
     direction === 'LONG'
       ? a.price - b.price   // ascending — nearest first for LONG
       : b.price - a.price   // descending — nearest first for SHORT
   );
 
-  // Walk swing levels in order. TP1 = first swing that clears minRR.
-  // TP2/TP3 = next distinct levels beyond TP1 (each at least 0.5R further).
-  // Never skip a nearby swing to chase RR — always respect nearest structure.
+  // TP1 = nearest qualifying swing; TP2/TP3 = next distinct levels (each ≥0.5R further)
   const structureTPs: number[] = [];
   for (const s of opposingSwings) {
     if (structureTPs.length === 0) {
-      // TP1: must clear minRR
-      if (Math.abs(s.price - price) / risk >= minRR) structureTPs.push(s.price);
+      structureTPs.push(s.price);
     } else {
-      // TP2/TP3: must be meaningfully beyond the previous TP
       const prev = structureTPs[structureTPs.length - 1];
       if (Math.abs(s.price - prev) / risk >= 0.5) structureTPs.push(s.price);
     }
