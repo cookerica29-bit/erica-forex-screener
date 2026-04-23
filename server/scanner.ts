@@ -38,6 +38,8 @@ export interface SetupChecklist {
   pdhlConfluence: boolean;
   goodSession: boolean;
   historicalEdge: boolean;
+  structureClearance: boolean;
+  tp1Fresh: boolean;
 }
 
 export interface Setup {
@@ -452,6 +454,43 @@ function analyzeCandles(
     : swingLows.filter(s => s.price < price && s.price > tp1);
   const clutteredPath = tpPathSwings.length >= 2;
 
+  // ── FILTER: Entry too close to opposing structure ─────────────────────────
+  // SHORT: swing low within 1.5×ATR below entry = entering into support → immediate reversal risk
+  // LONG:  swing high within 1.5×ATR above entry = entering below resistance → capped immediately
+  if (direction === 'SHORT') {
+    const nearestSupport = swingLows
+      .filter(s => s.price < price)
+      .sort((a, b) => b.price - a.price)[0];
+    if (nearestSupport) {
+      const dist = price - nearestSupport.price;
+      if (dist < 1.5 * atr) {
+        return { setup: null, reason: `Entry too close to support: swing low ${nearestSupport.price.toFixed(5)} is only ${(dist / atr).toFixed(1)}×ATR below entry — insufficient room before structure`, detail };
+      }
+    }
+  }
+  if (direction === 'LONG') {
+    const nearestResistance = swingHighs
+      .filter(s => s.price > price)
+      .sort((a, b) => a.price - b.price)[0];
+    if (nearestResistance) {
+      const dist = nearestResistance.price - price;
+      if (dist < 1.5 * atr) {
+        return { setup: null, reason: `Entry too close to resistance: swing high ${nearestResistance.price.toFixed(5)} is only ${(dist / atr).toFixed(1)}×ATR above entry — insufficient room before structure`, detail };
+      }
+    }
+  }
+
+  // ── FILTER: TP1 is a tested/congested level ───────────────────────────────
+  // Count candles in last 50 where price approached TP1 but failed to close through it.
+  // 2+ failed attempts = contested level likely to block the trade again.
+  const tp1RejectCount = candles.slice(-50).filter(c => {
+    if (direction === 'LONG')  return c.h >= tp1 - 0.5 * atr && c.c < tp1;
+    else                       return c.l <= tp1 + 0.5 * atr && c.c > tp1;
+  }).length;
+  if (tp1RejectCount >= 2) {
+    return { setup: null, reason: `TP1 at ${tp1.toFixed(5)} is a tested/rejected level (${tp1RejectCount} failed closes in last 50 candles) — likely to block again`, detail };
+  }
+
   // Volume — compare pullback candle to 20-candle average
   const avgVol  = candles.slice(-20).reduce((s,c) => s + c.v, 0) / 20;
   const volRatio = avgVol > 0 ? pullbackCandle.v / avgVol : 1;
@@ -546,6 +585,8 @@ function analyzeCandles(
     pdhlConfluence,
     goodSession: session === 'London' || session === 'New York',
     historicalEdge,
+    structureClearance: true,  // passed — entry has ≥1.5×ATR room before opposing structure
+    tp1Fresh: true,            // passed — TP1 level has <2 failed closes in last 50 candles
   };
 
   const setup: Setup = {
