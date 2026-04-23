@@ -376,11 +376,24 @@ function analyzeCandles(
   detail.momentum   = momentum?.type ?? null;
 
   let patternType = momentum?.type ?? null;
-  // Fallback: EMA touch + close on correct side counts as a valid bounce
+  // Fallback: EMA_BOUNCE — requires a real directional body, not just price passing through.
+  // Body must be ≥0.4×ATR (meaningful close) and close must be ≥0.2×ATR beyond the EMA
+  // to confirm rejection rather than a drift candle that happened to close the right side.
   if (!patternType) {
-    if (direction === 'LONG'  && pullbackCandle.l <= pullbackEma + 0.5 * atr && pullbackCandle.c > pullbackEma) {
+    const bounceBody = Math.abs(pullbackCandle.c - pullbackCandle.o);
+    if (
+      direction === 'LONG' &&
+      pullbackCandle.l <= pullbackEma + 0.5 * atr &&
+      pullbackCandle.c > pullbackEma + 0.2 * atr &&
+      bounceBody >= 0.4 * atr
+    ) {
       patternType = 'EMA_BOUNCE';
-    } else if (direction === 'SHORT' && pullbackCandle.h >= pullbackEma - 0.5 * atr && pullbackCandle.c < pullbackEma) {
+    } else if (
+      direction === 'SHORT' &&
+      pullbackCandle.h >= pullbackEma - 0.5 * atr &&
+      pullbackCandle.c < pullbackEma - 0.2 * atr &&
+      bounceBody >= 0.4 * atr
+    ) {
       patternType = 'EMA_BOUNCE';
     }
   }
