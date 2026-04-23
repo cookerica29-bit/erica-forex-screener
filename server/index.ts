@@ -5,7 +5,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, getPatternStats } from './db.js';
+import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats } from './db.js';
 import { debugScan, Setup, JournalStats } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -243,6 +243,16 @@ app.delete('/api/journal/:id', async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete journal entry' });
+  }
+});
+
+app.delete('/api/journal', async (_req, res) => {
+  try {
+    await clearAllJournalEntries();
+    cachedJournalStats = {};
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to clear journal' });
   }
 });
 

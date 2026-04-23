@@ -153,6 +153,12 @@ export async function deleteJournalEntry(id: number) {
   await db.delete(journalEntries).where(eq(journalEntries.id, id));
 }
 
+export async function clearAllJournalEntries() {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.delete(journalEntries);
+}
+
 // Returns win/loss counts keyed by "pattern|||timeframe" for journal-weighted scoring
 export async function getPatternStats(): Promise<Record<string, { wins: number; losses: number }>> {
   const db = await getDb();

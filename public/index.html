@@ -440,11 +440,14 @@
   <div class="journal-page">
 
     <!-- Analytics Controls -->
-    <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;">
+    <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <span style="font-size:11px;color:var(--slate-dim);">Show:</span>
       <button onclick="setAnalyticsFilter('all')" class="type-btn active-live" id="filter-all">All</button>
       <button onclick="setAnalyticsFilter('live')" class="type-btn" id="filter-live">💰 Live Only</button>
       <button onclick="setAnalyticsFilter('paper')" class="type-btn" id="filter-paper">📝 Paper Only</button>
+      <div style="margin-left:auto;">
+        <button onclick="resetAnalytics()" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,59,92,0.4);background:rgba(255,59,92,0.08);color:var(--red);font-family:inherit;cursor:pointer;">⚠ Reset All Data</button>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--slate);cursor:pointer;">
@@ -1183,6 +1186,19 @@
     else if (_analyticsTypeFilter === 'paper') entries = entries.filter(e => e.tradeType === 'paper');
     renderAnalytics(entries);
     renderEquityCurve(entries);
+  }
+
+  async function resetAnalytics() {
+    if (!confirm('Delete ALL journal entries and reset analytics to zero? This cannot be undone.')) return;
+    try {
+      const res = await fetch('/api/journal', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Server error');
+      _analyticsEntries = [];
+      reloadAnalytics();
+      await loadJournal();
+    } catch(e) {
+      alert('Failed to reset analytics. Try again.');
+    }
   }
 
   let _equityChartInstance = null;
