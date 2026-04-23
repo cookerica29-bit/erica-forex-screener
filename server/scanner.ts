@@ -173,7 +173,7 @@ function detectBOS(
   candles: Candle[],
   swings: Swing[],
   direction: 'LONG'|'SHORT',
-  lookbackCandles = 30
+  lookbackCandles = 50
 ): { confirmed: boolean; bosLevel: number } {
   const highs  = swings.filter(s => s.type === 'high');
   const lows   = swings.filter(s => s.type === 'low');

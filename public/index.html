@@ -249,8 +249,14 @@
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
     <span id="lastScan" style="font-size:10px;color:var(--slate-dim)"></span>
+    <div class="control-group">
+      <span class="control-label">TF</span>
+      <button class="pill" id="tf-M30" onclick="setScanTf('M30')">M30</button>
+      <button class="pill" id="tf-H1" onclick="setScanTf('H1')">H1</button>
+      <button class="pill active blue" id="tf-H4" onclick="setScanTf('H4')">H4</button>
+    </div>
     <button class="scan-btn" onclick="runScan()" id="scanBtn">
-      <span id="scanIcon">↻</span> Scan
+      <span id="scanIcon">↻</span> Scan Now
     </button>
     <span id="scanTfLabel" style="font-size:10px;color:var(--slate-dim);"></span>
   </div>
@@ -903,16 +909,25 @@
     return (h >= 8 && h < 12) || (h >= 13 && h < 15);
   }
 
+  let selectedScanTf = 'H4';
+
+  function setScanTf(tf) {
+    selectedScanTf = tf;
+    ['M30','H1','H4'].forEach(t => {
+      const el = document.getElementById('tf-' + t);
+      if (el) { el.className = 'pill' + (t === tf ? ' active blue' : ''); }
+    });
+  }
+
   function updateScanTfLabel() {
     const el = document.getElementById('scanTfLabel');
-    if (el) el.textContent = isLondonOrNYOpen() ? 'Scanning 4H + 30M' : 'Scanning 4H only';
+    if (el) el.textContent = `Scanning ${selectedScanTf}`;
   }
 
   async function runScan() {
     if(scanning) return;
     scanning=true; updateScanBtn(true); showLoading(); updateScanTfLabel();
-    const include30M = isLondonOrNYOpen();
-    const tfsToScan = include30M ? ['H4','M30'] : ['H4'];
+    const tfsToScan = [selectedScanTf];
     const results=[];
     for(const gran of tfsToScan){
       const htfGran = HTF_MAP[gran] || 'D';
@@ -930,7 +945,7 @@
     document.getElementById('lastScan').textContent=`Last scan: ${new Date().toLocaleTimeString()}`;
     // Trigger backend scan (uses journal-weighted scoring) then fetch near-misses
     try {
-      await fetch('/api/scan', { method: 'POST' });
+      await fetch(`/api/scan?tf=${selectedScanTf}`, { method: 'POST' });
       const nmRes = await fetch('/api/near-misses');
       allNearMisses = nmRes.ok ? await nmRes.json() : [];
     } catch(e) { console.warn('Backend scan failed:', e); }

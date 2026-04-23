@@ -88,16 +88,18 @@ function isLondonOrNYOpen(): boolean {
   return (h >= 8 && h < 12) || (h >= 13 && h < 15);
 }
 
-async function scheduledScan() {
+async function scheduledScan(forceTf?: string) {
   const include30M = isLondonOrNYOpen();
-  const tfs = include30M ? '4H + 30M' : '4H only';
-  console.log(`[Scanner] Running scheduled scan at ${new Date().toISOString()} (${tfs})`);
+  const tfsToRun = forceTf ? [forceTf] : (include30M ? ['H4', 'M30'] : ['H4']);
+  const tfs = tfsToRun.join(' + ');
+  console.log(`[Scanner] Running scan at ${new Date().toISOString()} (${tfs})`);
   try {
     // Refresh journal stats for historical edge/weakness scoring
     try { cachedJournalStats = await getPatternStats(); } catch { /* non-fatal */ }
 
-    const h4Debug = await debugScan('H4', 1.5, cachedJournalStats);
-    const m30Debug = include30M ? await debugScan('M30', 1.5, cachedJournalStats) : [];
+    const debugResults = await Promise.all(tfsToRun.map(tf => debugScan(tf, 1.5, cachedJournalStats)));
+    const h4Debug  = debugResults[0] ?? [];
+    const m30Debug = debugResults[1] ?? [];
 
     const ord: Record<string,number> = { PREMIUM: 0, STRONG: 1, DEVELOPING: 2 };
     latestSetups = [
@@ -128,8 +130,9 @@ app.get('/api/setups', (_req, res) => {
   res.json({ setups: latestSetups, lastScanTime, count: latestSetups.length });
 });
 
-app.post('/api/scan', async (_req, res) => {
-  await scheduledScan();
+app.post('/api/scan', async (req, res) => {
+  const tf = (req.query.tf as string) || undefined;
+  await scheduledScan(tf);
   res.json({ setups: latestSetups, lastScanTime, count: latestSetups.length });
 });
 
