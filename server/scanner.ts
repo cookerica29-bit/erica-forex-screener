@@ -40,6 +40,7 @@ export interface SetupChecklist {
   historicalEdge: boolean;
   structureClearance: boolean;
   tp1Fresh: boolean;
+  impulseStrong: boolean;
 }
 
 export interface Setup {
@@ -318,8 +319,10 @@ function analyzeCandles(
   }
 
   // HTF hard block — no counter-trend trades
-  const htfSwings = findSwings(htf.slice(-100));
-  const htfTrend  = getTrend(htfSwings);
+  const htfSwings     = findSwings(htf.slice(-100));
+  const htfSwingHighs = htfSwings.filter(s => s.type === 'high');
+  const htfSwingLows  = htfSwings.filter(s => s.type === 'low');
+  const htfTrend      = getTrend(htfSwings);
   detail.htfTrend = htfTrend;
   if (htfTrend && htfTrend !== direction) {
     return { setup: null, reason: `HTF conflict — Daily is ${htfTrend} but setup is ${direction}`, detail };
@@ -454,9 +457,35 @@ function analyzeCandles(
     : swingLows.filter(s => s.price < price && s.price > tp1);
   const clutteredPath = tpPathSwings.length >= 2;
 
+  // ── FILTER: Impulse leg strength ─────────────────────────────────────────
+  // The last directional swing leg before the pullback must be ≥1.5×ATR.
+  // A small impulse means the "trend" is range chop dressed up as a pullback.
+  if (direction === 'LONG') {
+    const lastSwingLow  = swingLows[swingLows.length - 1];
+    const impulseHighs  = swingHighs.filter(s => lastSwingLow && s.index > lastSwingLow.index);
+    const lastImpulseHigh = impulseHighs[impulseHighs.length - 1];
+    if (lastSwingLow && lastImpulseHigh) {
+      const impulseSize = lastImpulseHigh.price - lastSwingLow.price;
+      if (impulseSize < 1.5 * atr) {
+        return { setup: null, reason: `Weak impulse leg: last upswing ${impulseSize.toFixed(5)} = ${(impulseSize / atr).toFixed(1)}×ATR — likely chop not trend`, detail };
+      }
+    }
+  }
+  if (direction === 'SHORT') {
+    const lastSwingHigh = swingHighs[swingHighs.length - 1];
+    const impulseLows   = swingLows.filter(s => lastSwingHigh && s.index > lastSwingHigh.index);
+    const lastImpulseLow = impulseLows[impulseLows.length - 1];
+    if (lastSwingHigh && lastImpulseLow) {
+      const impulseSize = lastSwingHigh.price - lastImpulseLow.price;
+      if (impulseSize < 1.5 * atr) {
+        return { setup: null, reason: `Weak impulse leg: last downswing ${impulseSize.toFixed(5)} = ${(impulseSize / atr).toFixed(1)}×ATR — likely chop not trend`, detail };
+      }
+    }
+  }
+
   // ── FILTER: Entry too close to opposing structure ─────────────────────────
-  // SHORT: swing low within 1.5×ATR below entry = entering into support → immediate reversal risk
-  // LONG:  swing high within 1.5×ATR above entry = entering below resistance → capped immediately
+  // Entry-TF swings: 1.5×ATR clearance required.
+  // HTF swings (Daily/Weekly): 2.0×ATR clearance — stronger levels, wider buffer.
   if (direction === 'SHORT') {
     const nearestSupport = swingLows
       .filter(s => s.price < price)
@@ -464,7 +493,16 @@ function analyzeCandles(
     if (nearestSupport) {
       const dist = price - nearestSupport.price;
       if (dist < 1.5 * atr) {
-        return { setup: null, reason: `Entry too close to support: swing low ${nearestSupport.price.toFixed(5)} is only ${(dist / atr).toFixed(1)}×ATR below entry — insufficient room before structure`, detail };
+        return { setup: null, reason: `Entry too close to support (${granularity}): swing low ${nearestSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
+      }
+    }
+    const nearestHTFSupport = htfSwingLows
+      .filter(s => s.price < price)
+      .sort((a, b) => b.price - a.price)[0];
+    if (nearestHTFSupport) {
+      const dist = price - nearestHTFSupport.price;
+      if (dist < 2.0 * atr) {
+        return { setup: null, reason: `Entry too close to HTF support: ${HTF_MAP[granularity]} swing low ${nearestHTFSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
       }
     }
   }
@@ -475,7 +513,16 @@ function analyzeCandles(
     if (nearestResistance) {
       const dist = nearestResistance.price - price;
       if (dist < 1.5 * atr) {
-        return { setup: null, reason: `Entry too close to resistance: swing high ${nearestResistance.price.toFixed(5)} is only ${(dist / atr).toFixed(1)}×ATR above entry — insufficient room before structure`, detail };
+        return { setup: null, reason: `Entry too close to resistance (${granularity}): swing high ${nearestResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
+      }
+    }
+    const nearestHTFResistance = htfSwingHighs
+      .filter(s => s.price > price)
+      .sort((a, b) => a.price - b.price)[0];
+    if (nearestHTFResistance) {
+      const dist = nearestHTFResistance.price - price;
+      if (dist < 2.0 * atr) {
+        return { setup: null, reason: `Entry too close to HTF resistance: ${HTF_MAP[granularity]} swing high ${nearestHTFResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
       }
     }
   }
@@ -585,8 +632,9 @@ function analyzeCandles(
     pdhlConfluence,
     goodSession: session === 'London' || session === 'New York',
     historicalEdge,
-    structureClearance: true,  // passed — entry has ≥1.5×ATR room before opposing structure
+    structureClearance: true,  // passed — entry has ≥1.5×ATR (TF) / ≥2.0×ATR (HTF) room before opposing structure
     tp1Fresh: true,            // passed — TP1 level has <2 failed closes in last 50 candles
+    impulseStrong: true,       // passed — last directional leg ≥1.5×ATR, not chop
   };
 
   const setup: Setup = {

@@ -1013,6 +1013,7 @@
             ${ci(c.htfAligned?'pass':'fail',c.htfAligned?'✅':'❌','HTF aligned')}
             ${ci(c.notSandwiched?'pass':'fail',c.notSandwiched?'✅':'❌','Not sandwiched')}
             ${ci(c.minRR?'pass':'fail',c.minRR?'✅':'❌','Min 2.0 R:R')}
+            ${ci(c.impulseStrong!==false?'pass':'fail',c.impulseStrong!==false?'✅':'❌','Strong impulse leg')}
             ${ci(c.structureClearance!==false?'pass':'fail',c.structureClearance!==false?'✅':'❌','Structure clearance')}
             ${ci(c.tp1Fresh!==false?'pass':'fail',c.tp1Fresh!==false?'✅':'❌','TP1 fresh level')}
             ${ci(c.volumeSurge?'bonus':'inactive',c.volumeSurge?'⭐':'○','Volume surge')}
