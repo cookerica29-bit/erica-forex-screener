@@ -1093,22 +1093,48 @@
   function renderNearMisses() {
     const container = document.getElementById('nearMissContent');
     if (!container || !allNearMisses.length) { if (container) container.innerHTML = ''; return; }
-    const fmt5 = (n, pair) => n == null ? '—' : (pair && (pair.includes('JPY')||pair.includes('XAU')||pair.includes('XAG')) ? Number(n).toFixed(3) : Number(n).toFixed(5));
+    const fmt = (n, pair) => n == null ? '—' : (pair && (pair.includes('JPY')||pair.includes('XAU')||pair.includes('XAG')) ? Number(n).toFixed(3) : Number(n).toFixed(5));
+    const chk = (pass, label) => `<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:${pass?'var(--green)':'var(--red)'}">
+      <span style="font-size:11px">${pass?'✓':'✗'}</span>
+      <span style="color:${pass?'var(--slate)':'rgba(255,59,92,0.8)'}">${label}</span>
+    </div>`;
     const cards = allNearMisses.map(nm => {
-      const isLong = nm.detail?.trend === 'LONG';
-      const dirHtml = nm.detail?.trend
-        ? `<span class="nm-dir ${isLong?'long':'short'}">${isLong?'↑ LONG':'↓ SHORT'}</span>` : '';
-      const rsi = nm.detail?.rsi != null ? `RSI: ${Number(nm.detail.rsi).toFixed(1)}` : '';
-      const ema20 = nm.detail?.ema20 != null ? `EMA20: ${fmt5(nm.detail.ema20, nm.pair)}` : '';
-      const stats = [rsi, ema20].filter(Boolean).join(' · ');
-      return `<div class="nm-card">
-        <div class="nm-top">
-          <span class="nm-pair">${nm.pair.replace('_','/')}</span>
-          <span class="badge tf">${nm.granularity}</span>
-          ${dirHtml}
+      const d = nm.detail || {};
+      const isLong = d.trend === 'LONG';
+      const hasTrend  = !!d.trend;
+      const hasBOS    = d.bosLevel > 0;
+      const hasOB     = d.obHigh != null;
+      const hasMomentum = false; // reached near-miss = passed trend+BOS, failed at/after OB
+      const dirColor  = isLong ? 'var(--green)' : 'var(--red)';
+      const dirLabel  = isLong ? '↑ LONG' : '↓ SHORT';
+      const rsiStr    = d.rsi != null ? `RSI ${Number(d.rsi).toFixed(1)}` : '';
+      const obStr     = hasOB ? `OB ${fmt(d.obLow, nm.pair)} – ${fmt(d.obHigh, nm.pair)}` : '';
+      const bosStr    = hasBOS ? `BOS @ ${fmt(d.bosLevel, nm.pair)}` : '';
+      const htfStr    = d.htfTrend ? `HTF: ${d.htfTrend}` : '';
+      const metaLine  = [bosStr, obStr, rsiStr, htfStr].filter(Boolean).join(' · ');
+      return `<div class="nm-card" style="border-color:rgba(148,163,184,0.2)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+          <div>
+            <div style="font-size:17px;font-weight:800;color:var(--text)">${nm.pair.replace('_','/')}</div>
+            <div style="display:flex;gap:4px;margin-top:3px;">
+              <span class="badge developing">DEVELOPING</span>
+              <span class="badge tf">${nm.granularity}</span>
+              ${hasTrend ? `<span style="font-size:9px;padding:2px 6px;border-radius:99px;border:1px solid;color:${dirColor};border-color:${dirColor}40;background:${dirColor}10">${dirLabel}</span>` : ''}
+            </div>
+          </div>
+          <div style="text-align:right;font-size:9px;color:var(--slate-dim);line-height:1.6">
+            ${d.htfTrend ? `<div>HTF <span style="color:${d.htfTrend===d.trend?'var(--green)':'var(--red)'}">${d.htfTrend}</span></div>` : ''}
+            ${d.rsi != null ? `<div>RSI ${Number(d.rsi).toFixed(1)}</div>` : ''}
+          </div>
         </div>
-        <div class="nm-reason">${nm.reason}</div>
-        ${stats ? `<div class="nm-stats">${stats}</div>` : ''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:8px;padding:8px;background:rgba(255,255,255,0.02);border-radius:6px;border:1px solid rgba(255,255,255,0.04)">
+          ${chk(hasTrend,  'Trend confirmed')}
+          ${chk(hasBOS,    'BOS confirmed')}
+          ${chk(hasOB,     'Order block found')}
+          ${chk(false,     'Entry trigger')}
+        </div>
+        <div style="font-size:10px;color:rgba(255,59,92,0.75);background:rgba(255,59,92,0.05);border:1px solid rgba(255,59,92,0.15);border-radius:5px;padding:5px 8px;">✗ ${nm.reason}</div>
+        ${metaLine ? `<div style="font-size:9px;color:var(--slate-dim);margin-top:6px;line-height:1.6">${metaLine}</div>` : ''}
       </div>`;
     }).join('');
     container.innerHTML = `<div class="near-miss-section">
