@@ -83,14 +83,8 @@ function queueSetups(setups: Setup[]) {
   }
 }
 
-function isLondonOrNYOpen(): boolean {
-  const h = new Date().getUTCHours();
-  return (h >= 8 && h < 12) || (h >= 13 && h < 15);
-}
-
 async function scheduledScan(forceTf?: string) {
-  const include30M = isLondonOrNYOpen();
-  const tfsToRun = forceTf ? [forceTf] : (include30M ? ['H4', 'M30'] : ['H4']);
+  const tfsToRun = forceTf ? [forceTf] : ['H4', 'M30'];
   const tfs = tfsToRun.join(' + ');
   console.log(`[Scanner] Running scan at ${new Date().toISOString()} (${tfs})`);
   try {
