@@ -564,7 +564,7 @@ function analyzeCandles(
   if (pdhlConfluence)                                                   score += 10;
   if (liquiditySweep)                                                   score += 15;
   if (clutteredPath)                                                    score -= 15;
-  if (session === 'Asia')                                               score -= 15;
+  if (session === 'Asia')                                               score += 10;
   if (session === 'London' || session === 'New York')                   score += 10;
 
   // ── CONFLUENCE TAGS ───────────────────────────────────────────────────────────
@@ -576,7 +576,7 @@ function analyzeCandles(
   if (htfTrend === direction)         confluence.push('HTF aligned');
   if (rsiIdeal)                       confluence.push('RSI ideal zone');
   if (volRatio >= 1.2)                confluence.push('Volume surge');
-  if (session === 'London' || session === 'New York') confluence.push(`${session} session`);
+  if (session === 'Asia' || session === 'London' || session === 'New York') confluence.push(`${session} session`);
   if (liquiditySweep)                 confluence.push('Liquidity sweep');
   if (pdhlConfluence)                 confluence.push('PDH/PDL confluence');
   if (clutteredPath)                  confluence.push('Cluttered TP path');
