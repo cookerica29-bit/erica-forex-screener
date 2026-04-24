@@ -15,8 +15,6 @@ export const PAIRS = [
   'EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY',
   // Other crosses
   'EUR_GBP','EUR_AUD',
-  // Metals
-  'XAU_USD','XAG_USD',
 ];
 
 // Fixed: H4 confirms against Daily (was Weekly — too strict)
