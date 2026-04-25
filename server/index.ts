@@ -1,4 +1,5 @@
 // Required env vars: OANDA_API_KEY, OANDA_ACCOUNT_TYPE, BOT_URL, WEBHOOK_SECRET
+// Optional alerts: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -22,8 +23,6 @@ let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
 
-const SLACK_WEBHOOK = process.env.SLACK_WEBHOOK_URL || Buffer.from('aHR0cHM6Ly9ob29rcy5zbGFjay5jb20vc2VydmljZXMvVDBBTjM5NVRYQTgvQjBBUzlTRVBYSzcvYkZsZ3E3UUtSSlRCZFRVNnVFdUl4cWpN', 'base64').toString();
-
 function queueSetups(setups: Setup[]) {
   const premium = setups.filter(s => s.quality === 'PREMIUM' || s.quality === 'STRONG');
   for (const setup of premium) {
@@ -33,30 +32,8 @@ function queueSetups(setups: Setup[]) {
     );
     if (!exists) {
       pendingApprovals.push({ ...setup, id: `${setup.pair}-${Date.now()}` });
-      const slackToken = process.env.SLACK_BOT_TOKEN;
-      const slackUserId = process.env.SLACK_USER_ID || 'U0AMW8X3GLV';
-      if (slackToken) {
-        console.log(`[Slack] Attempting to notify for ${setup.pair} ${setup.quality}`);
-        const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
-        const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
-        const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
-        const newsPrefix = setup.newsRisk ? '⚠️ NEWS RISK\n' : '';
-        const text = `${newsPrefix}${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
-        fetch('https://slack.com/api/chat.postMessage', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${slackToken}`,
-          },
-          body: JSON.stringify({
-            channel: slackUserId,
-            text: text,
-          }),
-        }).then(() => console.log(`[Slack] Notification sent for ${setup.pair}`))
-          .catch((e: any) => console.error('Slack DM failed:', e.message));
-      }
-      const telegramToken = process.env.TELEGRAM_BOT_TOKEN || '8666767904:AAFamLcmXF6_0Ap0-N7ylgX0gptmzZtGaWs';
-      const telegramChatId = process.env.TELEGRAM_CHAT_ID || '7394371711';
+      const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+      const telegramChatId = process.env.TELEGRAM_CHAT_ID;
       if (telegramToken && telegramChatId) {
         const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
         const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
@@ -75,6 +52,8 @@ function queueSetups(setups: Setup[]) {
           if (!data.ok) console.error('[Telegram] API error:', JSON.stringify(data));
           else console.log(`[Telegram] Alert sent for ${setup.pair} ${setup.quality}`);
         }).catch((e: any) => console.error('[Telegram] fetch failed:', e.message));
+      } else {
+        console.warn('[Telegram] Alerts disabled: missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
       }
     }
   }
@@ -269,8 +248,11 @@ app.post('/api/approvals/:id/execute', async (req, res) => {
   const setup = pendingApprovals.find(p => p.id === req.params.id);
   if (!setup) return res.status(404).json({ error: 'Setup not found' });
 
-  const botUrl = process.env.BOT_URL || 'https://erica-forex-bot-production.up.railway.app';
-  const webhookSecret = process.env.WEBHOOK_SECRET || 'erica-bot-2026';
+  const botUrl = process.env.BOT_URL;
+  const webhookSecret = process.env.WEBHOOK_SECRET;
+  if (!botUrl || !webhookSecret) {
+    return res.status(500).json({ error: 'Bot execution disabled: missing BOT_URL or WEBHOOK_SECRET' });
+  }
 
   try {
     const payload = {
@@ -317,8 +299,8 @@ app.post('/api/approvals/manual', (req, res) => {
 
 // ─── TEST ENDPOINTS ───────────────────────────────────────────────────────────
 app.get('/api/test-telegram', async (_req, res) => {
-  const token = process.env.TELEGRAM_BOT_TOKEN || '8666767904:AAFamLcmXF6_0Ap0-N7ylgX0gptmzZtGaWs';
-  const chatId = process.env.TELEGRAM_CHAT_ID || '7394371711';
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return res.json({ error: 'Telegram not configured' });
   const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
@@ -340,5 +322,5 @@ console.log(`PORT env var is: ${process.env.PORT}`);
 server.listen(PORT, () => {
   console.log(`✅ Forex Scanner running on http://localhost:${PORT}`);
   console.log(`   OANDA: ${OANDA_API_KEY ? '✓ configured' : '✗ missing key'} (${OANDA_ACCOUNT_TYPE})`);
-  console.log(`[Config] SLACK_BOT_TOKEN: ${process.env.SLACK_BOT_TOKEN ? 'set' : 'MISSING'}`);
+  console.log(`[Config] TELEGRAM_BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN ? 'set' : 'MISSING'}`);
 });
