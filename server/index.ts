@@ -1,5 +1,5 @@
-// Required env vars: OANDA_API_KEY, OANDA_ACCOUNT_TYPE, BOT_URL, WEBHOOK_SECRET
-// Optional alerts: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+// Required env vars: OANDA_API_KEY, OANDA_ACCOUNT_TYPE
+// Optional alerts/execution: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TRADINGVIEW_WEBHOOK_SECRET, BOT_URL, WEBHOOK_SECRET
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -16,12 +16,74 @@ app.use(cors());
 const server = createServer(app);
 
 app.use(express.json());
+app.use(express.text({ type: 'text/plain' }));
 
 let latestSetups: Setup[] = [];
 let latestRejected: Array<{ pair: string; reason: string; detail: any; granularity: string }> = [];
 let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
+
+async function sendTelegram(text: string, parseMode?: 'Markdown') {
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  const telegramChatId = process.env.TELEGRAM_CHAT_ID;
+  if (!telegramToken || !telegramChatId) {
+    console.warn('[Telegram] Alerts disabled: missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
+    return { ok: false, skipped: true, error: 'Telegram not configured' };
+  }
+
+  const response = await fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: telegramChatId,
+      text,
+      ...(parseMode ? { parse_mode: parseMode } : {}),
+    }),
+  });
+  const data = await response.json() as any;
+  if (!data.ok) console.error('[Telegram] API error:', JSON.stringify(data));
+  return data;
+}
+
+function toNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const num = typeof value === 'number' ? value : parseFloat(String(value));
+  return Number.isFinite(num) ? num : undefined;
+}
+
+function normalizeDirection(value: unknown): 'LONG' | 'SHORT' | undefined {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'BUY' || normalized === 'LONG') return 'LONG';
+  if (normalized === 'SELL' || normalized === 'SHORT') return 'SHORT';
+  return undefined;
+}
+
+function normalizeSymbol(value: unknown) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!raw) return { symbol: '', displaySymbol: '' };
+  const compact = raw.replace(/^OANDA:/, '').replace(/[^A-Z]/g, '');
+  if (compact.length === 6) {
+    return { symbol: `${compact.slice(0, 3)}_${compact.slice(3)}`, displaySymbol: `${compact.slice(0, 3)}/${compact.slice(3)}` };
+  }
+  return { symbol: compact, displaySymbol: raw.replace('_', '/') };
+}
+
+function parseTradingViewBody(body: any): any {
+  if (typeof body !== 'string') return body || {};
+  try {
+    return JSON.parse(body);
+  } catch {
+    return { message: body };
+  }
+}
+
+function calculateRr(direction: 'LONG' | 'SHORT', entry: number, stopLoss: number, tp: number) {
+  const risk = direction === 'LONG' ? entry - stopLoss : stopLoss - entry;
+  const reward = direction === 'LONG' ? tp - entry : entry - tp;
+  if (risk <= 0 || reward <= 0) return undefined;
+  return Number((reward / risk).toFixed(1));
+}
 
 function queueSetups(setups: Setup[]) {
   const premium = setups.filter(s => s.quality === 'PREMIUM' || s.quality === 'STRONG');
@@ -32,29 +94,14 @@ function queueSetups(setups: Setup[]) {
     );
     if (!exists) {
       pendingApprovals.push({ ...setup, id: `${setup.pair}-${Date.now()}` });
-      const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
-      const telegramChatId = process.env.TELEGRAM_CHAT_ID;
-      if (telegramToken && telegramChatId) {
-        const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
-        const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
-        const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
-        const newsPrefix = setup.newsRisk ? '⚠️ NEWS RISK\n' : '';
-        const text = `${newsPrefix}${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
-        fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: telegramChatId,
-            text: text,
-            parse_mode: 'Markdown',
-          }),
-        }).then(r => r.json()).then((data: any) => {
-          if (!data.ok) console.error('[Telegram] API error:', JSON.stringify(data));
-          else console.log(`[Telegram] Alert sent for ${setup.pair} ${setup.quality}`);
-        }).catch((e: any) => console.error('[Telegram] fetch failed:', e.message));
-      } else {
-        console.warn('[Telegram] Alerts disabled: missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID');
-      }
+      const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
+      const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
+      const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
+      const newsPrefix = setup.newsRisk ? '⚠️ NEWS RISK\n' : '';
+      const text = `${newsPrefix}${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
+      sendTelegram(text, 'Markdown').then((data: any) => {
+        if (data.ok) console.log(`[Telegram] Alert sent for ${setup.pair} ${setup.quality}`);
+      }).catch((e: any) => console.error('[Telegram] fetch failed:', e.message));
     }
   }
   if (pendingApprovals.length > 20) {
@@ -226,6 +273,83 @@ app.delete('/api/journal', async (_req, res) => {
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to clear journal' });
+  }
+});
+
+// ─── TRADINGVIEW PAPER ALERT RELAY ────────────────────────────────────────────
+app.post('/api/tradingview-alert', async (req, res) => {
+  try {
+    const configuredSecret = process.env.TRADINGVIEW_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET;
+    if (!configuredSecret) {
+      return res.status(500).json({ error: 'TradingView alerts disabled: missing TRADINGVIEW_WEBHOOK_SECRET' });
+    }
+
+    const body = parseTradingViewBody(req.body);
+    if (body.secret !== configuredSecret) {
+      return res.status(401).json({ error: 'Invalid TradingView alert secret' });
+    }
+
+    const { symbol, displaySymbol } = normalizeSymbol(body.symbol || body.ticker || body.pair);
+    const direction = normalizeDirection(body.action || body.direction || body.side);
+    const entry = toNumber(body.entry || body.price || body.close);
+    const stopLoss = toNumber(body.sl || body.stop || body.stopLoss || body.stop_loss);
+    const tp1 = toNumber(body.tp || body.tp1 || body.takeProfit || body.take_profit);
+    const timeframe = String(body.timeframe || body.interval || 'TradingView').trim();
+    const strategy = String(body.strategy || body.pattern || 'TradingView Alert').trim();
+    const session = String(body.session || 'TradingView').trim();
+
+    if (!symbol || !direction || entry === undefined || stopLoss === undefined || tp1 === undefined) {
+      return res.status(400).json({
+        error: 'TradingView alert must include symbol, action/direction, entry, sl, and tp',
+        received: {
+          symbol: Boolean(symbol),
+          direction: Boolean(direction),
+          entry: entry !== undefined,
+          sl: stopLoss !== undefined,
+          tp: tp1 !== undefined,
+        },
+      });
+    }
+
+    const rr1 = calculateRr(direction, entry, stopLoss, tp1);
+    if (rr1 === undefined) {
+      return res.status(400).json({ error: 'Invalid risk/reward: check entry, sl, tp, and direction' });
+    }
+
+    const id = await createJournalEntry({
+      symbol,
+      displaySymbol,
+      direction,
+      quality: 'DEVELOPING',
+      pattern: strategy,
+      timeframe,
+      entry,
+      stopLoss,
+      tp1,
+      rr1,
+      confluences: ['TradingView alert', body.mode === 'paper' ? 'Paper trade' : 'Alert relay'],
+      session,
+      newsRisk: Boolean(body.newsRisk || body.news_risk),
+      notes: `TradingView paper alert${body.message ? `: ${String(body.message).slice(0, 300)}` : ''}`,
+      tradeType: 'paper',
+    });
+
+    const directionIcon = direction === 'LONG' ? 'LONG' : 'SHORT';
+    const text = [
+      `TradingView paper alert: ${displaySymbol}`,
+      `${directionIcon} | ${timeframe} | ${strategy}`,
+      `Entry: ${entry}`,
+      `SL: ${stopLoss}`,
+      `TP: ${tp1}`,
+      `R:R: ${rr1}`,
+      `Journal ID: ${id}`,
+    ].join('\n');
+
+    const telegram = await sendTelegram(text);
+    return res.json({ success: true, journalId: id, telegram: telegram.ok ? 'sent' : 'skipped', mode: 'paper' });
+  } catch (e: any) {
+    console.error('[TradingView] Alert failed:', e.message);
+    return res.status(500).json({ error: 'Failed to process TradingView alert' });
   }
 });
 

@@ -105,6 +105,8 @@ export async function createJournalEntry(data: {
   confluences?: string[];
   session?: string;
   newsRisk?: boolean;
+  notes?: string;
+  tradeType?: string;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
@@ -126,6 +128,8 @@ export async function createJournalEntry(data: {
     confluences: data.confluences ? JSON.stringify(data.confluences) : null,
     session: data.session,
     newsRisk: data.newsRisk ?? false,
+    notes: data.notes ?? null,
+    tradeType: data.tradeType ?? null,
     outcome: 'PENDING',
   }).$returningId();
   return result[0].id;
