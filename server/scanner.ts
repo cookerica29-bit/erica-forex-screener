@@ -15,31 +15,27 @@ export const PAIRS = [
   'EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY',
   // Other crosses
   'EUR_GBP','EUR_AUD',
+  // Metals
+  'XAU_USD','XAG_USD',
 ];
 
-// Fixed: H4 confirms against Daily (was Weekly — too strict)
-const HTF_MAP: Record<string,string> = { M15:'H1', M30:'H4', H1:'H4', H4:'D', D:'W' };
+const HTF_MAP: Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };
 
 interface Candle { t:string; o:number; h:number; l:number; c:number; v:number; }
 interface Swing  { index:number; price:number; type:'high'|'low'; }
 
 export interface SetupChecklist {
-  trendConfirmed: boolean;
-  bosConfirmed: boolean;
-  pullbackToOB: boolean;
-  momentumCandle: boolean;
-  rsiInZone: boolean;
-  htfAligned: boolean;
-  notSandwiched: boolean;
-  minRR: boolean;
+  trend: boolean;           // Gate 1: EMA stack (price > EMA50 > EMA200) + EMA20 slope + HTF alignment
+  pullbackQuality: boolean; // Gate 2: pullback to EMA20 within 0.5×ATR + not sandwiched
+  momentum: boolean;        // Gate 3: ENGULFING / PIN_BAR / STRONG_CLOSE / EMA_BOUNCE
+  rsi: boolean;             // Gate 4: RSI in zone (40–68 LONG, 35–60 SHORT)
+  viability: boolean;       // Gate 5: structure clearance + impulse leg + TP1 freshness + min R:R
+  session: string;          // Info field: active session at signal time (not a filter)
+  // Bonus/scoring signals — not gates
   volumeSurge: boolean;
   liquiditySweep: boolean;
   pdhlConfluence: boolean;
-  goodSession: boolean;
   historicalEdge: boolean;
-  structureClearance: boolean;
-  tp1Fresh: boolean;
-  impulseStrong: boolean;
 }
 
 export interface Setup {
@@ -78,10 +74,11 @@ export interface DebugResult {
     baselineATR?: number;
     recentATR?: number;
     price?: number;
+    ema20?: number;
+    ema50?: number;
+    ema200?: number;
+    emaSlope?: number;
     rsi?: number;
-    bosLevel?: number;
-    obHigh?: number;
-    obLow?: number;
   };
 }
 
@@ -110,6 +107,20 @@ function calcATR(candles: Candle[], period=14): number {
     i===0 ? c.h-c.l : Math.max(c.h-c.l, Math.abs(c.h-arr[i-1].c), Math.abs(c.l-arr[i-1].c))
   );
   return trs.reduce((a,b)=>a+b,0) / trs.length;
+}
+
+// Returns array same length as candles; indices before period-1 are undefined
+function calcEMA(candles: Candle[], period: number): number[] {
+  const k = 2 / (period + 1);
+  const emas: number[] = new Array(candles.length);
+  // Seed with SMA of first `period` candles
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += candles[i].c;
+  emas[period - 1] = sum / period;
+  for (let i = period; i < candles.length; i++) {
+    emas[i] = candles[i].c * k + emas[i - 1] * (1 - k);
+  }
+  return emas;
 }
 
 // Wilder RSI; indices before period are NaN
@@ -164,75 +175,6 @@ function getTrend(swings: Swing[]): 'LONG'|'SHORT'|null {
   return null;
 }
 
-// Confirms a BOS occurred in the given direction within the last `lookbackCandles` candles.
-// For LONG: a candle closed above the second-to-last swing high.
-// For SHORT: a candle closed below the second-to-last swing low.
-function detectBOS(
-  candles: Candle[],
-  swings: Swing[],
-  direction: 'LONG'|'SHORT',
-  lookbackCandles = 50
-): { confirmed: boolean; bosLevel: number } {
-  const highs  = swings.filter(s => s.type === 'high');
-  const lows   = swings.filter(s => s.type === 'low');
-  const minIdx = candles.length - 1 - lookbackCandles;
-
-  if (direction === 'LONG' && highs.length >= 2) {
-    const prevHigh = highs[highs.length - 2];
-    for (let i = Math.max(prevHigh.index + 1, minIdx); i < candles.length; i++) {
-      if (candles[i].c > prevHigh.price) {
-        return { confirmed: true, bosLevel: prevHigh.price };
-      }
-    }
-  }
-
-  if (direction === 'SHORT' && lows.length >= 2) {
-    const prevLow = lows[lows.length - 2];
-    for (let i = Math.max(prevLow.index + 1, minIdx); i < candles.length; i++) {
-      if (candles[i].c < prevLow.price) {
-        return { confirmed: true, bosLevel: prevLow.price };
-      }
-    }
-  }
-
-  return { confirmed: false, bosLevel: 0 };
-}
-
-// Finds the Order Block: the last opposing candle in the most recent impulse.
-// For LONG: last bearish candle since the last swing low.
-// For SHORT: last bullish candle since the last swing high.
-function findOrderBlock(
-  candles: Candle[],
-  direction: 'LONG'|'SHORT',
-  swings: Swing[]
-): { high: number; low: number; index: number } | null {
-  const lastIdx = candles.length - 1;
-
-  if (direction === 'LONG') {
-    const lows = swings.filter(s => s.type === 'low');
-    const lastSwingLow = lows[lows.length - 1];
-    if (!lastSwingLow) return null;
-    for (let i = lastIdx - 1; i >= lastSwingLow.index; i--) {
-      if (candles[i].c < candles[i].o) {
-        return { high: candles[i].h, low: candles[i].l, index: i };
-      }
-    }
-  }
-
-  if (direction === 'SHORT') {
-    const highs = swings.filter(s => s.type === 'high');
-    const lastSwingHigh = highs[highs.length - 1];
-    if (!lastSwingHigh) return null;
-    for (let i = lastIdx - 1; i >= lastSwingHigh.index; i--) {
-      if (candles[i].c > candles[i].o) {
-        return { high: candles[i].h, low: candles[i].l, index: i };
-      }
-    }
-  }
-
-  return null;
-}
-
 function detectMomentum(c: Candle, p: Candle, dir: string, atr: number, structureLevel: number): {type:string;strength:number}|null {
   const body=Math.abs(c.c-c.o), range=c.h-c.l, bodyRatio=range>0?body/range:0;
   const uw=c.h-Math.max(c.c,c.o), lw=Math.min(c.c,c.o)-c.l;
@@ -273,23 +215,29 @@ function getPDHL(candles: Candle[]): { pdh: number; pdl: number } | null {
   };
 }
 
-function getSession(): string {
+// Session labels: London / NY / London+NY overlap / Tokyo (JPY pairs) / Off-hours
+// UTC hour boundaries match the previous Asia/London/New York scoring weights exactly:
+//   h>=22||h<8 → Tokyo/Off-hours  (was 'Asia', score -15)
+//   h>=8&&h<13 → London           (was 'London', score +10)
+//   h>=13&&h<17 → London+NY overlap (was 'New York', score +10)
+//   h>=17&&h<22 → NY              (was 'New York', score +10)
+function getSessionLabel(pair: string): string {
   const h = new Date().getUTCHours();
-  if (h>=22||h<8)  return 'Asia';
-  if (h>=8&&h<13)  return 'London';
-  if (h>=13&&h<22) return 'New York';
-  return 'Transition';
+  if (h >= 22 || h < 8)  return pair.includes('JPY') ? 'Tokyo' : 'Off-hours';
+  if (h >= 8  && h < 13) return 'London';
+  if (h >= 13 && h < 17) return 'London+NY overlap';
+  return 'NY';
 }
 
-function analyzeCandles(
+export function analyzeCandles(
   candles: Candle[], htf: Candle[], pair: string,
   granularity='H1', minRR=1.5, _debug=false,
   journalStats: JournalStats = {}
 ): { setup: Setup|null; reason: string; detail: DebugResult['detail'] } {
   const detail: DebugResult['detail'] = {};
 
-  // Reduced from 210 — no longer need 200-period EMA warmup
-  if (candles.length < 100) return { setup: null, reason: 'Not enough candles (<100)', detail };
+  // Need 210+ for a stable 200 EMA with warmup
+  if (candles.length < 210) return { setup: null, reason: 'Not enough candles (<210)', detail };
 
   const atr = calcATR(candles.slice(-50));
   detail.atr = atr;
@@ -297,11 +245,15 @@ function analyzeCandles(
 
   // ATR minimum — reject dead/illiquid markets
   const ATR_MIN: Record<string,number> = {
+    // Metals
     XAU_USD: 0.8,   XAG_USD: 0.015,
+    // JPY pairs
     USD_JPY: 0.03,  EUR_JPY: 0.04,  GBP_JPY: 0.05,
     AUD_JPY: 0.03,  NZD_JPY: 0.03,  CAD_JPY: 0.03,
+    // USD majors
     GBP_USD: 0.0004, EUR_USD: 0.0003, AUD_USD: 0.0002,
     NZD_USD: 0.0002, USD_CAD: 0.0003, USD_CHF: 0.0003,
+    // Crosses
     EUR_GBP: 0.0002, EUR_AUD: 0.0003,
   };
   const atrMin = ATR_MIN[pair] ?? 0.0003;
@@ -317,43 +269,132 @@ function analyzeCandles(
   if (spikeInWindow) return { setup: null, reason: 'Post-news spike in last 20 candles — chop window', detail };
   if (recentATR > 1.8 * baselineATR) return { setup: null, reason: `Elevated volatility regime — recent ATR ${recentATR.toFixed(5)} > 1.8× baseline ${baselineATR.toFixed(5)}`, detail };
 
+  // Calculate indicators on full candle set
+  const ema20arr  = calcEMA(candles, 20);
+  const ema50arr  = calcEMA(candles, 50);
+  const ema200arr = calcEMA(candles, 200);
+  const rsiArr    = calcRSI(candles, 14);
+
   const lastIdx = candles.length - 1;
   const last    = candles[lastIdx];
   const price   = last.c;
   detail.price  = price;
 
-  // RSI
-  const rsiArr = calcRSI(candles, 14);
+  const ema20  = ema20arr[lastIdx];
+  const ema50  = ema50arr[lastIdx];
+  const ema200 = ema200arr[lastIdx];
   const rsi    = rsiArr[lastIdx];
-  detail.rsi   = rsi;
-  if (isNaN(rsi)) return { setup: null, reason: 'Insufficient data for RSI calculation', detail };
 
-  // ── TREND DETECTION (swing structure) ────────────────────────────────────────
-  const entrySwings = findSwings(candles, 5);
-  const direction   = getTrend(entrySwings);
-  if (!direction) return { setup: null, reason: 'No clear swing structure (need HH/HL or LH/LL)', detail };
-  detail.trend = direction;
+  detail.ema20  = ema20;
+  detail.ema50  = ema50;
+  detail.ema200 = ema200;
+  detail.rsi    = rsi;
 
-  // ── BOS CONFIRMATION ─────────────────────────────────────────────────────────
-  const bos = detectBOS(candles, entrySwings, direction, 30);
-  if (!bos.confirmed) return {
+  if (!ema20 || !ema50 || !ema200 || isNaN(rsi)) {
+    return { setup: null, reason: 'Insufficient data for EMA/RSI calculation', detail };
+  }
+
+  // ── GATE 1: TREND ──────────────────────────────────────────────────────────
+  // 1a. EMA direction: price must be above EMA50 + EMA200 (LONG) or below both (SHORT)
+  let direction: 'LONG'|'SHORT'|null = null;
+  if (price > ema50 && price > ema200)      direction = 'LONG';
+  else if (price < ema50 && price < ema200) direction = 'SHORT';
+
+  if (!direction) return {
     setup: null,
-    reason: `No confirmed BOS in ${direction} direction within last 30 candles`,
+    reason: `EMA alignment neutral — price (${price.toFixed(5)}) not clearly above/below EMA50 (${ema50.toFixed(5)}) + EMA200 (${ema200.toFixed(5)})`,
     detail,
   };
-  detail.bosLevel = bos.bosLevel;
+  detail.trend = direction;
 
-  // ── HTF HARD BLOCK — no counter-trend trades ──────────────────────────────────
+  // 1b. EMA20 slope: must be rising for LONG, falling for SHORT
+  const ema20_3ago = ema20arr[lastIdx - 3];
+  const emaSlope   = ema20 - ema20_3ago;
+  detail.emaSlope  = emaSlope;
+  const emaSlopeStrong = Math.abs(emaSlope) > 0.5 * atr;
+
+  if (direction === 'LONG'  && emaSlope <= 0) return { setup: null, reason: `20 EMA not rising for LONG (slope=${emaSlope.toFixed(5)})`, detail };
+  if (direction === 'SHORT' && emaSlope >= 0) return { setup: null, reason: `20 EMA not falling for SHORT (slope=${emaSlope.toFixed(5)})`, detail };
+
+  // 1c. HTF alignment: no counter-trend trades
   const htfSwings     = findSwings(htf.slice(-100));
   const htfSwingHighs = htfSwings.filter(s => s.type === 'high');
   const htfSwingLows  = htfSwings.filter(s => s.type === 'low');
   const htfTrend      = getTrend(htfSwings);
   detail.htfTrend = htfTrend;
   if (htfTrend && htfTrend !== direction) {
-    return { setup: null, reason: `HTF conflict — ${HTF_MAP[granularity] ?? 'HTF'} is ${htfTrend} but setup is ${direction}`, detail };
+    return { setup: null, reason: `HTF conflict — Daily is ${htfTrend} but setup is ${direction}`, detail };
   }
 
-  // ── RSI FILTER ───────────────────────────────────────────────────────────────
+  // ── GATE 2: PULLBACK QUALITY ───────────────────────────────────────────────
+  // 2a. Not sandwiched between EMA20 and EMA50 (no-man's-land)
+  if (direction === 'LONG') {
+    if (price < ema50 && price > ema20) {
+      return { setup: null, reason: `Price sandwiched between 20 and 50 EMA (${price.toFixed(5)} between ${ema20.toFixed(5)} and ${ema50.toFixed(5)}) — no man's land`, detail };
+    }
+  }
+  if (direction === 'SHORT') {
+    if (price > ema50 && price < ema20) {
+      return { setup: null, reason: `Price sandwiched between 20 and 50 EMA (${price.toFixed(5)} between ${ema50.toFixed(5)} and ${ema20.toFixed(5)}) — no man's land`, detail };
+    }
+  }
+
+  // 2b. Pullback to EMA20: one of the last 3 candles must have touched within 0.5×ATR
+  let pullbackCandle: Candle | null = null;
+  let pullbackIdx = -1;
+  for (let i = lastIdx; i >= lastIdx - 2; i--) {
+    const c   = candles[i];
+    const ema = ema20arr[i];
+    if (!ema) continue;
+    const touchDist = direction === 'LONG'
+      ? Math.abs(c.l - ema)
+      : Math.abs(c.h - ema);
+    if (touchDist <= 0.5 * atr) {
+      pullbackCandle = c;
+      pullbackIdx    = i;
+      break;
+    }
+  }
+  if (!pullbackCandle) return {
+    setup: null,
+    reason: `No pullback to 20 EMA in last 3 candles (EMA20=${ema20.toFixed(5)}, price=${price.toFixed(5)})`,
+    detail,
+  };
+
+  // ── GATE 3: MOMENTUM CONFIRMATION ─────────────────────────────────────────
+  // ENGULFING / PIN_BAR / STRONG_CLOSE at the pullback candle, or EMA_BOUNCE.
+  // EMA_BOUNCE requires: body ≥0.4×ATR + close ≥0.2×ATR beyond EMA (no drift candles).
+  const pullbackEma = ema20arr[pullbackIdx];
+  const prevCandle  = candles[pullbackIdx - 1];
+  const momentum    = detectMomentum(pullbackCandle, prevCandle, direction, atr, pullbackEma);
+  detail.momentum   = momentum?.type ?? null;
+
+  let patternType = momentum?.type ?? null;
+  if (!patternType) {
+    const bounceBody = Math.abs(pullbackCandle.c - pullbackCandle.o);
+    if (
+      direction === 'LONG' &&
+      pullbackCandle.l <= pullbackEma + 0.5 * atr &&
+      pullbackCandle.c > pullbackEma + 0.2 * atr &&
+      bounceBody >= 0.4 * atr
+    ) {
+      patternType = 'EMA_BOUNCE';
+    } else if (
+      direction === 'SHORT' &&
+      pullbackCandle.h >= pullbackEma - 0.5 * atr &&
+      pullbackCandle.c < pullbackEma - 0.2 * atr &&
+      bounceBody >= 0.4 * atr
+    ) {
+      patternType = 'EMA_BOUNCE';
+    }
+  }
+  if (!patternType) return {
+    setup: null,
+    reason: 'No rejection candle at 20 EMA (need engulfing, pin bar, strong close, or clean EMA bounce close)',
+    detail,
+  };
+
+  // ── GATE 4: RSI ────────────────────────────────────────────────────────────
   if (direction === 'LONG') {
     if (rsi > 70) return { setup: null, reason: `RSI overbought for LONG (${rsi.toFixed(1)} > 70)`, detail };
     if (rsi < 40 || rsi > 68) return { setup: null, reason: `RSI outside LONG zone (${rsi.toFixed(1)}, need 40–68)`, detail };
@@ -362,59 +403,8 @@ function analyzeCandles(
     if (rsi < 35 || rsi > 60) return { setup: null, reason: `RSI outside SHORT zone (${rsi.toFixed(1)}, need 35–60)`, detail };
   }
 
-  // ── ORDER BLOCK PULLBACK ──────────────────────────────────────────────────────
-  const ob = findOrderBlock(candles, direction, entrySwings);
-  if (!ob) return { setup: null, reason: 'No order block found in current impulse', detail };
-  detail.obHigh = ob.high;
-  detail.obLow  = ob.low;
-
-  // Price must be touching or inside the OB zone (within 0.5×ATR tolerance)
-  const inOB = direction === 'LONG'
-    ? last.l <= ob.high + 0.5 * atr && last.c >= ob.low - 0.5 * atr
-    : last.h >= ob.low - 0.5 * atr  && last.c <= ob.high + 0.5 * atr;
-
-  if (!inOB) return {
-    setup: null,
-    reason: `Price not pulling back into OB (OB: ${ob.low.toFixed(5)}–${ob.high.toFixed(5)}, price: ${price.toFixed(5)})`,
-    detail,
-  };
-
-  // ── MOMENTUM CANDLE AT OB ────────────────────────────────────────────────────
-  const prevCandle = candles[lastIdx - 1];
-  const obLevel    = direction === 'LONG' ? ob.high : ob.low;
-  const momentum   = detectMomentum(last, prevCandle, direction, atr, obLevel);
-  detail.momentum  = momentum?.type ?? null;
-
-  let patternType = momentum?.type ?? null;
-
-  // Fallback: OB_BOUNCE — meaningful directional close from within the OB
-  if (!patternType) {
-    const bounceBody = Math.abs(last.c - last.o);
-    const obMid      = (ob.high + ob.low) / 2;
-    if (
-      direction === 'LONG' &&
-      last.l <= ob.high &&
-      last.c > obMid &&
-      bounceBody >= 0.4 * atr
-    ) {
-      patternType = 'OB_BOUNCE';
-    } else if (
-      direction === 'SHORT' &&
-      last.h >= ob.low &&
-      last.c < obMid &&
-      bounceBody >= 0.4 * atr
-    ) {
-      patternType = 'OB_BOUNCE';
-    }
-  }
-
-  if (!patternType) return {
-    setup: null,
-    reason: 'No rejection candle at OB (need engulfing, pin bar, strong close, or OB bounce)',
-    detail,
-  };
-
-  // ── STOP LOSS ────────────────────────────────────────────────────────────────
+  // ── SL / TP (prerequisite for Gate 5) ─────────────────────────────────────
+  // Swing high/low of last 5 candles ± 0.3×ATR
   const window5 = candles.slice(lastIdx - 4, lastIdx + 1);
   const sl = direction === 'LONG'
     ? Math.min(...window5.map(c => c.l)) - 0.3 * atr
@@ -425,20 +415,23 @@ function analyzeCandles(
   const risk = Math.abs(price - sl);
   if (risk <= 0) return { setup: null, reason: 'Risk is zero (price equals SL)', detail };
 
-  // ── TAKE PROFIT ──────────────────────────────────────────────────────────────
   const recentSwings = findSwings(recent80);
   const swingHighs   = recentSwings.filter(s => s.type === 'high');
   const swingLows    = recentSwings.filter(s => s.type === 'low');
 
   const MIN_TP_RR = 2.0;
 
+  // Only consider opposing swings that clear the 2.0R minimum — nearest first
   const opposingSwings = (direction === 'LONG'
     ? swingHighs.filter(s => s.price > price && Math.abs(s.price - price) / risk >= MIN_TP_RR)
     : swingLows.filter(s => s.price < price && Math.abs(s.price - price) / risk >= MIN_TP_RR)
   ).sort((a, b) =>
-    direction === 'LONG' ? a.price - b.price : b.price - a.price
+    direction === 'LONG'
+      ? a.price - b.price   // ascending — nearest first for LONG
+      : b.price - a.price   // descending — nearest first for SHORT
   );
 
+  // TP1 = nearest qualifying swing; TP2/TP3 = next distinct levels (each ≥0.5R further)
   const structureTPs: number[] = [];
   for (const s of opposingSwings) {
     if (structureTPs.length === 0) {
@@ -453,30 +446,76 @@ function analyzeCandles(
   // PDH/PDL obstacle check
   let pdhlConfluence = false;
   if (pdhl) {
-    if (direction === 'LONG'  && Math.abs(ob.low  - pdhl.pdl) <= 0.5 * atr) pdhlConfluence = true;
-    if (direction === 'SHORT' && Math.abs(ob.high - pdhl.pdh) <= 0.5 * atr) pdhlConfluence = true;
-    if (direction === 'LONG'  && pdhl.pdh > price && structureTPs[0] !== undefined && pdhl.pdh < structureTPs[0])
+    if (direction === 'LONG' && Math.abs(ema20 - pdhl.pdl) <= 0.5 * atr) pdhlConfluence = true;
+    if (direction === 'SHORT' && Math.abs(ema20 - pdhl.pdh) <= 0.5 * atr) pdhlConfluence = true;
+    // Trim TP1 back if PDH/PDL is an obstacle between entry and TP1
+    if (direction === 'LONG' && pdhl.pdh > price && structureTPs[0] !== undefined && pdhl.pdh < structureTPs[0])
       structureTPs[0] = pdhl.pdh - 0.1 * atr;
     if (direction === 'SHORT' && pdhl.pdl < price && structureTPs[0] !== undefined && pdhl.pdl > structureTPs[0])
       structureTPs[0] = pdhl.pdl + 0.1 * atr;
   }
 
+  // Use structure TPs where found; fall back to R-multiples
   const tp1 = structureTPs[0] ?? (direction === 'LONG' ? price + 2 * risk : price - 2 * risk);
   const tp2 = structureTPs[1] ?? (direction === 'LONG' ? price + 3 * risk : price - 3 * risk);
   const tp3 = structureTPs[2] ?? (direction === 'LONG' ? price + 4 * risk : price - 4 * risk);
   const rrRatio = Math.abs(tp1 - price) / risk;
-  if (rrRatio < minRR) return { setup: null, reason: `RR too low (${rrRatio.toFixed(2)} < ${minRR})`, detail };
 
-  // TP path obstruction
-  const tpPathSwings = direction === 'LONG'
-    ? swingHighs.filter(s => s.price > price && s.price < tp1)
-    : swingLows.filter(s => s.price < price && s.price > tp1);
-  const clutteredPath = tpPathSwings.length >= 2;
+  // ── GATE 5: VIABILITY (COMPOSITE) ─────────────────────────────────────────
+  // All five sub-checks must pass. Returns specific sub-reason on failure.
 
-  // ── FILTER: Impulse leg strength ──────────────────────────────────────────────
+  // 5a. Structure clearance — entry-TF swings (1.5×ATR required)
+  if (direction === 'SHORT') {
+    const nearestSupport = swingLows
+      .filter(s => s.price < price)
+      .sort((a, b) => b.price - a.price)[0];
+    if (nearestSupport) {
+      const dist = price - nearestSupport.price;
+      if (dist < 1.5 * atr) {
+        return { setup: null, reason: `Entry too close to support (${granularity}): swing low ${nearestSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
+      }
+    }
+  }
   if (direction === 'LONG') {
-    const lastSwingLow    = swingLows[swingLows.length - 1];
-    const impulseHighs    = swingHighs.filter(s => lastSwingLow && s.index > lastSwingLow.index);
+    const nearestResistance = swingHighs
+      .filter(s => s.price > price)
+      .sort((a, b) => a.price - b.price)[0];
+    if (nearestResistance) {
+      const dist = nearestResistance.price - price;
+      if (dist < 1.5 * atr) {
+        return { setup: null, reason: `Entry too close to resistance (${granularity}): swing high ${nearestResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
+      }
+    }
+  }
+
+  // 5b. Structure clearance — HTF swings (2.0×ATR required)
+  if (direction === 'SHORT') {
+    const nearestHTFSupport = htfSwingLows
+      .filter(s => s.price < price)
+      .sort((a, b) => b.price - a.price)[0];
+    if (nearestHTFSupport) {
+      const dist = price - nearestHTFSupport.price;
+      if (dist < 2.0 * atr) {
+        return { setup: null, reason: `Entry too close to HTF support: ${HTF_MAP[granularity]} swing low ${nearestHTFSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
+      }
+    }
+  }
+  if (direction === 'LONG') {
+    const nearestHTFResistance = htfSwingHighs
+      .filter(s => s.price > price)
+      .sort((a, b) => a.price - b.price)[0];
+    if (nearestHTFResistance) {
+      const dist = nearestHTFResistance.price - price;
+      if (dist < 2.0 * atr) {
+        return { setup: null, reason: `Entry too close to HTF resistance: ${HTF_MAP[granularity]} swing high ${nearestHTFResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
+      }
+    }
+  }
+
+  // 5c. Impulse leg strength: last directional swing ≥1.5×ATR (filters chop)
+  if (direction === 'LONG') {
+    const lastSwingLow  = swingLows[swingLows.length - 1];
+    const impulseHighs  = swingHighs.filter(s => lastSwingLow && s.index > lastSwingLow.index);
     const lastImpulseHigh = impulseHighs[impulseHighs.length - 1];
     if (lastSwingLow && lastImpulseHigh) {
       const impulseSize = lastImpulseHigh.price - lastSwingLow.price;
@@ -486,8 +525,8 @@ function analyzeCandles(
     }
   }
   if (direction === 'SHORT') {
-    const lastSwingHigh  = swingHighs[swingHighs.length - 1];
-    const impulseLows    = swingLows.filter(s => lastSwingHigh && s.index > lastSwingHigh.index);
+    const lastSwingHigh = swingHighs[swingHighs.length - 1];
+    const impulseLows   = swingLows.filter(s => lastSwingHigh && s.index > lastSwingHigh.index);
     const lastImpulseLow = impulseLows[impulseLows.length - 1];
     if (lastSwingHigh && lastImpulseLow) {
       const impulseSize = lastSwingHigh.price - lastImpulseLow.price;
@@ -497,41 +536,7 @@ function analyzeCandles(
     }
   }
 
-  // ── FILTER: Entry too close to opposing structure ──────────────────────────────
-  if (direction === 'SHORT') {
-    const nearestSupport = swingLows.filter(s => s.price < price).sort((a, b) => b.price - a.price)[0];
-    if (nearestSupport) {
-      const dist = price - nearestSupport.price;
-      if (dist < 1.5 * atr) {
-        return { setup: null, reason: `Entry too close to support (${granularity}): swing low ${nearestSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
-      }
-    }
-    const nearestHTFSupport = htfSwingLows.filter(s => s.price < price).sort((a, b) => b.price - a.price)[0];
-    if (nearestHTFSupport) {
-      const dist = price - nearestHTFSupport.price;
-      if (dist < 2.0 * atr) {
-        return { setup: null, reason: `Entry too close to HTF support: ${HTF_MAP[granularity]} swing low ${nearestHTFSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
-      }
-    }
-  }
-  if (direction === 'LONG') {
-    const nearestResistance = swingHighs.filter(s => s.price > price).sort((a, b) => a.price - b.price)[0];
-    if (nearestResistance) {
-      const dist = nearestResistance.price - price;
-      if (dist < 1.5 * atr) {
-        return { setup: null, reason: `Entry too close to resistance (${granularity}): swing high ${nearestResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
-      }
-    }
-    const nearestHTFResistance = htfSwingHighs.filter(s => s.price > price).sort((a, b) => a.price - b.price)[0];
-    if (nearestHTFResistance) {
-      const dist = nearestHTFResistance.price - price;
-      if (dist < 2.0 * atr) {
-        return { setup: null, reason: `Entry too close to HTF resistance: ${HTF_MAP[granularity]} swing high ${nearestHTFResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
-      }
-    }
-  }
-
-  // ── FILTER: TP1 is a tested/congested level ───────────────────────────────────
+  // 5d. TP1 freshness: ≤1 failed approach at TP1 level in last 50 candles (±0.5×ATR zone)
   const tp1RejectCount = candles.slice(-50).filter(c => {
     if (direction === 'LONG')  return c.h >= tp1 - 0.5 * atr && c.c < tp1;
     else                       return c.l <= tp1 + 0.5 * atr && c.c > tp1;
@@ -540,55 +545,64 @@ function analyzeCandles(
     return { setup: null, reason: `TP1 at ${tp1.toFixed(5)} is a tested/rejected level (${tp1RejectCount} failed closes in last 50 candles) — likely to block again`, detail };
   }
 
-  // Volume — compare last candle to 20-candle average
+  // 5e. Minimum R:R
+  if (rrRatio < minRR) return { setup: null, reason: `RR too low (${rrRatio.toFixed(2)} < ${minRR})`, detail };
+
+  // ── BONUS SIGNALS (scoring + confluence only, not gates) ──────────────────
   const avgVol   = candles.slice(-20).reduce((s,c) => s + c.v, 0) / 20;
-  const volRatio = avgVol > 0 ? last.v / avgVol : 1;
+  const volRatio = avgVol > 0 ? pullbackCandle.v / avgVol : 1;
 
-  // Liquidity sweep: wick through OB boundary then closed back
-  const sweepWindow    = candles.slice(lastIdx - 5, lastIdx);
+  const sweepWindow = candles.slice(lastIdx - 5, lastIdx);
   const liquiditySweep = direction === 'LONG'
-    ? sweepWindow.some(c => c.l < ob.low  && c.c > ob.low)
-    : sweepWindow.some(c => c.h > ob.high && c.c < ob.high);
+    ? sweepWindow.some(c => c.l < ema20 && c.c > ema20)
+    : sweepWindow.some(c => c.h > ema20 && c.c < ema20);
 
-  const session = getSession();
+  const tpPathSwings = direction === 'LONG'
+    ? swingHighs.filter(s => s.price > price && s.price < tp1)
+    : swingLows.filter(s => s.price < price && s.price > tp1);
+  const clutteredPath = tpPathSwings.length >= 2;
 
-  // ── SCORING ───────────────────────────────────────────────────────────────────
+  const session = getSessionLabel(pair);
+
+  // ── SCORING ───────────────────────────────────────────────────────────────
   let score = 60;
-  if (htfTrend === direction)                                           score += 15;
+  if (emaSlopeStrong)                                                       score += 15;
+  if (htfTrend === direction)                                               score += 15;
   const rsiIdeal = direction === 'LONG' ? (rsi >= 45 && rsi <= 60) : (rsi >= 40 && rsi <= 55);
-  if (rsiIdeal)                                                         score += 10;
-  if (volRatio >= 1.2)                                                  score += 10;
-  if (Math.abs(last.c - last.o) > 0.5 * atr)                           score += 10;
-  if (pdhlConfluence)                                                   score += 10;
-  if (liquiditySweep)                                                   score += 15;
-  if (clutteredPath)                                                    score -= 15;
-  if (session === 'Asia')                                               score += 10;
-  if (session === 'London' || session === 'New York')                   score += 10;
+  if (rsiIdeal)                                                             score += 10;
+  if (volRatio >= 1.2)                                                      score += 10;
+  if (Math.abs(pullbackCandle.c - pullbackCandle.o) > 0.5 * atr)           score += 10;
+  if (pdhlConfluence)                                                       score += 10;
+  if (liquiditySweep)                                                       score += 15;
+  if (clutteredPath)                                                        score -= 15;
+  if (session === 'Tokyo' || session === 'Off-hours')                       score -= 15;
+  if (session === 'London' || session === 'NY' || session === 'London+NY overlap') score += 10;
 
-  // ── CONFLUENCE TAGS ───────────────────────────────────────────────────────────
-  const confluence: string[] = ['BOS confirmed'];
-  if (patternType === 'ENGULFING')    confluence.push('Engulfing at OB');
-  if (patternType === 'PIN_BAR')      confluence.push('Pin bar at OB');
-  if (patternType === 'STRONG_CLOSE') confluence.push('Strong close at OB');
-  if (patternType === 'OB_BOUNCE')    confluence.push('OB bounce');
+  // ── CONFLUENCE TAGS ───────────────────────────────────────────────────────
+  const confluence: string[] = ['EMA 20/50/200 aligned'];
+  if (patternType === 'ENGULFING')    confluence.push('Engulfing at 20 EMA');
+  if (patternType === 'PIN_BAR')      confluence.push('Pin bar at 20 EMA');
+  if (patternType === 'STRONG_CLOSE') confluence.push('Strong close off 20 EMA');
+  if (patternType === 'EMA_BOUNCE')   confluence.push('EMA bounce close');
   if (htfTrend === direction)         confluence.push('HTF aligned');
+  if (emaSlopeStrong)                 confluence.push('Strong EMA slope');
   if (rsiIdeal)                       confluence.push('RSI ideal zone');
   if (volRatio >= 1.2)                confluence.push('Volume surge');
-  if (session === 'Asia' || session === 'London' || session === 'New York') confluence.push(`${session} session`);
+  if (session === 'London' || session === 'NY' || session === 'London+NY overlap') confluence.push(`${session} session`);
   if (liquiditySweep)                 confluence.push('Liquidity sweep');
   if (pdhlConfluence)                 confluence.push('PDH/PDL confluence');
   if (clutteredPath)                  confluence.push('Cluttered TP path');
 
-  // ── JOURNAL-WEIGHTED SCORING ──────────────────────────────────────────────────
+  // ── JOURNAL-WEIGHTED SCORING ──────────────────────────────────────────────
   if (patternType && Object.keys(journalStats).length > 0) {
     const dl2 = direction === 'LONG' ? 'Bullish' : 'Bearish';
     const ptName: Record<string, string> = {
-      ENGULFING:    `${dl2} Engulfing at OB`,
-      PIN_BAR:      `${dl2} Pin Bar at OB`,
-      STRONG_CLOSE: `${dl2} Strong Close at OB`,
-      OB_BOUNCE:    `${dl2} OB Pullback`,
+      ENGULFING:    `${dl2} Engulfing at 20 EMA`,
+      PIN_BAR:      `${dl2} Pin Bar off 20 EMA`,
+      STRONG_CLOSE: `${dl2} Strong Close off 20 EMA`,
+      EMA_BOUNCE:   `${dl2} EMA 20 Pullback`,
     };
-    const histKey = `${ptName[patternType] || 'OB Pullback'}|||${granularity}`;
+    const histKey = `${ptName[patternType] || 'EMA Pullback'}|||${granularity}`;
     const hist = journalStats[histKey];
     if (hist) {
       const closed = hist.wins + hist.losses;
@@ -612,29 +626,23 @@ function analyzeCandles(
 
   const dl = direction === 'LONG' ? 'Bullish' : 'Bearish';
   const patternNames: Record<string,string> = {
-    ENGULFING:    `${dl} Engulfing at OB`,
-    PIN_BAR:      `${dl} Pin Bar at OB`,
-    STRONG_CLOSE: `${dl} Strong Close at OB`,
-    OB_BOUNCE:    `${dl} OB Pullback`,
+    ENGULFING:    `${dl} Engulfing at 20 EMA`,
+    PIN_BAR:      `${dl} Pin Bar off 20 EMA`,
+    STRONG_CLOSE: `${dl} Strong Close off 20 EMA`,
+    EMA_BOUNCE:   `${dl} EMA 20 Pullback`,
   };
 
   const checklist: SetupChecklist = {
-    trendConfirmed: true,
-    bosConfirmed: true,
-    pullbackToOB: true,
-    momentumCandle: true,
-    rsiInZone: true,
-    htfAligned: htfTrend === direction,
-    notSandwiched: true,
-    minRR: true,
+    trend: true,           // passed Gate 1
+    pullbackQuality: true, // passed Gate 2
+    momentum: true,        // passed Gate 3
+    rsi: true,             // passed Gate 4
+    viability: true,       // passed Gate 5
+    session,
     volumeSurge: volRatio >= 1.5,
     liquiditySweep,
     pdhlConfluence,
-    goodSession: session === 'London' || session === 'New York',
     historicalEdge,
-    structureClearance: true,
-    tp1Fresh: true,
-    impulseStrong: true,
   };
 
   const setup: Setup = {
@@ -647,7 +655,7 @@ function analyzeCandles(
     tp1,
     tp2,
     tp3,
-    pattern: patternNames[patternType] || 'OB Pullback',
+    pattern: patternNames[patternType] || 'EMA Pullback',
     confluence,
     scannedAt: new Date().toISOString(),
     timeframe: granularity,
