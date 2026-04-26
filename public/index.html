@@ -2475,29 +2475,82 @@
 
   // ── Simulated chart ───────────────────────────────────────────────────────
   let trainerChartInstance = null;
+  // Push N candles in a direction then return data
+  function pushCandles(opens, highs, lows, closes, labels, startPrice, count, dir, step, wickRatio) {
+    let p = startPrice;
+    for (let i = 0; i < count; i++) {
+      const body = step * (0.6 + Math.random() * 0.7);
+      const o = p;
+      const c = o + dir * body;
+      const w = body * (wickRatio || 0.4);
+      opens.push(+o.toFixed(5)); closes.push(+c.toFixed(5));
+      highs.push(+(Math.max(o,c) + w).toFixed(5));
+      lows.push(+(Math.min(o,c) - w).toFixed(5));
+      labels.push('');
+      p = c;
+    }
+    return p;
+  }
+
   function drawChart(levelKey) {
     const canvas = document.getElementById('trainer-chart');
     if (trainerChartInstance) { trainerChartInstance.destroy(); trainerChartInstance = null; }
 
-    const bars = 30;
-    let price = 1.1000 + Math.random() * 0.05;
     const opens=[], highs=[], lows=[], closes=[], labels=[];
+    let price = 1.1000 + Math.random() * 0.04;
+    const step = price * 0.007; // ~7 pips per bar — clearly visible
+    const bull = 1, bear = -1;
 
-    const trend = Math.random() > 0.5 ? 1 : -1;
-    // candleSize scales body to ~0.5–1% of price so it's clearly visible
-    const candleSize = price * (levelKey === 'beginner' ? 0.006 : 0.009);
-    for (let i = 0; i < bars; i++) {
-      const isTrendBar = levelKey === 'beginner' ? Math.random() > 0.25 : Math.random() > 0.4;
-      const bodySize = candleSize * (0.4 + Math.random() * 0.8);
-      const open  = price;
-      const close = open + (isTrendBar ? trend : -trend) * bodySize;
-      const wickMult = 0.3 + Math.random() * 0.5;
-      const high  = Math.max(open, close) + bodySize * wickMult;
-      const low   = Math.min(open, close) - bodySize * wickMult;
-      opens.push(+open.toFixed(5)); highs.push(+high.toFixed(5));
-      lows.push(+low.toFixed(5));   closes.push(+close.toFixed(5));
-      labels.push('Bar ' + (i + 1));
-      price = close;
+    if (levelKey === 'beginner') {
+      // Clear zigzag: alternating swing legs with obvious peaks and troughs
+      // Pattern: up leg → pullback → up leg → pullback → up leg (or bearish version)
+      const trendDir = Math.random() > 0.5 ? bull : bear;
+      price = pushCandles(opens,highs,lows,closes,labels, price, 5, trendDir,    step, 0.35); // leg 1 up
+      price = pushCandles(opens,highs,lows,closes,labels, price, 3, -trendDir,   step * 0.6, 0.3); // pullback 1
+      price = pushCandles(opens,highs,lows,closes,labels, price, 5, trendDir,    step, 0.35); // leg 2 up (HH or LL)
+      price = pushCandles(opens,highs,lows,closes,labels, price, 3, -trendDir,   step * 0.6, 0.3); // pullback 2
+      price = pushCandles(opens,highs,lows,closes,labels, price, 5, trendDir,    step, 0.35); // leg 3 up (HH or LL)
+      price = pushCandles(opens,highs,lows,closes,labels, price, 3, -trendDir,   step * 0.5, 0.3); // pullback 3
+      price = pushCandles(opens,highs,lows,closes,labels, price, 4, trendDir,    step, 0.35); // leg 4
+
+    } else if (levelKey === 'intermediate') {
+      // Trending structure with a BOS then CHoCH — clear structure break mid-chart
+      // Up trend → BOS above prior high → pullback to OB → continuation OR CHoCH
+      const scenario = Math.random();
+      if (scenario < 0.5) {
+        // BOS scenario: trending, break above swing high, then demand zone pullback
+        price = pushCandles(opens,highs,lows,closes,labels, price, 4, bull, step, 0.4);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 3, bear, step * 0.5, 0.3);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 5, bull, step * 1.2, 0.35); // BOS — strong push
+        price = pushCandles(opens,highs,lows,closes,labels, price, 3, bear, step * 0.6, 0.3);  // pullback to OB
+        price = pushCandles(opens,highs,lows,closes,labels, price, 2, bull, step * 0.4, 0.3);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 5, bull, step, 0.35);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 3, bear, step * 0.5, 0.3);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 4, bull, step, 0.35);
+      } else {
+        // CHoCH scenario: downtrend then structure change — LH broken to upside
+        price = pushCandles(opens,highs,lows,closes,labels, price, 4, bear, step, 0.4);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 3, bull, step * 0.5, 0.3);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 4, bear, step, 0.35);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 3, bull, step * 0.5, 0.3);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 5, bull, step * 1.3, 0.4); // CHoCH — breaks LH
+        price = pushCandles(opens,highs,lows,closes,labels, price, 3, bear, step * 0.5, 0.3);
+        price = pushCandles(opens,highs,lows,closes,labels, price, 4, bull, step, 0.35);
+      }
+
+    } else {
+      // Advanced: complex — trend, liquidity sweep below LL, sharp reversal, then BOS up
+      price = pushCandles(opens,highs,lows,closes,labels, price, 3, bull, step, 0.4);
+      price = pushCandles(opens,highs,lows,closes,labels, price, 2, bear, step * 0.5, 0.3);
+      price = pushCandles(opens,highs,lows,closes,labels, price, 3, bull, step, 0.35);
+      price = pushCandles(opens,highs,lows,closes,labels, price, 2, bear, step * 0.5, 0.3);
+      price = pushCandles(opens,highs,lows,closes,labels, price, 4, bear, step * 1.1, 0.4); // sells into lows
+      price = pushCandles(opens,highs,lows,closes,labels, price, 1, bear, step * 1.5, 0.8); // liquidity sweep wick
+      price = pushCandles(opens,highs,lows,closes,labels, price, 4, bull, step * 1.4, 0.4); // sharp reversal
+      price = pushCandles(opens,highs,lows,closes,labels, price, 2, bear, step * 0.4, 0.3);
+      price = pushCandles(opens,highs,lows,closes,labels, price, 5, bull, step * 1.1, 0.35); // BOS
+      price = pushCandles(opens,highs,lows,closes,labels, price, 2, bear, step * 0.4, 0.3);
+      price = pushCandles(opens,highs,lows,closes,labels, price, 3, bull, step, 0.35);
     }
 
     const allPrices = highs.concat(lows);
