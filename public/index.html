@@ -268,6 +268,7 @@
   <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
   <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">🧮 Calculator</button>
   <button class="tab-btn" onclick="switchTab('bot')" id="tab-bot">🤖 Bot</button>
+  <button class="tab-btn" onclick="switchTab('trainer')" id="tab-trainer">🎯 Trainer</button>
 </div>
 
 <div id="content-scanner" class="tab-content active">
@@ -2106,6 +2107,423 @@
 
   const orig=window.switchTab;
   window.switchTab=function(tab){orig&&orig(tab);clearInterval(botTimer);if(tab==='bot'){refreshBot();botTimer=setInterval(refreshBot,60000);}};
+})();
+</script>
+
+<div id="content-trainer" class="tab-content">
+  <div class="journal-page">
+
+    <!-- Level badge + progress -->
+    <div id="trainer-header" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div id="trainer-level-badge" style="font-size:22px;font-weight:800;"></div>
+          <div>
+            <div id="trainer-level-name" style="font-size:13px;font-weight:700;color:var(--text);"></div>
+            <div id="trainer-level-desc" style="font-size:10px;color:var(--slate-dim);margin-top:2px;"></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="trainer-drop-btn" onclick="trainerDropLevel()" style="display:none;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--slate-dim);font-size:10px;font-family:inherit;cursor:pointer;">↓ Practice previous level</button>
+        </div>
+      </div>
+      <div id="trainer-progress-section">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span id="trainer-progress-label" style="font-size:10px;color:var(--slate-dim);"></span>
+          <span id="trainer-progress-pct" style="font-size:10px;font-weight:700;color:var(--text);"></span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:6px;">
+          <div id="trainer-progress-bar" style="height:100%;width:0%;border-radius:99px;transition:width 0.5s;"></div>
+        </div>
+        <div id="trainer-progress-msg" style="font-size:11px;color:var(--slate-dim);"></div>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+      <div class="stat-box"><div class="stat-value" id="tr-stat-total" style="font-size:20px;color:var(--text);">0</div><div class="stat-label">Charts done</div></div>
+      <div class="stat-box"><div class="stat-value" id="tr-stat-correct" style="font-size:20px;color:var(--green);">0</div><div class="stat-label">Correct</div></div>
+      <div class="stat-box"><div class="stat-value" id="tr-stat-accuracy" style="font-size:20px;color:var(--blue);">—</div><div class="stat-label">Accuracy</div></div>
+      <div class="stat-box"><div class="stat-value" id="tr-stat-streak" style="font-size:20px;color:var(--gold);">0</div><div class="stat-label">Streak</div></div>
+    </div>
+
+    <!-- Chart exercise -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px;">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div id="trainer-task-label" style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">Current task</div>
+          <div id="trainer-task-text" style="font-size:13px;font-weight:700;color:var(--text);"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span id="trainer-pair-badge" style="font-size:10px;padding:2px 8px;border-radius:99px;border:1px solid rgba(96,165,250,0.4);color:var(--blue);background:rgba(96,165,250,0.08);"></span>
+          <span id="trainer-tf-badge" style="font-size:10px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--slate-dim);"></span>
+        </div>
+      </div>
+
+      <!-- Simulated chart canvas area -->
+      <div style="position:relative;background:var(--inner);min-height:260px;display:flex;align-items:center;justify-content:center;">
+        <canvas id="trainer-chart" style="width:100%;max-height:260px;"></canvas>
+        <div id="trainer-chart-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;">
+          <div style="font-size:32px;">📊</div>
+          <div style="font-size:13px;color:var(--slate-dim);">Press <strong style="color:var(--text);">Load Chart</strong> to begin</div>
+        </div>
+      </div>
+
+      <!-- Concept checkboxes -->
+      <div id="trainer-concepts" style="padding:14px 16px;border-top:1px solid var(--border);display:none;">
+        <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">What do you see? (select all that apply)</div>
+        <div id="trainer-concept-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="trainerSubmit()" style="padding:7px 20px;border-radius:8px;border:1px solid rgba(0,255,136,0.4);background:rgba(0,255,136,0.1);color:var(--green);font-size:12px;font-family:inherit;cursor:pointer;font-weight:700;">Submit Answer</button>
+          <button onclick="trainerSkip()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--slate-dim);font-size:12px;font-family:inherit;cursor:pointer;">Skip</button>
+        </div>
+      </div>
+
+      <!-- Result feedback -->
+      <div id="trainer-feedback" style="display:none;padding:14px 16px;border-top:1px solid var(--border);">
+        <div id="trainer-feedback-inner"></div>
+        <button onclick="trainerNext()" style="margin-top:10px;padding:7px 20px;border-radius:8px;border:1px solid rgba(96,165,250,0.4);background:rgba(96,165,250,0.1);color:var(--blue);font-size:12px;font-family:inherit;cursor:pointer;font-weight:700;">Next Chart →</button>
+      </div>
+
+      <!-- Load button state -->
+      <div id="trainer-load-area" style="padding:14px 16px;border-top:1px solid var(--border);text-align:center;">
+        <button onclick="trainerLoad()" style="padding:10px 32px;border-radius:8px;border:1px solid rgba(96,165,250,0.4);background:rgba(96,165,250,0.1);color:var(--blue);font-size:13px;font-family:inherit;cursor:pointer;font-weight:700;">Load Chart</button>
+      </div>
+    </div>
+
+    <!-- Level history -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;">
+      <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Level history</div>
+      <div id="trainer-level-history"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Unlock celebration modal -->
+<div id="trainer-unlock-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid rgba(245,166,35,0.4);border-radius:20px;padding:36px;max-width:380px;width:90%;text-align:center;box-shadow:0 0 60px rgba(245,166,35,0.15);">
+    <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+    <div id="unlock-modal-title" style="font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px;"></div>
+    <div id="unlock-modal-body" style="font-size:13px;color:var(--slate);line-height:1.6;margin-bottom:20px;"></div>
+    <button onclick="document.getElementById('trainer-unlock-modal').style.display='none'" style="padding:10px 32px;border-radius:8px;border:1px solid rgba(245,166,35,0.4);background:rgba(245,166,35,0.1);color:var(--gold);font-size:13px;font-family:inherit;cursor:pointer;font-weight:700;">Let's go! 🚀</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ── Config ────────────────────────────────────────────────────────────────
+  const LEVELS = {
+    beginner: {
+      name: 'Beginner', badge: '🟢 Beginner',
+      desc: 'Strong trends · Clear BOS & CHoCH · Obvious swing points',
+      task: 'Mark all swing highs and swing lows',
+      concepts: ['Swing High','Swing Low','Uptrend','Downtrend'],
+      answers: ['Swing High','Swing Low'],
+      promoteAt: { accuracy: 0.75, charts: 10 },
+      next: 'intermediate',
+      color: 'var(--green)', barColor: '#00FF88',
+    },
+    intermediate: {
+      name: 'Intermediate', badge: '🟡 Intermediate',
+      desc: 'Trending + ranging · Multiple BOS · Supply & demand zones',
+      task: 'Identify BOS, CHoCH, and supply/demand zones',
+      concepts: ['BOS','CHoCH','Supply Zone','Demand Zone','Multiple BOS'],
+      answers: ['BOS','CHoCH','Supply Zone','Demand Zone'],
+      promoteAt: { accuracy: 0.70, charts: 15 },
+      next: 'advanced',
+      color: 'var(--gold)', barColor: '#F5A623',
+    },
+    advanced: {
+      name: 'Advanced', badge: '🔴 Advanced',
+      desc: 'Complex structure · Subtle CHoCH · Liquidity sweeps · All concepts',
+      task: 'Identify all SMC concepts: BOS, CHoCH, OB, liquidity sweeps',
+      concepts: ['BOS','CHoCH','Order Block','Liquidity Sweep','Fair Value Gap','Inducement'],
+      answers: ['BOS','CHoCH','Order Block','Liquidity Sweep'],
+      promoteAt: null,
+      next: null,
+      color: 'var(--red)', barColor: '#FF3B5C',
+    },
+  };
+
+  const PAIRS = ['EUR/USD','GBP/USD','USD/JPY','EUR/JPY','GBP/JPY','AUD/USD','NZD/USD','USD/CAD'];
+  const TFS   = ['H1','H4','D1'];
+
+  // ── State helpers ─────────────────────────────────────────────────────────
+  function load() {
+    return JSON.parse(localStorage.getItem('trainerState') || 'null') || {
+      currentLevel: 'beginner',
+      accuracyHistory: { beginner: [], intermediate: [], advanced: [] },
+      totalChartsCompleted: 0,
+      levelUnlockDates: { beginner: new Date().toISOString() },
+      streak: 0,
+    };
+  }
+  function save(s) { localStorage.setItem('trainerState', JSON.stringify(s)); }
+
+  let state = load();
+  let currentExercise = null; // { levelKey, pair, tf, correctAnswers, chartData }
+  let selectedConcepts = new Set();
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function render() {
+    state = load();
+    const lk  = state.currentLevel;
+    const lv  = LEVELS[lk];
+    const hist = state.accuracyHistory[lk] || [];
+    const total = hist.length;
+    const correct = hist.filter(Boolean).length;
+    const acc = total ? correct / total : null;
+
+    // Badge
+    document.getElementById('trainer-level-badge').textContent = lv.badge;
+    document.getElementById('trainer-level-name').textContent  = lv.name + ' Level';
+    document.getElementById('trainer-level-desc').textContent  = lv.desc;
+
+    // Drop button
+    const dropBtn = document.getElementById('trainer-drop-btn');
+    dropBtn.style.display = lk !== 'beginner' ? 'inline-block' : 'none';
+    dropBtn.textContent   = lk === 'advanced' ? '↓ Practice Intermediate' : '↓ Practice Beginner';
+
+    // Progress bar
+    if (lv.promoteAt) {
+      const need   = lv.promoteAt.charts;
+      const pctAcc = acc !== null ? Math.round(acc * 100) : 0;
+      const done   = Math.min(total, need);
+      const pct    = Math.round((done / need) * 100);
+      document.getElementById('trainer-progress-bar').style.width      = pct + '%';
+      document.getElementById('trainer-progress-bar').style.background = lv.barColor;
+      document.getElementById('trainer-progress-pct').textContent      = pctAcc + '% accuracy';
+      document.getElementById('trainer-progress-label').textContent    = `Progress to ${LEVELS[lv.next].name}`;
+      const remaining = Math.max(0, need - total);
+      const nextName  = LEVELS[lv.next].name;
+      if (remaining > 0) {
+        document.getElementById('trainer-progress-msg').textContent =
+          `You need ${remaining} more chart${remaining !== 1 ? 's' : ''} at ${lv.promoteAt.accuracy * 100}%+ accuracy to unlock ${nextName}`;
+      } else if (acc !== null && acc >= lv.promoteAt.accuracy) {
+        document.getElementById('trainer-progress-msg').textContent = `✅ Criteria met! Keep going — promotion triggers automatically.`;
+      } else {
+        document.getElementById('trainer-progress-msg').textContent =
+          `${need} charts done · Accuracy ${pctAcc}% (need ${lv.promoteAt.accuracy * 100}%)`;
+      }
+    } else {
+      document.getElementById('trainer-progress-bar').style.width      = '100%';
+      document.getElementById('trainer-progress-bar').style.background = lv.barColor;
+      document.getElementById('trainer-progress-pct').textContent      = 'Max level';
+      document.getElementById('trainer-progress-label').textContent    = 'You\'ve reached the top';
+      document.getElementById('trainer-progress-msg').textContent      = 'No further promotion — master all concepts here.';
+    }
+
+    // Stats
+    document.getElementById('tr-stat-total').textContent    = state.totalChartsCompleted;
+    document.getElementById('tr-stat-correct').textContent  = Object.values(state.accuracyHistory).flat().filter(Boolean).length;
+    document.getElementById('tr-stat-accuracy').textContent = acc !== null ? Math.round(acc * 100) + '%' : '—';
+    document.getElementById('tr-stat-streak').textContent   = state.streak || 0;
+
+    // Level history
+    const histEl = document.getElementById('trainer-level-history');
+    const entries = Object.entries(state.levelUnlockDates);
+    if (!entries.length) {
+      histEl.innerHTML = '<div style="font-size:11px;color:var(--slate-dim);">No history yet</div>';
+    } else {
+      histEl.innerHTML = entries.map(([lk2, iso]) => {
+        const lv2 = LEVELS[lk2];
+        const d   = new Date(iso).toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'});
+        const isCurrent = lk2 === state.currentLevel;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;">
+          <span style="font-size:14px;">${lv2.badge.split(' ')[0]}</span>
+          <span style="font-weight:700;flex:1;">${lv2.name}</span>
+          ${isCurrent ? '<span style="font-size:9px;padding:1px 7px;border-radius:99px;border:1px solid rgba(96,165,250,0.4);color:var(--blue);">current</span>' : ''}
+          <span style="color:var(--slate-dim);">Unlocked ${d}</span>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // ── Load exercise ─────────────────────────────────────────────────────────
+  window.trainerLoad = function() {
+    const lk  = state.currentLevel;
+    const lv  = LEVELS[lk];
+    const pair = PAIRS[Math.floor(Math.random() * PAIRS.length)];
+    const tf   = TFS[Math.floor(Math.random() * TFS.length)];
+
+    currentExercise = { levelKey: lk, pair, tf, correctAnswers: lv.answers };
+    selectedConcepts.clear();
+
+    document.getElementById('trainer-pair-badge').textContent = pair;
+    document.getElementById('trainer-tf-badge').textContent   = tf;
+    document.getElementById('trainer-task-label').textContent = 'Current task';
+    document.getElementById('trainer-task-text').textContent  = lv.task;
+
+    // Draw simulated candlestick chart
+    drawChart(lk);
+
+    // Show concepts
+    document.getElementById('trainer-concepts').style.display = 'block';
+    document.getElementById('trainer-feedback').style.display = 'none';
+    document.getElementById('trainer-load-area').style.display = 'none';
+    document.getElementById('trainer-chart-overlay').style.display = 'none';
+
+    const list = document.getElementById('trainer-concept-list');
+    list.innerHTML = lv.concepts.map(c =>
+      `<button onclick="trainerToggle(this,'${c}')" data-concept="${c}"
+        style="padding:5px 12px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--slate);font-size:11px;font-family:inherit;cursor:pointer;transition:all 0.15s;">${c}</button>`
+    ).join('');
+  };
+
+  window.trainerToggle = function(btn, concept) {
+    if (selectedConcepts.has(concept)) {
+      selectedConcepts.delete(concept);
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--slate)';
+      btn.style.borderColor = 'var(--border)';
+    } else {
+      selectedConcepts.add(concept);
+      btn.style.background = 'rgba(96,165,250,0.15)';
+      btn.style.color = 'var(--blue)';
+      btn.style.borderColor = 'rgba(96,165,250,0.4)';
+    }
+  };
+
+  window.trainerSubmit = function() {
+    if (!currentExercise) return;
+    const correct = currentExercise.correctAnswers;
+    const selected = [...selectedConcepts];
+    const hits = correct.filter(c => selected.includes(c)).length;
+    const isCorrect = hits >= Math.ceil(correct.length * 0.6);
+
+    recordResult(isCorrect);
+
+    const fb = document.getElementById('trainer-feedback-inner');
+    if (isCorrect) {
+      fb.innerHTML = `<div style="color:var(--green);font-weight:700;font-size:13px;margin-bottom:6px;">✅ Correct! Well spotted.</div>
+        <div style="font-size:11px;color:var(--slate-dim);">Key concepts: <span style="color:var(--text);">${correct.join(', ')}</span></div>`;
+    } else {
+      fb.innerHTML = `<div style="color:var(--red);font-weight:700;font-size:13px;margin-bottom:6px;">❌ Not quite.</div>
+        <div style="font-size:11px;color:var(--slate-dim);">You selected: <span style="color:var(--slate);">${selected.join(', ') || 'nothing'}</span></div>
+        <div style="font-size:11px;color:var(--slate-dim);margin-top:4px;">Expected: <span style="color:var(--text);">${correct.join(', ')}</span></div>`;
+    }
+    document.getElementById('trainer-concepts').style.display = 'none';
+    document.getElementById('trainer-feedback').style.display = 'block';
+  };
+
+  window.trainerSkip = function() {
+    document.getElementById('trainer-concepts').style.display = 'none';
+    document.getElementById('trainer-feedback').style.display = 'none';
+    document.getElementById('trainer-load-area').style.display = 'block';
+    document.getElementById('trainer-chart-overlay').style.display = 'flex';
+    currentExercise = null;
+  };
+
+  window.trainerNext = function() {
+    document.getElementById('trainer-feedback').style.display = 'none';
+    document.getElementById('trainer-load-area').style.display = 'block';
+    document.getElementById('trainer-chart-overlay').style.display = 'flex';
+    currentExercise = null;
+  };
+
+  window.trainerDropLevel = function() {
+    const lk = state.currentLevel;
+    if (lk === 'beginner') return;
+    state.currentLevel = lk === 'advanced' ? 'intermediate' : 'beginner';
+    save(state);
+    render();
+  };
+
+  // ── Record + promote ──────────────────────────────────────────────────────
+  function recordResult(isCorrect) {
+    state = load();
+    const lk = state.currentLevel;
+    state.accuracyHistory[lk].push(isCorrect);
+    state.totalChartsCompleted++;
+    state.streak = isCorrect ? (state.streak || 0) + 1 : 0;
+    save(state);
+    checkPromotion();
+    render();
+  }
+
+  function checkPromotion() {
+    state = load();
+    const lk = state.currentLevel;
+    const lv = LEVELS[lk];
+    if (!lv.promoteAt || !lv.next) return;
+    const hist = state.accuracyHistory[lk];
+    if (hist.length < lv.promoteAt.charts) return;
+    const recent = hist.slice(-lv.promoteAt.charts);
+    const acc = recent.filter(Boolean).length / recent.length;
+    if (acc >= lv.promoteAt.accuracy) {
+      const nextKey = lv.next;
+      state.currentLevel = nextKey;
+      if (!state.levelUnlockDates[nextKey]) {
+        state.levelUnlockDates[nextKey] = new Date().toISOString();
+      }
+      save(state);
+      showUnlockModal(nextKey);
+    }
+  }
+
+  function showUnlockModal(levelKey) {
+    const lv = LEVELS[levelKey];
+    document.getElementById('unlock-modal-title').textContent = lv.badge + ' Unlocked!';
+    document.getElementById('unlock-modal-body').textContent =
+      `You've mastered the previous level and unlocked ${lv.name}. Get ready for ${lv.desc.toLowerCase()}.`;
+    const modal = document.getElementById('trainer-unlock-modal');
+    modal.style.display = 'flex';
+  }
+
+  // ── Simulated chart ───────────────────────────────────────────────────────
+  let trainerChartInstance = null;
+  function drawChart(levelKey) {
+    const canvas = document.getElementById('trainer-chart');
+    if (trainerChartInstance) { trainerChartInstance.destroy(); trainerChartInstance = null; }
+
+    const bars = 40;
+    let price = 1.1000 + Math.random() * 0.05;
+    const opens=[], highs=[], lows=[], closes=[], labels=[];
+
+    // Generate price data with structure appropriate to level
+    const trend = Math.random() > 0.5 ? 1 : -1;
+    for (let i = 0; i < bars; i++) {
+      const momentum = levelKey === 'beginner' ? trend * 0.0008 : trend * (Math.random() > 0.3 ? 0.0006 : -0.0004);
+      const noise    = (Math.random() - 0.5) * (levelKey === 'beginner' ? 0.0015 : 0.003);
+      const open  = price;
+      const close = price + momentum + noise;
+      const range = Math.abs(close - open) * (1 + Math.random());
+      const high  = Math.max(open, close) + range * Math.random() * 0.5;
+      const low   = Math.min(open, close) - range * Math.random() * 0.5;
+      opens.push(+open.toFixed(5)); highs.push(+high.toFixed(5));
+      lows.push(+low.toFixed(5));   closes.push(+close.toFixed(5));
+      labels.push('Bar ' + (i + 1));
+      price = close;
+    }
+
+    trainerChartInstance = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'High-Low', data: highs.map((h,i)=>[lows[i],h]), backgroundColor: closes.map((c,i)=>c>=opens[i]?'rgba(0,255,136,0.5)':'rgba(255,59,92,0.5)'), borderColor: closes.map((c,i)=>c>=opens[i]?'#00FF88':'#FF3B5C'), borderWidth: 1, borderSkipped: false },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `H:${highs[ctx.dataIndex]} L:${lows[ctx.dataIndex]}` } } },
+        scales: {
+          x: { ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y: { ticks: { color: '#475569', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+        }
+      }
+    });
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  render();
+  // Hook into switchTab so render fires when tab opens
+  const origSwitch = window.switchTab;
+  window.switchTab = function(tab) {
+    origSwitch && origSwitch(tab);
+    if (tab === 'trainer') render();
+  };
 })();
 </script>
 </body>
