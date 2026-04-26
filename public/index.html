@@ -2505,27 +2505,45 @@
     for (const v of allPrices) { if (v < yMin) yMin = v; if (v > yMax) yMax = v; }
     const yPad = (yMax - yMin) * 0.2 || 0.005;
 
+    const bullColor = 'rgba(0,255,136,0.85)';
+    const bearColor = 'rgba(255,59,92,0.85)';
+    const colors = closes.map((c,i) => c >= opens[i] ? bullColor : bearColor);
+
     trainerChartInstance = new Chart(canvas, {
       type: 'bar',
       data: {
         labels,
-        datasets: [{
-          data: opens.map((o,i) => [Math.min(o, closes[i]), Math.max(o, closes[i])]),
-          backgroundColor: closes.map((c,i) => c >= opens[i] ? 'rgba(0,255,136,0.85)' : 'rgba(255,59,92,0.85)'),
-          borderColor:     closes.map((c,i) => c >= opens[i] ? '#00FF88' : '#FF3B5C'),
-          borderWidth: 1,
-          borderSkipped: false,
-          barPercentage: 0.7,
-          categoryPercentage: 0.85,
-        }]
+        datasets: [
+          // Wick layer — thin, full high-low range
+          {
+            data: highs.map((h,i) => [lows[i], h]),
+            backgroundColor: colors,
+            borderColor: 'transparent',
+            borderWidth: 0,
+            borderSkipped: false,
+            barPercentage: 0.12,
+            categoryPercentage: 1.0,
+          },
+          // Body layer — wide, open-close range
+          {
+            data: opens.map((o,i) => [Math.min(o, closes[i]), Math.max(o, closes[i])]),
+            backgroundColor: colors,
+            borderColor: closes.map((c,i) => c >= opens[i] ? '#00FF88' : '#FF3B5C'),
+            borderWidth: 1,
+            borderSkipped: false,
+            barPercentage: 0.6,
+            categoryPercentage: 1.0,
+          },
+        ]
       },
       options: {
+        grouped: false,
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: ctx => `O:${opens[ctx.dataIndex]} H:${highs[ctx.dataIndex]} L:${lows[ctx.dataIndex]} C:${closes[ctx.dataIndex]}` } }
+          tooltip: { filter: item => item.datasetIndex === 1, callbacks: { label: ctx => `O:${opens[ctx.dataIndex]} H:${highs[ctx.dataIndex]} L:${lows[ctx.dataIndex]} C:${closes[ctx.dataIndex]}` } }
         },
         scales: {
           x: { ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } },
