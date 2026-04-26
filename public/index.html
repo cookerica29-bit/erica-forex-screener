@@ -2499,20 +2499,28 @@
       price = close;
     }
 
+    const allPrices = [...highs, ...lows];
+    const yMin = Math.min(...allPrices);
+    const yMax = Math.max(...allPrices);
+    const yPad = (yMax - yMin) * 0.15;
+
     trainerChartInstance = new Chart(canvas, {
       type: 'bar',
       data: {
         labels,
         datasets: [
-          { label: 'High-Low', data: highs.map((h,i)=>[lows[i],h]), backgroundColor: closes.map((c,i)=>c>=opens[i]?'rgba(0,255,136,0.5)':'rgba(255,59,92,0.5)'), borderColor: closes.map((c,i)=>c>=opens[i]?'#00FF88':'#FF3B5C'), borderWidth: 1, borderSkipped: false },
+          // Wick: full high-low range, thin and dim
+          { label: 'Wick', data: highs.map((h,i)=>[lows[i],h]), backgroundColor: closes.map((c,i)=>c>=opens[i]?'rgba(0,255,136,0.25)':'rgba(255,59,92,0.25)'), borderColor: 'transparent', borderWidth: 0, borderSkipped: false, barPercentage: 0.2, categoryPercentage: 0.8 },
+          // Body: open-close range, solid
+          { label: 'Body', data: opens.map((o,i)=>[Math.min(o,closes[i]),Math.max(o,closes[i])]), backgroundColor: closes.map((c,i)=>c>=opens[i]?'rgba(0,255,136,0.8)':'rgba(255,59,92,0.8)'), borderColor: closes.map((c,i)=>c>=opens[i]?'#00FF88':'#FF3B5C'), borderWidth: 1, borderSkipped: false, barPercentage: 0.6, categoryPercentage: 0.8 },
         ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `H:${highs[ctx.dataIndex]} L:${lows[ctx.dataIndex]}` } } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `O:${opens[ctx.dataIndex]} H:${highs[ctx.dataIndex]} L:${lows[ctx.dataIndex]} C:${closes[ctx.dataIndex]}` } } },
         scales: {
           x: { ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.04)' } },
-          y: { ticks: { color: '#475569', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+          y: { min: yMin - yPad, max: yMax + yPad, ticks: { color: '#475569', font: { size: 10 }, callback: v => v.toFixed(4) }, grid: { color: 'rgba(255,255,255,0.04)' } }
         }
       }
     });
