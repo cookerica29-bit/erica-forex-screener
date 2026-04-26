@@ -1021,26 +1021,28 @@
         const c = s.checklist;
         if (!c) return '';
         const ci = (cls, icon, label) => `<div class="check-item ${cls}">${icon} ${label}</div>`;
+        const rows = [
+          c.trendConfirmed  ? ci('pass','✅','Trend confirmed')    : '',
+          c.emaSlope        ? ci('pass','✅','EMA slope')          : '',
+          c.pullbackToEMA   ? ci('pass','✅','Pullback to EMA')    : '',
+          c.momentumCandle  ? ci('pass','✅','Momentum candle')    : '',
+          c.rsiInZone       ? ci('pass','✅','RSI in zone')        : '',
+          c.htfAligned      ? ci('pass','✅','HTF aligned')        : '',
+          c.notSandwiched   ? ci('pass','✅','Not sandwiched')     : '',
+          c.minRR           ? ci('pass','✅','Min 2.0 R:R')        : '',
+          c.impulseStrong   !== false ? ci('pass','✅','Strong impulse leg')    : '',
+          c.structureClearance !== false ? ci('pass','✅','Structure clearance') : '',
+          c.tp1Fresh        !== false ? ci('pass','✅','TP1 fresh level')       : '',
+          c.volumeSurge     ? ci('bonus','⭐','Volume surge')      : '',
+          c.liquiditySweep  ? ci('bonus','⭐','Liquidity sweep')   : '',
+          c.pdhlConfluence  ? ci('bonus','⭐','PDH/PDL level')     : '',
+          c.goodSession     ? ci('bonus','⭐','Good session')      : '',
+          c.historicalEdge  ? ci('bonus','⭐','Historical edge')   : '',
+        ].filter(Boolean).join('');
+        if (!rows) return '';
         return `<div class="checklist" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);">
           <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-dim);margin-bottom:8px;">Conditions Met</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-            ${ci(c.trendConfirmed?'pass':'fail',c.trendConfirmed?'✅':'❌','Trend confirmed')}
-            ${ci(c.emaSlope?'pass':'fail',c.emaSlope?'✅':'❌','EMA slope')}
-            ${ci(c.pullbackToEMA?'pass':'fail',c.pullbackToEMA?'✅':'❌','Pullback to EMA')}
-            ${ci(c.momentumCandle?'pass':'fail',c.momentumCandle?'✅':'❌','Momentum candle')}
-            ${ci(c.rsiInZone?'pass':'fail',c.rsiInZone?'✅':'❌','RSI in zone')}
-            ${ci(c.htfAligned?'pass':'fail',c.htfAligned?'✅':'❌','HTF aligned')}
-            ${ci(c.notSandwiched?'pass':'fail',c.notSandwiched?'✅':'❌','Not sandwiched')}
-            ${ci(c.minRR?'pass':'fail',c.minRR?'✅':'❌','Min 2.0 R:R')}
-            ${ci(c.impulseStrong!==false?'pass':'fail',c.impulseStrong!==false?'✅':'❌','Strong impulse leg')}
-            ${ci(c.structureClearance!==false?'pass':'fail',c.structureClearance!==false?'✅':'❌','Structure clearance')}
-            ${ci(c.tp1Fresh!==false?'pass':'fail',c.tp1Fresh!==false?'✅':'❌','TP1 fresh level')}
-            ${ci(c.volumeSurge?'bonus':'inactive',c.volumeSurge?'⭐':'○','Volume surge')}
-            ${ci(c.liquiditySweep?'bonus':'inactive',c.liquiditySweep?'⭐':'○','Liquidity sweep')}
-            ${ci(c.pdhlConfluence?'bonus':'inactive',c.pdhlConfluence?'⭐':'○','PDH/PDL level')}
-            ${ci(c.goodSession?'bonus':'inactive',c.goodSession?'⭐':'○','Good session')}
-            ${ci(c.historicalEdge?'bonus':'inactive',c.historicalEdge?'⭐':'○','Historical edge')}
-          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${rows}</div>
         </div>`;
       })()}
       <div class="scanned-at">Scanned: ${new Date(s.scannedAt).toLocaleTimeString()} · Live data via Oanda v20 API</div>
