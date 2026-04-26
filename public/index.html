@@ -2479,20 +2479,21 @@
     const canvas = document.getElementById('trainer-chart');
     if (trainerChartInstance) { trainerChartInstance.destroy(); trainerChartInstance = null; }
 
-    const bars = 40;
+    const bars = 30;
     let price = 1.1000 + Math.random() * 0.05;
     const opens=[], highs=[], lows=[], closes=[], labels=[];
 
-    // Generate price data with structure appropriate to level
     const trend = Math.random() > 0.5 ? 1 : -1;
+    // candleSize scales body to ~0.5–1% of price so it's clearly visible
+    const candleSize = price * (levelKey === 'beginner' ? 0.006 : 0.009);
     for (let i = 0; i < bars; i++) {
-      const momentum = levelKey === 'beginner' ? trend * 0.0008 : trend * (Math.random() > 0.3 ? 0.0006 : -0.0004);
-      const noise    = (Math.random() - 0.5) * (levelKey === 'beginner' ? 0.0015 : 0.003);
+      const isTrendBar = levelKey === 'beginner' ? Math.random() > 0.25 : Math.random() > 0.4;
+      const bodySize = candleSize * (0.4 + Math.random() * 0.8);
       const open  = price;
-      const close = price + momentum + noise;
-      const range = Math.abs(close - open) * (1 + Math.random());
-      const high  = Math.max(open, close) + range * Math.random() * 0.5;
-      const low   = Math.min(open, close) - range * Math.random() * 0.5;
+      const close = open + (isTrendBar ? trend : -trend) * bodySize;
+      const wickMult = 0.3 + Math.random() * 0.5;
+      const high  = Math.max(open, close) + bodySize * wickMult;
+      const low   = Math.min(open, close) - bodySize * wickMult;
       opens.push(+open.toFixed(5)); highs.push(+high.toFixed(5));
       lows.push(+low.toFixed(5));   closes.push(+close.toFixed(5));
       labels.push('Bar ' + (i + 1));
