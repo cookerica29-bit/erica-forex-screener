@@ -19,7 +19,8 @@ export const PAIRS = [
   'XAU_USD','XAG_USD',
 ];
 
-const HTF_MAP: Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };
+const HTF_MAP:  Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'D', D:'W' };
+const HTF2_MAP: Record<string,string> = { M15:'D',  M30:'D' }; // second HTF — M30/M15 must also align with Daily
 
 interface Candle { t:string; o:number; h:number; l:number; c:number; v:number; }
 interface Swing  { index:number; price:number; type:'high'|'low'; }
@@ -79,6 +80,7 @@ export interface DebugResult {
     ema200?: number;
     emaSlope?: number;
     rsi?: number;
+    htf2Trend?: string | null;
     chochType?: 'bearish' | 'bullish' | null;
     chochReason?: string;
     chochSuppressed?: boolean;
@@ -335,7 +337,8 @@ function getSessionLabel(pair: string): string {
 export function analyzeCandles(
   candles: Candle[], htf: Candle[], pair: string,
   granularity='H1', minRR=1.5, _debug=false,
-  journalStats: JournalStats = {}
+  journalStats: JournalStats = {},
+  htf2: Candle[] = []
 ): { setup: Setup|null; reason: string; detail: DebugResult['detail'] } {
   const detail: DebugResult['detail'] = {};
 
@@ -420,13 +423,27 @@ export function analyzeCandles(
   if (direction === 'SHORT' && emaSlope >= 0) return { setup: null, reason: `20 EMA not falling for SHORT (slope=${emaSlope.toFixed(5)})`, detail };
 
   // 1c. HTF alignment: no counter-trend trades
+  //     M30/M15 check two levels up (H4 + Daily — both must agree).
+  //     H1 checks Daily; H4 checks Daily; D checks Weekly.
+  const htfName   = HTF_MAP[granularity] || 'D';
   const htfSwings     = findSwings(htf.slice(-100));
   const htfSwingHighs = htfSwings.filter(s => s.type === 'high');
   const htfSwingLows  = htfSwings.filter(s => s.type === 'low');
   const htfTrend      = getTrend(htfSwings);
   detail.htfTrend = htfTrend;
   if (htfTrend && htfTrend !== direction) {
-    return { setup: null, reason: `HTF conflict — Daily is ${htfTrend} but setup is ${direction}`, detail };
+    return { setup: null, reason: `HTF conflict — ${htfName} is ${htfTrend} but setup is ${direction}`, detail };
+  }
+
+  // Second HTF check (M30 and M15 must also align with Daily)
+  if (htf2.length > 0) {
+    const htf2Name   = HTF2_MAP[granularity] || 'D';
+    const htf2Swings = findSwings(htf2.slice(-100));
+    const htf2Trend  = getTrend(htf2Swings);
+    detail.htf2Trend = htf2Trend;
+    if (htf2Trend && htf2Trend !== direction) {
+      return { setup: null, reason: `HTF conflict — ${htf2Name} is ${htf2Trend} but setup is ${direction}`, detail };
+    }
   }
 
   // 1d. ChoCH hard block — scan last 200 candles for structural character change.
@@ -783,15 +800,18 @@ export function analyzeCandles(
 }
 
 export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
-  const htfGran = HTF_MAP[granularity] || 'D';
+  const htfGran  = HTF_MAP[granularity]  || 'D';
+  const htf2Gran = HTF2_MAP[granularity] || null;
   const results: Setup[] = [];
   for (const pair of PAIRS) {
     try {
-      const [candles, htf] = await Promise.all([
+      const fetches: Promise<Candle[]>[] = [
         fetchCandles(pair, granularity, 250),
         fetchCandles(pair, htfGran, 150),
-      ]);
-      const { setup } = analyzeCandles(candles, htf, pair, granularity, minRR);
+      ];
+      if (htf2Gran) fetches.push(fetchCandles(pair, htf2Gran, 150));
+      const [candles, htf, htf2 = []] = await Promise.all(fetches);
+      const { setup } = analyzeCandles(candles, htf, pair, granularity, minRR, false, {}, htf2);
       if (setup) {
         setup.newsRisk = await checkNewsRisk(pair);
         results.push(setup);
@@ -810,15 +830,18 @@ export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
 export async function debugScan(
   granularity='H1', minRR=1.5, journalStats: JournalStats = {}
 ): Promise<DebugResult[]> {
-  const htfGran = HTF_MAP[granularity] || 'D';
+  const htfGran  = HTF_MAP[granularity]  || 'D';
+  const htf2Gran = HTF2_MAP[granularity] || null;
   const results: DebugResult[] = [];
   for (const pair of PAIRS) {
     try {
-      const [candles, htf] = await Promise.all([
+      const fetches: Promise<Candle[]>[] = [
         fetchCandles(pair, granularity, 250),
         fetchCandles(pair, htfGran, 150),
-      ]);
-      const { setup, reason, detail } = analyzeCandles(candles, htf, pair, granularity, minRR, true, journalStats);
+      ];
+      if (htf2Gran) fetches.push(fetchCandles(pair, htf2Gran, 150));
+      const [candles, htf, htf2 = []] = await Promise.all(fetches);
+      const { setup, reason, detail } = analyzeCandles(candles, htf, pair, granularity, minRR, true, journalStats, htf2);
       if (setup) {
         setup.newsRisk = await checkNewsRisk(pair);
       }
