@@ -55,6 +55,7 @@ export interface Setup {
   quality: 'PREMIUM'|'STRONG'|'DEVELOPING';
   rrRatio: number;
   entry: number;
+  entryZone: { low: number; high: number };
   sl: number;
   tp1: number;
   tp2: number;
@@ -537,6 +538,18 @@ export function analyzeCandles(
     detail,
   };
 
+  // ── STALENESS CHECK ────────────────────────────────────────────────────────
+  // Pattern confirmed, but if price has already run >1×ATR from EMA20 the
+  // entry zone has passed — reject so a stale setup never prints.
+  const distFromEma = Math.abs(price - ema20);
+  if (distFromEma > atr) {
+    return {
+      setup: null,
+      reason: `Setup stale — price moved ${(distFromEma / atr).toFixed(1)}×ATR from EMA20 (${price.toFixed(5)} vs EMA ${ema20.toFixed(5)})`,
+      detail,
+    };
+  }
+
   // ── GATE 4: RSI ────────────────────────────────────────────────────────────
   if (direction === 'LONG') {
     if (rsi > 70) return { setup: null, reason: `RSI overbought for LONG (${rsi.toFixed(1)} > 70)`, detail };
@@ -784,6 +797,12 @@ export function analyzeCandles(
     EMA_BOUNCE:   `${dl} EMA 20 Pullback`,
   };
 
+  // Entry zone: ±0.3×ATR around EMA20 — valid fill range
+  const entryZone = {
+    low:  ema20 - 0.3 * atr,
+    high: ema20 + 0.3 * atr,
+  };
+
   const checklist: SetupChecklist = {
     trend: true,           // passed Gate 1
     pullbackQuality: true, // passed Gate 2
@@ -802,7 +821,8 @@ export function analyzeCandles(
     direction,
     quality,
     rrRatio: Math.round(rrRatio * 100) / 100,
-    entry: price,
+    entry: ema20,
+    entryZone,
     sl,
     tp1,
     tp2,

@@ -98,7 +98,10 @@ function queueSetups(setups: Setup[]) {
       const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
       const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
       const newsPrefix = setup.newsRisk ? '⚠️ NEWS RISK\n' : '';
-      const text = `${newsPrefix}${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
+      const zoneStr = setup.entryZone
+        ? `Entry Zone: ${setup.entryZone.low.toFixed(5)} — ${setup.entryZone.high.toFixed(5)}`
+        : `Entry: ${setup.entry}`;
+      const text = `${newsPrefix}${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\n${zoneStr} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
       sendTelegram(text, 'Markdown').then((data: any) => {
         if (data.ok) console.log(`[Telegram] Alert sent for ${setup.pair} ${setup.quality}`);
       }).catch((e: any) => console.error('[Telegram] fetch failed:', e.message));
