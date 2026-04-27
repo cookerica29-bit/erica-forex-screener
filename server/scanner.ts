@@ -19,6 +19,16 @@ export const PAIRS = [
   'XAU_USD','XAG_USD',
 ];
 
+// Pip size per instrument — used for minimum SL distance check
+const PIP_SIZE: Record<string,number> = {
+  // JPY pairs: 1 pip = 0.01
+  USD_JPY:0.01, EUR_JPY:0.01, GBP_JPY:0.01, AUD_JPY:0.01, NZD_JPY:0.01, CAD_JPY:0.01,
+  // Metals
+  XAU_USD:0.1, XAG_USD:0.01,
+  // Standard 4-decimal pairs: 1 pip = 0.0001
+};
+const DEFAULT_PIP = 0.0001;
+
 const HTF_MAP:  Record<string,string> = { M30:'H4', H4:'D' };
 const HTF2_MAP: Record<string,string> = { M30:'D' }; // M30 must also align with Daily (two-level check)
 
@@ -547,6 +557,15 @@ export function analyzeCandles(
   if (direction === 'SHORT' && sl <= price) return { setup: null, reason: 'Inverted SL: sl <= entry for SHORT', detail };
   const risk = Math.abs(price - sl);
   if (risk <= 0) return { setup: null, reason: 'Risk is zero (price equals SL)', detail };
+
+  // Minimum SL distance: 5 pips — rejects dangerously tight stops
+  const pipSize  = PIP_SIZE[pair] ?? DEFAULT_PIP;
+  const slPips   = risk / pipSize;
+  if (slPips < 5) return {
+    setup: null,
+    reason: `❌ SL too tight — ${slPips.toFixed(1)} pips (minimum 5 pips required)`,
+    detail,
+  };
 
   const recentSwings = findSwings(recent80);
   const swingHighs   = recentSwings.filter(s => s.type === 'high');
