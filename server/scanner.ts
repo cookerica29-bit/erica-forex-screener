@@ -19,8 +19,8 @@ export const PAIRS = [
   'XAU_USD','XAG_USD',
 ];
 
-const HTF_MAP:  Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'D', D:'W' };
-const HTF2_MAP: Record<string,string> = { M15:'D',  M30:'D' }; // second HTF — M30/M15 must also align with Daily
+const HTF_MAP:  Record<string,string> = { M30:'H4', H4:'D' };
+const HTF2_MAP: Record<string,string> = { M30:'D' }; // M30 must also align with Daily (two-level check)
 
 interface Candle { t:string; o:number; h:number; l:number; c:number; v:number; }
 interface Swing  { index:number; price:number; type:'high'|'low'; }
