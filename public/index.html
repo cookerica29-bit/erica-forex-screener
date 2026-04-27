@@ -2171,9 +2171,12 @@
           <div style="font-size:13px;color:var(--slate-dim);">Press <strong style="color:var(--text);">Load Chart</strong> to begin</div>
         </div>
         <!-- Marker toolbar shown when chart is active -->
-        <div id="trainer-marker-toolbar" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);display:none;gap:6px;z-index:10;">
-          <button onclick="setMarkMode('high')" id="mark-high-btn" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(96,165,250,0.5);background:rgba(96,165,250,0.12);color:var(--blue);font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;">▲ Mark Swing High</button>
-          <button onclick="setMarkMode('low')" id="mark-low-btn" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(245,166,35,0.5);background:rgba(245,166,35,0.08);color:var(--gold);font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;">▼ Mark Swing Low</button>
+        <div id="trainer-marker-toolbar" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);display:none;gap:6px;z-index:10;flex-wrap:wrap;justify-content:center;max-width:96%;">
+          <button onclick="setMarkMode('high')" id="mark-high-btn" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(96,165,250,0.5);background:rgba(96,165,250,0.12);color:var(--blue);font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;">▲ Swing High</button>
+          <button onclick="setMarkMode('low')" id="mark-low-btn" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(245,166,35,0.5);background:rgba(245,166,35,0.08);color:var(--gold);font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;">▼ Swing Low</button>
+          <button onclick="setMarkMode('bos')" id="mark-bos-btn" data-level="intermediate advanced" style="display:none;padding:4px 12px;border-radius:6px;border:1px solid rgba(0,255,136,0.5);background:rgba(0,255,136,0.08);color:var(--green);font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;">→ BOS</button>
+          <button onclick="setMarkMode('choch')" id="mark-choch-btn" data-level="intermediate advanced" style="display:none;padding:4px 12px;border-radius:6px;border:1px solid rgba(245,166,35,0.5);background:rgba(245,166,35,0.08);color:var(--gold);font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;">⚡ CHoCH</button>
+          <button onclick="setMarkMode('ob')" id="mark-ob-btn" data-level="advanced" style="display:none;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,59,92,0.5);background:rgba(255,59,92,0.08);color:var(--red);font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;">□ OB</button>
           <button onclick="setMarkMode(null)" id="mark-none-btn" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--slate-dim);font-size:11px;font-family:inherit;cursor:pointer;">✕ Clear</button>
         </div>
       </div>
@@ -2391,6 +2394,11 @@
       overlay.style.display = 'none';
       const tb = document.getElementById('trainer-marker-toolbar');
       tb.style.display = 'flex';
+
+      // Show level-appropriate toolbar buttons
+      document.getElementById('mark-bos-btn').style.display   = (lk === 'intermediate' || lk === 'advanced') ? 'inline-block' : 'none';
+      document.getElementById('mark-choch-btn').style.display = (lk === 'intermediate' || lk === 'advanced') ? 'inline-block' : 'none';
+      document.getElementById('mark-ob-btn').style.display    = lk === 'advanced' ? 'inline-block' : 'none';
       setMarkMode('high');
 
       const list = document.getElementById('trainer-concept-list');
@@ -2644,14 +2652,13 @@
 
   window.setMarkMode = function(mode) {
     markMode = mode;
-    const toolbar = document.getElementById('trainer-marker-toolbar');
-    ['high','low','none'].forEach(m => {
+    ['high','low','bos','choch','ob','none'].forEach(m => {
       const btn = document.getElementById(`mark-${m}-btn`);
       if (!btn) return;
       btn.style.opacity = (mode === m || (mode === null && m === 'none')) ? '1' : '0.45';
     });
     const chartEl = document.getElementById('trainer-chart');
-    chartEl.style.cursor = mode ? 'crosshair' : 'default';
+    chartEl.style.cursor = mode && mode !== null ? 'crosshair' : 'default';
   };
 
   function drawChart(candles) {
@@ -2683,19 +2690,21 @@
     candleSeries.setData(chartCandles);
     lwChart.timeScale().fitContent();
 
-    // Click handler — place swing high/low markers
+    // Click handler — place markers for any active mark mode
     lwChart.subscribeClick(param => {
       if (!markMode || !param.time) return;
-      // Remove existing marker on this candle if clicking same time
       userMarkers = userMarkers.filter(m => m.time !== param.time);
-      userMarkers.push({
-        time: param.time,
-        position: markMode === 'high' ? 'aboveBar' : 'belowBar',
-        color: markMode === 'high' ? '#60A5FA' : '#F5A623',
-        shape: markMode === 'high' ? 'arrowDown' : 'arrowUp',
-        text: markMode === 'high' ? 'SH' : 'SL',
-      });
-      candleSeries.setMarkers([...userMarkers].sort((a,b) => a.time - b.time));
+      const cfg = {
+        high:  { position: 'aboveBar', color: '#60A5FA', shape: 'arrowDown', text: 'SH' },
+        low:   { position: 'belowBar', color: '#F5A623', shape: 'arrowUp',   text: 'SL' },
+        bos:   { position: 'aboveBar', color: '#00FF88', shape: 'arrowDown', text: 'BOS' },
+        choch: { position: 'aboveBar', color: '#F5A623', shape: 'arrowDown', text: 'CHoCH' },
+        ob:    { position: 'belowBar', color: '#FF3B5C', shape: 'arrowUp',   text: 'OB' },
+      }[markMode];
+      if (cfg) {
+        userMarkers.push({ time: param.time, ...cfg });
+        candleSeries.setMarkers([...userMarkers].sort((a,b) => a.time - b.time));
+      }
     });
 
     // Handle resize
