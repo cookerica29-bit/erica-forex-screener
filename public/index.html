@@ -2356,37 +2356,54 @@
   }
 
   // ── Load exercise ─────────────────────────────────────────────────────────
-  window.trainerLoad = function() {
-    const lk  = state.currentLevel;
-    const lv  = LEVELS[lk];
-    const pair = PAIRS[Math.floor(Math.random() * PAIRS.length)];
-    const tf   = TFS[Math.floor(Math.random() * TFS.length)];
-
-    currentExercise = { levelKey: lk, pair, tf, correctAnswers: lv.answers };
+  window.trainerLoad = async function() {
+    const lk = state.currentLevel;
+    const lv = LEVELS[lk];
     selectedConcepts.clear();
 
-    document.getElementById('trainer-pair-badge').textContent = pair;
-    document.getElementById('trainer-tf-badge').textContent   = tf;
-    document.getElementById('trainer-task-label').textContent = 'Current task';
-    document.getElementById('trainer-task-text').textContent  = lv.task;
-
-    // Draw simulated candlestick chart
-    drawChart(lk);
-
-    // Show concepts
-    document.getElementById('trainer-concepts').style.display = 'block';
-    document.getElementById('trainer-feedback').style.display = 'none';
+    // Show loading state
+    const overlay = document.getElementById('trainer-chart-overlay');
+    overlay.innerHTML = '<div style="color:var(--slate-dim);font-size:13px;">Loading real chart data…</div>';
+    overlay.style.display = 'flex';
     document.getElementById('trainer-load-area').style.display = 'none';
-    document.getElementById('trainer-chart-overlay').style.display = 'none';
-    const tb = document.getElementById('trainer-marker-toolbar');
-    tb.style.display = 'flex';
-    setMarkMode('high');
+    document.getElementById('trainer-concepts').style.display  = 'none';
+    document.getElementById('trainer-feedback').style.display  = 'none';
 
-    const list = document.getElementById('trainer-concept-list');
-    list.innerHTML = lv.concepts.map(c =>
-      `<button onclick="trainerToggle(this,'${c}')" data-concept="${c}"
-        style="padding:5px 12px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--slate);font-size:11px;font-family:inherit;cursor:pointer;transition:all 0.15s;">${c}</button>`
-    ).join('');
+    try {
+      const res  = await fetch(`/api/trainer/chart?level=${lk}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      currentExercise = { levelKey: lk, pair: data.pair, tf: data.timeframe,
+                          correctAnswers: data.structures.presentConcepts,
+                          structures: data.structures };
+
+      document.getElementById('trainer-pair-badge').textContent = data.pair;
+      document.getElementById('trainer-tf-badge').textContent   = data.timeframe;
+      document.getElementById('trainer-task-label').textContent = 'Current task';
+      document.getElementById('trainer-task-text').textContent  = lv.task;
+
+      drawChart(data.candles);
+
+      document.getElementById('trainer-concepts').style.display = 'block';
+      document.getElementById('trainer-feedback').style.display = 'none';
+      document.getElementById('trainer-load-area').style.display = 'none';
+      overlay.style.display = 'none';
+      const tb = document.getElementById('trainer-marker-toolbar');
+      tb.style.display = 'flex';
+      setMarkMode('high');
+
+      const list = document.getElementById('trainer-concept-list');
+      list.innerHTML = lv.concepts.map(c =>
+        `<button onclick="trainerToggle(this,'${c}')" data-concept="${c}"
+          style="padding:5px 12px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--slate);font-size:11px;font-family:inherit;cursor:pointer;transition:all 0.15s;">${c}</button>`
+      ).join('');
+    } catch(err) {
+      overlay.innerHTML = `<div style="color:var(--red);font-size:12px;margin-bottom:8px;">Failed to load chart: ${err.message}</div>
+        <button onclick="trainerLoad()" style="padding:6px 18px;border-radius:8px;border:1px solid rgba(96,165,250,0.4);background:rgba(96,165,250,0.1);color:var(--blue);font-size:12px;font-family:inherit;cursor:pointer;">Retry</button>`;
+      overlay.style.display = 'flex';
+      document.getElementById('trainer-load-area').style.display = 'block';
+    }
   };
 
   window.trainerToggle = function(btn, concept) {
@@ -2405,26 +2422,36 @@
 
   window.trainerSubmit = function() {
     if (!currentExercise) return;
-    const correct = currentExercise.correctAnswers;
+    const present  = currentExercise.structures.presentConcepts;
     const selected = [...selectedConcepts];
-    const hits = correct.filter(c => selected.includes(c)).length;
-    const isCorrect = hits >= Math.ceil(correct.length * 0.6);
+    const hits     = present.filter(c => selected.includes(c)).length;
+    const isCorrect = hits >= Math.ceil(present.length * 0.6);
 
     recordResult(isCorrect);
 
+    // Reveal real structures on chart
+    showAnswerMarkers(currentExercise.structures);
+
+    const correct = present.filter(c => selected.includes(c));
+    const missed  = present.filter(c => !selected.includes(c));
+    const extra   = selected.filter(c => !present.includes(c));
+
     const fb = document.getElementById('trainer-feedback-inner');
-    if (isCorrect) {
-      fb.innerHTML = `<div style="color:var(--green);font-weight:700;font-size:13px;margin-bottom:6px;">✅ Correct! Well spotted.</div>
-        <div style="font-size:11px;color:var(--slate-dim);">Key concepts: <span style="color:var(--text);">${correct.join(', ')}</span></div>`;
-    } else {
-      fb.innerHTML = `<div style="color:var(--red);font-weight:700;font-size:13px;margin-bottom:6px;">❌ Not quite.</div>
-        <div style="font-size:11px;color:var(--slate-dim);">You selected: <span style="color:var(--slate);">${selected.join(', ') || 'nothing'}</span></div>
-        <div style="font-size:11px;color:var(--slate-dim);margin-top:4px;">Expected: <span style="color:var(--text);">${correct.join(', ')}</span></div>`;
-    }
+    fb.innerHTML = `
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:${isCorrect ? 'var(--green)' : 'var(--red)'}">
+        ${isCorrect ? '✅ Well spotted!' : '❌ Not quite — review the chart'}
+      </div>
+      <div style="font-size:11px;color:var(--slate-dim);margin-bottom:4px;">
+        Chart contained: <span style="color:var(--text);">${present.join(', ')}</span>
+      </div>
+      ${correct.length ? `<div style="font-size:11px;color:var(--green);margin-top:3px;">✓ Identified: ${correct.join(', ')}</div>` : ''}
+      ${missed.length  ? `<div style="font-size:11px;color:var(--red);margin-top:3px;">✗ Missed: ${missed.join(', ')}</div>` : ''}
+      ${extra.length   ? `<div style="font-size:11px;color:var(--gold);margin-top:3px;">⚠ Not present: ${extra.join(', ')}</div>` : ''}
+    `;
+
     document.getElementById('trainer-concepts').style.display = 'none';
     document.getElementById('trainer-feedback').style.display = 'block';
     document.getElementById('trainer-marker-toolbar').style.display = 'none';
-    showAnswerMarkers(currentExercise.levelKey);
   };
 
   window.trainerSkip = function() {
@@ -2627,7 +2654,7 @@
     chartEl.style.cursor = mode ? 'crosshair' : 'default';
   };
 
-  function drawChart(levelKey) {
+  function drawChart(candles) {
     const container = document.getElementById('trainer-chart');
 
     if (lwChart) { lwChart.remove(); lwChart = null; candleSeries = null; }
@@ -2652,8 +2679,7 @@
       wickUpColor: '#00FF88', wickDownColor: '#FF3B5C',
     });
 
-    const pair = currentExercise ? currentExercise.pair : PAIRS[Math.floor(Math.random()*PAIRS.length)];
-    chartCandles = buildCandles(levelKey, pair);
+    chartCandles = candles;
     candleSeries.setData(chartCandles);
     lwChart.timeScale().fitContent();
 
@@ -2677,20 +2703,37 @@
     ro.observe(container);
   }
 
-  function showAnswerMarkers(levelKey) {
-    if (!candleSeries || !chartCandles.length) return;
-    // Find actual swing highs and lows from the generated candles
-    const answerMarkers = [];
-    for (let i = 1; i < chartCandles.length - 1; i++) {
-      const prev = chartCandles[i-1], cur = chartCandles[i], next = chartCandles[i+1];
-      if (cur.high > prev.high && cur.high > next.high) {
-        answerMarkers.push({ time: cur.time, position: 'aboveBar', color: '#00FF88', shape: 'arrowDown', text: '✓ SH' });
-      }
-      if (cur.low < prev.low && cur.low < next.low) {
-        answerMarkers.push({ time: cur.time, position: 'belowBar', color: '#00FF88', shape: 'arrowUp', text: '✓ SL' });
-      }
+  function showAnswerMarkers(structures) {
+    if (!candleSeries) return;
+    const markers = [];
+
+    for (const s of structures.swingHighs)
+      markers.push({ time: s.time, position: 'aboveBar', color: '#94A3B8', shape: 'arrowDown', text: 'SH' });
+    for (const s of structures.swingLows)
+      markers.push({ time: s.time, position: 'belowBar', color: '#94A3B8', shape: 'arrowUp', text: 'SL' });
+    for (const b of structures.bosEvents)
+      markers.push({ time: b.time,
+        position: b.type === 'bullish' ? 'belowBar' : 'aboveBar',
+        color: b.type === 'bullish' ? '#00FF88' : '#FF3B5C',
+        shape: b.type === 'bullish' ? 'arrowUp' : 'arrowDown', text: 'BOS' });
+    for (const c of structures.chochEvents)
+      markers.push({ time: c.time,
+        position: c.type === 'bullish' ? 'belowBar' : 'aboveBar',
+        color: '#F5A623',
+        shape: c.type === 'bullish' ? 'arrowUp' : 'arrowDown', text: 'ChoCH' });
+
+    candleSeries.setMarkers(markers.sort((a, b) => a.time - b.time));
+
+    // Supply zones — red dashed price lines
+    for (const z of structures.supplyZones) {
+      candleSeries.createPriceLine({ price: z.obHigh, color: 'rgba(255,59,92,0.7)',  lineWidth: 1, lineStyle: 2, title: 'Supply' });
+      candleSeries.createPriceLine({ price: z.obLow,  color: 'rgba(255,59,92,0.35)', lineWidth: 1, lineStyle: 2, title: '' });
     }
-    candleSeries.setMarkers(answerMarkers.sort((a,b) => a.time - b.time));
+    // Demand zones — green dashed price lines
+    for (const z of structures.demandZones) {
+      candleSeries.createPriceLine({ price: z.obHigh, color: 'rgba(0,255,136,0.35)', lineWidth: 1, lineStyle: 2, title: '' });
+      candleSeries.createPriceLine({ price: z.obLow,  color: 'rgba(0,255,136,0.7)',  lineWidth: 1, lineStyle: 2, title: 'Demand' });
+    }
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────

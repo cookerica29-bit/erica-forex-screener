@@ -7,7 +7,7 @@ import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats } from './db.js';
-import { debugScan, Setup, JournalStats } from './scanner.js';
+import { debugScan, Setup, JournalStats, fetchCandles, computeStructures } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -433,6 +433,31 @@ app.get('/api/test-telegram', async (_req, res) => {
   });
   const data = await r.json();
   return res.json(data);
+});
+
+// ─── TRAINER ──────────────────────────────────────────────────────────────────
+const TRAINER_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','EUR_JPY','GBP_JPY','AUD_USD','NZD_USD','USD_CAD'];
+const TRAINER_CONFIG: Record<string, { gran: string; count: number }> = {
+  beginner:     { gran: 'H1', count: 70  },
+  intermediate: { gran: 'H4', count: 80  },
+  advanced:     { gran: 'H4', count: 100 },
+};
+
+app.get('/api/trainer/chart', async (req, res) => {
+  const level = (req.query.level as string) || 'intermediate';
+  const cfg   = TRAINER_CONFIG[level] || TRAINER_CONFIG.intermediate;
+  const pair  = TRAINER_PAIRS[Math.floor(Math.random() * TRAINER_PAIRS.length)];
+  try {
+    const raw    = await fetchCandles(pair, cfg.gran, cfg.count);
+    const structures = computeStructures(raw);
+    const candles = raw.map(c => ({
+      time:  Math.floor(new Date(c.t).getTime() / 1000),
+      open:  c.o, high: c.h, low: c.l, close: c.c,
+    }));
+    res.json({ pair: pair.replace('_', '/'), timeframe: cfg.gran, candles, structures });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ─── STATIC ───────────────────────────────────────────────────────────────────

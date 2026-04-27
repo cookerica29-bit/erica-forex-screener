@@ -82,7 +82,7 @@ export interface DebugResult {
   };
 }
 
-async function fetchCandles(instrument: string, granularity: string, count=250): Promise<Candle[]> {
+export async function fetchCandles(instrument: string, granularity: string, count=250): Promise<Candle[]> {
   const url = `${OANDA_BASE}/v3/instruments/${instrument}/candles?granularity=${granularity}&count=${count}&price=M`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${OANDA_API_KEY}` }
@@ -144,7 +144,7 @@ function calcRSI(candles: Candle[], period = 14): number[] {
   return rsi;
 }
 
-function findSwings(candles: Candle[], margin=5): Swing[] {
+export function findSwings(candles: Candle[], margin=5): Swing[] {
   const swings: Swing[] = [];
   for (let i=margin; i<candles.length-margin; i++) {
     const c = candles[i];
@@ -718,4 +718,110 @@ export async function debugScan(
     }
   }
   return results;
+}
+
+// ── Trainer: compute labeled structures from real candles ─────────────────────
+
+export interface TrainerStructures {
+  swingHighs:  { time: number; price: number }[];
+  swingLows:   { time: number; price: number }[];
+  bosEvents:   { time: number; type: 'bullish'|'bearish'; brokenLevel: number }[];
+  chochEvents: { time: number; type: 'bullish'|'bearish'; brokenLevel: number }[];
+  supplyZones: { time: number; obHigh: number; obLow: number }[];
+  demandZones: { time: number; obHigh: number; obLow: number }[];
+  presentConcepts: string[];
+}
+
+function toTs(iso: string): number {
+  return Math.floor(new Date(iso).getTime() / 1000);
+}
+
+export function computeStructures(candles: Candle[], margin = 5): TrainerStructures {
+  const swings = findSwings(candles, margin);
+  const highs  = swings.filter(s => s.type === 'high');
+  const lows   = swings.filter(s => s.type === 'low');
+
+  const swingHighs = highs.map(s => ({ time: toTs(candles[s.index].t), price: s.price }));
+  const swingLows  = lows.map(s => ({ time: toTs(candles[s.index].t), price: s.price }));
+
+  // Overall trend — used to classify BOS (with trend) vs CHoCH (against trend)
+  const overallTrend = getTrend(swings);
+
+  const bosEvents:   TrainerStructures['bosEvents']   = [];
+  const chochEvents: TrainerStructures['chochEvents'] = [];
+  const brokenHighs = new Set<number>(); // swing indices already flagged
+  const brokenLows  = new Set<number>();
+
+  // Each swing high/low → find first candle that closes through it
+  for (const sh of highs) {
+    for (let i = sh.index + 1; i < candles.length; i++) {
+      if (candles[i].c > sh.price) {
+        const t = toTs(candles[i].t);
+        // Breaking a swing HIGH → bullish break
+        // In a downtrend that's a CHoCH; in uptrend or null it's a BOS
+        if (!brokenHighs.has(sh.index)) {
+          brokenHighs.add(sh.index);
+          if (overallTrend === 'SHORT') {
+            chochEvents.push({ time: t, type: 'bullish', brokenLevel: sh.price });
+          } else {
+            bosEvents.push({ time: t, type: 'bullish', brokenLevel: sh.price });
+          }
+        }
+        break;
+      }
+    }
+  }
+  for (const sl of lows) {
+    for (let i = sl.index + 1; i < candles.length; i++) {
+      if (candles[i].c < sl.price) {
+        const t = toTs(candles[i].t);
+        // Breaking a swing LOW → bearish break
+        // In an uptrend that's a CHoCH; in downtrend or null it's a BOS
+        if (!brokenLows.has(sl.index)) {
+          brokenLows.add(sl.index);
+          if (overallTrend === 'LONG') {
+            chochEvents.push({ time: t, type: 'bearish', brokenLevel: sl.price });
+          } else {
+            bosEvents.push({ time: t, type: 'bearish', brokenLevel: sl.price });
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  bosEvents.sort((a, b)   => a.time - b.time);
+  chochEvents.sort((a, b) => a.time - b.time);
+
+  // Order blocks: last opposing candle before each BOS (limit 4 zones per side to keep chart clean)
+  const supplyZones: TrainerStructures['supplyZones'] = [];
+  const demandZones: TrainerStructures['demandZones'] = [];
+
+  for (const bos of bosEvents) {
+    const bosIdx = candles.findIndex(c => toTs(c.t) === bos.time);
+    if (bosIdx < 2) continue;
+    if (bos.type === 'bearish' && supplyZones.length < 4) {
+      for (let i = bosIdx - 1; i >= Math.max(0, bosIdx - 8); i--) {
+        if (candles[i].c > candles[i].o) { // last bullish candle before bearish BOS = supply OB
+          supplyZones.push({ time: toTs(candles[i].t), obHigh: candles[i].h, obLow: candles[i].l });
+          break;
+        }
+      }
+    } else if (bos.type === 'bullish' && demandZones.length < 4) {
+      for (let i = bosIdx - 1; i >= Math.max(0, bosIdx - 8); i--) {
+        if (candles[i].c < candles[i].o) { // last bearish candle before bullish BOS = demand OB
+          demandZones.push({ time: toTs(candles[i].t), obHigh: candles[i].h, obLow: candles[i].l });
+          break;
+        }
+      }
+    }
+  }
+
+  const presentConcepts: string[] = ['Swing High', 'Swing Low'];
+  if (bosEvents.length   > 0) presentConcepts.push('BOS');
+  if (chochEvents.length > 0) presentConcepts.push('CHoCH');
+  if (supplyZones.length > 0) presentConcepts.push('Supply Zone');
+  if (demandZones.length > 0) presentConcepts.push('Demand Zone');
+
+  return { swingHighs, swingLows, bosEvents, chochEvents, supplyZones, demandZones, presentConcepts };
 }
