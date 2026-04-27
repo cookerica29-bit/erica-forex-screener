@@ -79,6 +79,9 @@ export interface DebugResult {
     ema200?: number;
     emaSlope?: number;
     rsi?: number;
+    chochType?: 'bearish' | 'bullish' | null;
+    chochReason?: string;
+    chochSuppressed?: boolean;
   };
 }
 
@@ -173,6 +176,106 @@ function getTrend(swings: Swing[]): 'LONG'|'SHORT'|null {
   if ((hh || hh2) && (hl || hl2) && (hh || hl)) return 'LONG';
   if ((lh || lh2) && (ll || ll2) && (lh || ll)) return 'SHORT';
   return null;
+}
+
+interface ChoCHResult {
+  suppress: boolean;
+  mostRecentType: 'bearish' | 'bullish' | null;
+  reason: string;
+  bearishChoCHLevel: number | null;
+}
+
+/**
+ * Scan ALL swing pairs in the provided candles for ChoCH events.
+ * The most recent ChoCH wins — a short-term bounce cannot override a confirmed
+ * bearish ChoCH made earlier in the window.
+ *
+ * Bearish ChoCH: price makes a Lower Low after a Lower High → suppresses LONG.
+ * Bullish ChoCH: price makes a Higher High after a Higher Low → suppresses SHORT.
+ */
+function detectChoCH(candles: Candle[], direction: 'LONG' | 'SHORT' | null, margin = 5): ChoCHResult {
+  const swings = findSwings(candles, margin);
+  const highs  = swings.filter(s => s.type === 'high');
+  const lows   = swings.filter(s => s.type === 'low');
+
+  let lastBearishIdx     = -1;
+  let lastBullishIdx     = -1;
+  let bearishReason      = '';
+  let bullishReason      = '';
+  let bearishChoCHLevel: number | null = null;
+
+  // Bearish ChoCH: LL confirmed after a LH between the two lows
+  for (let i = 1; i < lows.length; i++) {
+    if (lows[i].price < lows[i - 1].price) {
+      const betweenHighs = highs.filter(h => h.index > lows[i - 1].index && h.index < lows[i].index);
+      const priorHighs   = highs.filter(h => h.index < lows[i - 1].index);
+      if (
+        betweenHighs.length > 0 && priorHighs.length > 0 &&
+        betweenHighs[betweenHighs.length - 1].price < priorHighs[priorHighs.length - 1].price
+      ) {
+        if (lows[i].index > lastBearishIdx) {
+          lastBearishIdx    = lows[i].index;
+          bearishChoCHLevel = lows[i - 1].price;
+          bearishReason = (
+            `bearish ChoCH at ${lows[i].price.toFixed(5)} ` +
+            `(LH ${betweenHighs[betweenHighs.length-1].price.toFixed(5)} ` +
+            `< prior ${priorHighs[priorHighs.length-1].price.toFixed(5)}, ` +
+            `broke level ${lows[i-1].price.toFixed(5)})`
+          );
+        }
+      }
+    }
+  }
+
+  // Bullish ChoCH: HH confirmed after a HL between the two highs
+  for (let i = 1; i < highs.length; i++) {
+    if (highs[i].price > highs[i - 1].price) {
+      const betweenLows = lows.filter(l => l.index > highs[i - 1].index && l.index < highs[i].index);
+      const priorLows   = lows.filter(l => l.index < highs[i - 1].index);
+      if (
+        betweenLows.length > 0 && priorLows.length > 0 &&
+        betweenLows[betweenLows.length - 1].price > priorLows[priorLows.length - 1].price
+      ) {
+        if (highs[i].index > lastBullishIdx) {
+          lastBullishIdx = highs[i].index;
+          bullishReason = (
+            `bullish ChoCH at ${highs[i].price.toFixed(5)} ` +
+            `(HL ${betweenLows[betweenLows.length-1].price.toFixed(5)} ` +
+            `> prior ${priorLows[priorLows.length-1].price.toFixed(5)}, ` +
+            `broke level ${highs[i-1].price.toFixed(5)})`
+          );
+        }
+      }
+    }
+  }
+
+  if (lastBearishIdx === -1 && lastBullishIdx === -1) {
+    return { suppress: false, mostRecentType: null, reason: 'no ChoCH detected', bearishChoCHLevel: null };
+  }
+
+  const mostRecentType = lastBearishIdx >= lastBullishIdx ? 'bearish' : 'bullish';
+
+  if (mostRecentType === 'bearish') {
+    const suppress = direction === 'LONG';
+    return {
+      suppress,
+      mostRecentType,
+      reason: suppress
+        ? `[SUPPRESS] most recent ChoCH is bearish → ${bearishReason}`
+        : `bearish ChoCH present (not suppressing ${direction}) → ${bearishReason}`,
+      bearishChoCHLevel,
+    };
+  } else {
+    const suppress = direction === 'SHORT';
+    return {
+      suppress,
+      mostRecentType,
+      reason: suppress
+        ? `[SUPPRESS] most recent ChoCH is bullish → ${bullishReason}`
+        : `bullish ChoCH present (not suppressing ${direction}) → ${bullishReason}`,
+      bearishChoCHLevel: null,
+    };
+  }
 }
 
 function detectMomentum(c: Candle, p: Candle, dir: string, atr: number, structureLevel: number): {type:string;strength:number}|null {
@@ -324,6 +427,19 @@ export function analyzeCandles(
   detail.htfTrend = htfTrend;
   if (htfTrend && htfTrend !== direction) {
     return { setup: null, reason: `HTF conflict — Daily is ${htfTrend} but setup is ${direction}`, detail };
+  }
+
+  // 1d. ChoCH hard block — scan last 200 candles for structural character change.
+  //     Bearish ChoCH + LONG = suppress. Bullish ChoCH + SHORT = suppress.
+  //     Most recent ChoCH wins over short-term bounces.
+  const chochWindow = candles.slice(-200);
+  const choch = detectChoCH(chochWindow, direction, 5);
+  detail.chochType      = choch.mostRecentType;
+  detail.chochReason    = choch.reason;
+  detail.chochSuppressed = choch.suppress;
+  console.log(`[${pair}] ChoCH: ${choch.reason}`);
+  if (choch.suppress) {
+    return { setup: null, reason: `ChoCH conflict — ${choch.reason}`, detail };
   }
 
   // ── GATE 2: PULLBACK QUALITY ───────────────────────────────────────────────
