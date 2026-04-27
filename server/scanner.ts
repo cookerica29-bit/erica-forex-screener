@@ -19,18 +19,7 @@ export const PAIRS = [
   'XAU_USD','XAG_USD',
 ];
 
-// Pip size per instrument — used for minimum SL distance check
-const PIP_SIZE: Record<string,number> = {
-  // JPY pairs: 1 pip = 0.01
-  USD_JPY:0.01, EUR_JPY:0.01, GBP_JPY:0.01, AUD_JPY:0.01, NZD_JPY:0.01, CAD_JPY:0.01,
-  // Metals
-  XAU_USD:0.1, XAG_USD:0.01,
-  // Standard 4-decimal pairs: 1 pip = 0.0001
-};
-const DEFAULT_PIP = 0.0001;
-
-const HTF_MAP:  Record<string,string> = { M30:'H4', H4:'D' };
-const HTF2_MAP: Record<string,string> = { M30:'D' }; // M30 must also align with Daily (two-level check)
+const HTF_MAP: Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };
 
 interface Candle { t:string; o:number; h:number; l:number; c:number; v:number; }
 interface Swing  { index:number; price:number; type:'high'|'low'; }
@@ -55,7 +44,6 @@ export interface Setup {
   quality: 'PREMIUM'|'STRONG'|'DEVELOPING';
   rrRatio: number;
   entry: number;
-  entryZone: { low: number; high: number };
   sl: number;
   tp1: number;
   tp2: number;
@@ -91,10 +79,6 @@ export interface DebugResult {
     ema200?: number;
     emaSlope?: number;
     rsi?: number;
-    htf2Trend?: string | null;
-    chochType?: 'bearish' | 'bullish' | null;
-    chochReason?: string;
-    chochSuppressed?: boolean;
   };
 }
 
@@ -191,106 +175,6 @@ function getTrend(swings: Swing[]): 'LONG'|'SHORT'|null {
   return null;
 }
 
-interface ChoCHResult {
-  suppress: boolean;
-  mostRecentType: 'bearish' | 'bullish' | null;
-  reason: string;
-  bearishChoCHLevel: number | null;
-}
-
-/**
- * Scan ALL swing pairs in the provided candles for ChoCH events.
- * The most recent ChoCH wins — a short-term bounce cannot override a confirmed
- * bearish ChoCH made earlier in the window.
- *
- * Bearish ChoCH: price makes a Lower Low after a Lower High → suppresses LONG.
- * Bullish ChoCH: price makes a Higher High after a Higher Low → suppresses SHORT.
- */
-function detectChoCH(candles: Candle[], direction: 'LONG' | 'SHORT' | null, margin = 5): ChoCHResult {
-  const swings = findSwings(candles, margin);
-  const highs  = swings.filter(s => s.type === 'high');
-  const lows   = swings.filter(s => s.type === 'low');
-
-  let lastBearishIdx     = -1;
-  let lastBullishIdx     = -1;
-  let bearishReason      = '';
-  let bullishReason      = '';
-  let bearishChoCHLevel: number | null = null;
-
-  // Bearish ChoCH: LL confirmed after a LH between the two lows
-  for (let i = 1; i < lows.length; i++) {
-    if (lows[i].price < lows[i - 1].price) {
-      const betweenHighs = highs.filter(h => h.index > lows[i - 1].index && h.index < lows[i].index);
-      const priorHighs   = highs.filter(h => h.index < lows[i - 1].index);
-      if (
-        betweenHighs.length > 0 && priorHighs.length > 0 &&
-        betweenHighs[betweenHighs.length - 1].price < priorHighs[priorHighs.length - 1].price
-      ) {
-        if (lows[i].index > lastBearishIdx) {
-          lastBearishIdx    = lows[i].index;
-          bearishChoCHLevel = lows[i - 1].price;
-          bearishReason = (
-            `bearish ChoCH at ${lows[i].price.toFixed(5)} ` +
-            `(LH ${betweenHighs[betweenHighs.length-1].price.toFixed(5)} ` +
-            `< prior ${priorHighs[priorHighs.length-1].price.toFixed(5)}, ` +
-            `broke level ${lows[i-1].price.toFixed(5)})`
-          );
-        }
-      }
-    }
-  }
-
-  // Bullish ChoCH: HH confirmed after a HL between the two highs
-  for (let i = 1; i < highs.length; i++) {
-    if (highs[i].price > highs[i - 1].price) {
-      const betweenLows = lows.filter(l => l.index > highs[i - 1].index && l.index < highs[i].index);
-      const priorLows   = lows.filter(l => l.index < highs[i - 1].index);
-      if (
-        betweenLows.length > 0 && priorLows.length > 0 &&
-        betweenLows[betweenLows.length - 1].price > priorLows[priorLows.length - 1].price
-      ) {
-        if (highs[i].index > lastBullishIdx) {
-          lastBullishIdx = highs[i].index;
-          bullishReason = (
-            `bullish ChoCH at ${highs[i].price.toFixed(5)} ` +
-            `(HL ${betweenLows[betweenLows.length-1].price.toFixed(5)} ` +
-            `> prior ${priorLows[priorLows.length-1].price.toFixed(5)}, ` +
-            `broke level ${highs[i-1].price.toFixed(5)})`
-          );
-        }
-      }
-    }
-  }
-
-  if (lastBearishIdx === -1 && lastBullishIdx === -1) {
-    return { suppress: false, mostRecentType: null, reason: 'no ChoCH detected', bearishChoCHLevel: null };
-  }
-
-  const mostRecentType = lastBearishIdx >= lastBullishIdx ? 'bearish' : 'bullish';
-
-  if (mostRecentType === 'bearish') {
-    const suppress = direction === 'LONG';
-    return {
-      suppress,
-      mostRecentType,
-      reason: suppress
-        ? `[SUPPRESS] most recent ChoCH is bearish → ${bearishReason}`
-        : `bearish ChoCH present (not suppressing ${direction}) → ${bearishReason}`,
-      bearishChoCHLevel,
-    };
-  } else {
-    const suppress = direction === 'SHORT';
-    return {
-      suppress,
-      mostRecentType,
-      reason: suppress
-        ? `[SUPPRESS] most recent ChoCH is bullish → ${bullishReason}`
-        : `bullish ChoCH present (not suppressing ${direction}) → ${bullishReason}`,
-      bearishChoCHLevel: null,
-    };
-  }
-}
-
 function detectMomentum(c: Candle, p: Candle, dir: string, atr: number, structureLevel: number): {type:string;strength:number}|null {
   const body=Math.abs(c.c-c.o), range=c.h-c.l, bodyRatio=range>0?body/range:0;
   const uw=c.h-Math.max(c.c,c.o), lw=Math.min(c.c,c.o)-c.l;
@@ -348,8 +232,7 @@ function getSessionLabel(pair: string): string {
 export function analyzeCandles(
   candles: Candle[], htf: Candle[], pair: string,
   granularity='H1', minRR=1.5, _debug=false,
-  journalStats: JournalStats = {},
-  htf2: Candle[] = []
+  journalStats: JournalStats = {}
 ): { setup: Setup|null; reason: string; detail: DebugResult['detail'] } {
   const detail: DebugResult['detail'] = {};
 
@@ -434,40 +317,13 @@ export function analyzeCandles(
   if (direction === 'SHORT' && emaSlope >= 0) return { setup: null, reason: `20 EMA not falling for SHORT (slope=${emaSlope.toFixed(5)})`, detail };
 
   // 1c. HTF alignment: no counter-trend trades
-  //     M30/M15 check two levels up (H4 + Daily — both must agree).
-  //     H1 checks Daily; H4 checks Daily; D checks Weekly.
-  const htfName   = HTF_MAP[granularity] || 'D';
   const htfSwings     = findSwings(htf.slice(-100));
   const htfSwingHighs = htfSwings.filter(s => s.type === 'high');
   const htfSwingLows  = htfSwings.filter(s => s.type === 'low');
   const htfTrend      = getTrend(htfSwings);
   detail.htfTrend = htfTrend;
   if (htfTrend && htfTrend !== direction) {
-    return { setup: null, reason: `HTF conflict — ${htfName} is ${htfTrend} but setup is ${direction}`, detail };
-  }
-
-  // Second HTF check (M30 and M15 must also align with Daily)
-  if (htf2.length > 0) {
-    const htf2Name   = HTF2_MAP[granularity] || 'D';
-    const htf2Swings = findSwings(htf2.slice(-100));
-    const htf2Trend  = getTrend(htf2Swings);
-    detail.htf2Trend = htf2Trend;
-    if (htf2Trend && htf2Trend !== direction) {
-      return { setup: null, reason: `HTF conflict — ${htf2Name} is ${htf2Trend} but setup is ${direction}`, detail };
-    }
-  }
-
-  // 1d. ChoCH hard block — scan last 200 candles for structural character change.
-  //     Bearish ChoCH + LONG = suppress. Bullish ChoCH + SHORT = suppress.
-  //     Most recent ChoCH wins over short-term bounces.
-  const chochWindow = candles.slice(-200);
-  const choch = detectChoCH(chochWindow, direction, 5);
-  detail.chochType      = choch.mostRecentType;
-  detail.chochReason    = choch.reason;
-  detail.chochSuppressed = choch.suppress;
-  console.log(`[${pair}] ChoCH: ${choch.reason}`);
-  if (choch.suppress) {
-    return { setup: null, reason: `ChoCH conflict — ${choch.reason}`, detail };
+    return { setup: null, reason: `HTF conflict — Daily is ${htfTrend} but setup is ${direction}`, detail };
   }
 
   // ── GATE 2: PULLBACK QUALITY ───────────────────────────────────────────────
@@ -538,18 +394,6 @@ export function analyzeCandles(
     detail,
   };
 
-  // ── STALENESS CHECK ────────────────────────────────────────────────────────
-  // Pattern confirmed, but if price has already run >1×ATR from EMA20 the
-  // entry zone has passed — reject so a stale setup never prints.
-  const distFromEma = Math.abs(price - ema20);
-  if (distFromEma > atr) {
-    return {
-      setup: null,
-      reason: `Setup stale — price moved ${(distFromEma / atr).toFixed(1)}×ATR from EMA20 (${price.toFixed(5)} vs EMA ${ema20.toFixed(5)})`,
-      detail,
-    };
-  }
-
   // ── GATE 4: RSI ────────────────────────────────────────────────────────────
   if (direction === 'LONG') {
     if (rsi > 70) return { setup: null, reason: `RSI overbought for LONG (${rsi.toFixed(1)} > 70)`, detail };
@@ -570,15 +414,6 @@ export function analyzeCandles(
   if (direction === 'SHORT' && sl <= price) return { setup: null, reason: 'Inverted SL: sl <= entry for SHORT', detail };
   const risk = Math.abs(price - sl);
   if (risk <= 0) return { setup: null, reason: 'Risk is zero (price equals SL)', detail };
-
-  // Minimum SL distance: 5 pips — rejects dangerously tight stops
-  const pipSize  = PIP_SIZE[pair] ?? DEFAULT_PIP;
-  const slPips   = risk / pipSize;
-  if (slPips < 5) return {
-    setup: null,
-    reason: `❌ SL too tight — ${slPips.toFixed(1)} pips (minimum 5 pips required)`,
-    detail,
-  };
 
   const recentSwings = findSwings(recent80);
   const swingHighs   = recentSwings.filter(s => s.type === 'high');
@@ -797,12 +632,6 @@ export function analyzeCandles(
     EMA_BOUNCE:   `${dl} EMA 20 Pullback`,
   };
 
-  // Entry zone: ±0.3×ATR around EMA20 — valid fill range
-  const entryZone = {
-    low:  ema20 - 0.3 * atr,
-    high: ema20 + 0.3 * atr,
-  };
-
   const checklist: SetupChecklist = {
     trend: true,           // passed Gate 1
     pullbackQuality: true, // passed Gate 2
@@ -821,8 +650,7 @@ export function analyzeCandles(
     direction,
     quality,
     rrRatio: Math.round(rrRatio * 100) / 100,
-    entry: ema20,
-    entryZone,
+    entry: price,
     sl,
     tp1,
     tp2,
@@ -839,18 +667,15 @@ export function analyzeCandles(
 }
 
 export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
-  const htfGran  = HTF_MAP[granularity]  || 'D';
-  const htf2Gran = HTF2_MAP[granularity] || null;
+  const htfGran = HTF_MAP[granularity] || 'D';
   const results: Setup[] = [];
   for (const pair of PAIRS) {
     try {
-      const fetches: Promise<Candle[]>[] = [
+      const [candles, htf] = await Promise.all([
         fetchCandles(pair, granularity, 250),
         fetchCandles(pair, htfGran, 150),
-      ];
-      if (htf2Gran) fetches.push(fetchCandles(pair, htf2Gran, 150));
-      const [candles, htf, htf2 = []] = await Promise.all(fetches);
-      const { setup } = analyzeCandles(candles, htf, pair, granularity, minRR, false, {}, htf2);
+      ]);
+      const { setup } = analyzeCandles(candles, htf, pair, granularity, minRR);
       if (setup) {
         setup.newsRisk = await checkNewsRisk(pair);
         results.push(setup);
@@ -869,18 +694,15 @@ export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
 export async function debugScan(
   granularity='H1', minRR=1.5, journalStats: JournalStats = {}
 ): Promise<DebugResult[]> {
-  const htfGran  = HTF_MAP[granularity]  || 'D';
-  const htf2Gran = HTF2_MAP[granularity] || null;
+  const htfGran = HTF_MAP[granularity] || 'D';
   const results: DebugResult[] = [];
   for (const pair of PAIRS) {
     try {
-      const fetches: Promise<Candle[]>[] = [
+      const [candles, htf] = await Promise.all([
         fetchCandles(pair, granularity, 250),
         fetchCandles(pair, htfGran, 150),
-      ];
-      if (htf2Gran) fetches.push(fetchCandles(pair, htf2Gran, 150));
-      const [candles, htf, htf2 = []] = await Promise.all(fetches);
-      const { setup, reason, detail } = analyzeCandles(candles, htf, pair, granularity, minRR, true, journalStats, htf2);
+      ]);
+      const { setup, reason, detail } = analyzeCandles(candles, htf, pair, granularity, minRR, true, journalStats);
       if (setup) {
         setup.newsRisk = await checkNewsRisk(pair);
       }
