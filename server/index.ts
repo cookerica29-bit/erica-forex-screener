@@ -6,7 +6,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats } from './db.js';
+import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats, getSetting, setSetting, deleteSetting } from './db.js';
 import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -162,9 +162,21 @@ async function scheduledScan(forceTf?: string) {
   }
 }
 
-// Run immediately on startup then every 15 minutes
-scheduledScan();
-setInterval(scheduledScan, 15 * 60 * 1000);
+// Load persisted priority pairs from DB, then run first scan
+async function init() {
+  try {
+    const stored = await getSetting('priority_pairs');
+    if (stored) {
+      priorityPairsData = JSON.parse(stored) as PriorityPairsData;
+      console.log(`[Priority] Restored from DB: ${priorityPairsData.pairs.join(', ')}`);
+    }
+  } catch (e) {
+    console.warn('[Priority] Could not load from DB on startup:', e);
+  }
+  scheduledScan();
+  setInterval(scheduledScan, 15 * 60 * 1000);
+}
+init();
 
 // ─── SCANNER API ──────────────────────────────────────────────────────────────
 app.get('/api/setups', (_req, res) => {
@@ -210,7 +222,7 @@ app.get('/api/priority-pairs', (_req, res) => {
   });
 });
 
-app.post('/api/priority-pairs', (req, res) => {
+app.post('/api/priority-pairs', async (req, res) => {
   const { pairs, meta } = req.body as { pairs?: unknown; meta?: unknown };
   if (!Array.isArray(pairs) || pairs.length === 0) {
     return res.status(400).json({ error: 'Body must include non-empty pairs array' });
@@ -219,13 +231,16 @@ app.post('/api/priority-pairs', (req, res) => {
   if (normalized.length === 0) {
     return res.status(400).json({ error: 'No valid pair symbols after normalization' });
   }
-  priorityPairsData = { pairs: normalized, setAt: new Date().toISOString(), meta: meta as any };
+  const record: PriorityPairsData = { pairs: normalized, setAt: new Date().toISOString(), meta: meta as any };
+  priorityPairsData = record;
+  await setSetting('priority_pairs', JSON.stringify(record));
   console.log(`[Priority] Set to ${normalized.length} pairs: ${normalized.join(', ')}`);
   res.json({ success: true, pairs: normalized, count: normalized.length });
 });
 
-app.delete('/api/priority-pairs', (_req, res) => {
+app.delete('/api/priority-pairs', async (_req, res) => {
   priorityPairsData = null;
+  await deleteSetting('priority_pairs');
   console.log('[Priority] Cleared — reverting to full 16-pair list');
   res.json({ success: true, message: 'Priority pairs cleared, reverted to full list' });
 });

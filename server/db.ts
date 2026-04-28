@@ -4,27 +4,39 @@ import { journalEntries } from '../drizzle/schema.js';
 import { eq, desc } from 'drizzle-orm';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: mysql.Pool | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const pool = mysql.createPool({
+      _pool = mysql.createPool({
         uri: process.env.DATABASE_URL,
         waitForConnections: true,
         connectionLimit: 5,
         queueLimit: 0,
       });
-      _db = drizzle(pool);
-      await initSchema(pool);
+      _db = drizzle(_pool);
+      await initSchema(_pool);
     } catch (error) {
       console.warn('[Database] Failed to connect:', error);
       _db = null;
+      _pool = null;
     }
   }
   return _db;
 }
 
+
 async function initSchema(pool: mysql.Pool) {
+  // Key-value store for persistent app settings (e.g. priority pairs)
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS settings (
+      \`key\` VARCHAR(100) PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS journal_entries (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -161,6 +173,43 @@ export async function clearAllJournalEntries() {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
   await db.delete(journalEntries);
+}
+
+// ── Settings (persistent key-value) ─────────────────────────────────────────
+
+export async function getSetting(key: string): Promise<string | null> {
+  await getDb(); // ensure pool is initialised
+  if (!_pool) return null;
+  try {
+    const [rows] = await _pool.promise().execute('SELECT value FROM settings WHERE `key` = ?', [key]) as any[];
+    return rows.length ? rows[0].value : null;
+  } catch (e) {
+    console.warn('[Settings] getSetting failed:', e);
+    return null;
+  }
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  await getDb();
+  if (!_pool) return;
+  try {
+    await _pool.promise().execute(
+      'INSERT INTO settings (`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = CURRENT_TIMESTAMP',
+      [key, value]
+    );
+  } catch (e) {
+    console.warn('[Settings] setSetting failed:', e);
+  }
+}
+
+export async function deleteSetting(key: string): Promise<void> {
+  await getDb();
+  if (!_pool) return;
+  try {
+    await _pool.promise().execute('DELETE FROM settings WHERE `key` = ?', [key]);
+  } catch (e) {
+    console.warn('[Settings] deleteSetting failed:', e);
+  }
 }
 
 // Returns win/loss counts keyed by "pattern|||timeframe" for journal-weighted scoring
