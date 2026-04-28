@@ -47,6 +47,10 @@ function isRailwayRuntime() {
   return Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
 }
 
+function hasDatabaseConfig() {
+  return getDatabaseUrl() !== null;
+}
+
 function getSettingsFilePath(): { filePath: string; durable: boolean; detail: string } | null {
   const configuredPath = process.env.SETTINGS_FILE || process.env.PRIORITY_PAIRS_STORE;
   if (configuredPath) {
@@ -279,8 +283,12 @@ export async function getSetting(key: string): Promise<string | null> {
       const [rows] = await _pool.execute('SELECT value FROM settings WHERE `key` = ?', [key]) as any[];
       return rows.length ? rows[0].value : null;
     } catch (e) {
-      console.warn('[Settings] getSetting DB failed, falling back to file:', e);
+      console.warn('[Settings] getSetting DB failed:', e);
+      throw e;
     }
+  }
+  if (hasDatabaseConfig()) {
+    throw new Error('Database settings backend is configured but unavailable');
   }
   const settings = await readFileSettings();
   return settings[key] ?? null;
@@ -296,9 +304,11 @@ export async function setSetting(key: string, value: string): Promise<boolean> {
       );
       return true;
     } catch (e) {
-      console.warn('[Settings] setSetting DB failed, falling back to file:', e);
+      console.warn('[Settings] setSetting DB failed:', e);
+      return false;
     }
   }
+  if (hasDatabaseConfig()) return false;
   const settings = await readFileSettings();
   settings[key] = value;
   return writeFileSettings(settings);
@@ -311,9 +321,11 @@ export async function deleteSetting(key: string): Promise<boolean> {
       await _pool.execute('DELETE FROM settings WHERE `key` = ?', [key]);
       return true;
     } catch (e) {
-      console.warn('[Settings] deleteSetting DB failed, falling back to file:', e);
+      console.warn('[Settings] deleteSetting DB failed:', e);
+      return false;
     }
   }
+  if (hasDatabaseConfig()) return false;
   const settings = await readFileSettings();
   delete settings[key];
   return writeFileSettings(settings);
@@ -323,6 +335,13 @@ export async function getSettingsStorageInfo(): Promise<SettingsStorageInfo> {
   await getDb();
   if (_pool) {
     return { backend: 'mysql', durable: true, detail: 'settings table' };
+  }
+  if (hasDatabaseConfig()) {
+    return {
+      backend: 'unavailable',
+      durable: false,
+      detail: 'MySQL settings backend is configured but currently unavailable.',
+    };
   }
 
   const file = getSettingsFilePath();

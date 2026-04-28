@@ -239,8 +239,27 @@ app.get('/api/near-misses', (_req, res) => {
 // DELETE /api/priority-pairs → clears priority mode, reverts to full 16-pair list
 
 app.get('/api/priority-pairs', async (_req, res) => {
-  await loadPriorityPairsFromStorage('GET');
-  const storage = await getSettingsStorageInfo();
+  let storage = await getSettingsStorageInfo();
+  let stale = false;
+  try {
+    await loadPriorityPairsFromStorage('GET');
+    storage = await getSettingsStorageInfo();
+  } catch (e: any) {
+    stale = priorityPairsData !== null;
+    storage = await getSettingsStorageInfo();
+    console.warn(`[Priority] GET storage read failed storage=${storage.backend} active=${priorityPairsData !== null}: ${e.message}`);
+    if (!stale) {
+      return res.status(503).json({
+        error: 'Priority pair storage is unavailable',
+        active: null,
+        pairs: FULL_PAIRS,
+        setAt: null,
+        meta: null,
+        fullList: FULL_PAIRS,
+        storage,
+      });
+    }
+  }
   res.json({
     active: priorityPairsData !== null,
     pairs: priorityPairsData?.pairs ?? FULL_PAIRS,
@@ -248,6 +267,7 @@ app.get('/api/priority-pairs', async (_req, res) => {
     meta: priorityPairsData?.meta ?? null,
     fullList: FULL_PAIRS,
     storage,
+    stale,
   });
 });
 

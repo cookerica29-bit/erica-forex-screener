@@ -584,12 +584,23 @@
     calcPosition();
   }
 
+  function updatePriorityBadge(data) {
+    const badge = document.getElementById('priorityBadge');
+    if (!badge) return;
+    const active = data?.active === true;
+    badge.style.display = active ? 'inline-flex' : 'none';
+    badge.title = active && data.setAt ? `Set at ${new Date(data.setAt).toLocaleTimeString()}` : '';
+  }
+
   async function loadPriorityPairs() {
     try {
       const res = await fetch('/api/priority-pairs');
-      if (!res.ok) return;
+      if (!res.ok) {
+        updatePriorityBadge(null);
+        return;
+      }
       const data = await res.json();
-      priorityPairsActive = Boolean(data.active);
+      priorityPairsActive = data.active === true;
       PAIRS = priorityPairsActive ? data.pairs : (data.fullList || FULL_SCAN_PAIRS);
       PAIR_LABELS = Object.fromEntries(PAIRS.map(p => [p, makePairLabel(p)]));
       const label = priorityPairsActive
@@ -598,13 +609,12 @@
       const el = document.getElementById('initScanSubtext');
       if (el) el.textContent = label;
       renderCalculatorPairs();
-      // Show/hide priority badge in header
-      const badge = document.getElementById('priorityBadge');
-      if (badge) {
-        badge.style.display = data.active ? 'inline-flex' : 'none';
-        badge.title = data.setAt ? `Set at ${new Date(data.setAt).toLocaleTimeString()}` : '';
-      }
-    } catch(e) { console.warn('Priority pairs fetch failed:', e); }
+      updatePriorityBadge(data);
+    } catch(e) {
+      priorityPairsActive = false;
+      updatePriorityBadge(null);
+      console.warn('Priority pairs fetch failed:', e);
+    }
   }
   const HTF_MAP = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };
 
