@@ -1144,8 +1144,89 @@
           <div><span class="scout-ind-label">EMA20</span><span class="scout-ind-value">${f(r.ema20)}</span></div>
         </div>
         <div class="scanned-at" style="margin-top:8px;">Scanned: ${new Date(r.scannedAt).toLocaleTimeString()} · OANDA v20</div>
+        <div class="card-actions" style="margin-top:10px;">
+          <button class="push-btn" id="scout-push-${r.pair}" onclick="toggleScoutJournal('${r.pair}')">📓 Log Trade</button>
+        </div>
+        <div class="journal-panel" id="scout-journal-${r.pair}" style="display:none;">
+          <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Log your trade — fill in levels from your own analysis</div>
+          <div class="outcome-row" style="margin-bottom:8px;">
+            <span class="outcome-label">Direction:</span>
+            <button class="outcome-btn ${r.bias === 'BULLISH' ? 'win active-outcome' : 'win'}" id="scout-dir-long-${r.pair}" onclick="scoutSetDir('${r.pair}','LONG')">LONG</button>
+            <button class="outcome-btn ${r.bias === 'BEARISH' ? 'loss active-outcome' : 'loss'}" id="scout-dir-short-${r.pair}" onclick="scoutSetDir('${r.pair}','SHORT')">SHORT</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
+            <div>
+              <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:3px;">Entry</div>
+              <input type="number" class="pnl-input" id="scout-entry-${r.pair}" placeholder="${f(r.price)}" step="0.00001" style="width:100%;" />
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--red);text-transform:uppercase;margin-bottom:3px;">Stop Loss</div>
+              <input type="number" class="pnl-input" id="scout-sl-${r.pair}" placeholder="SL" step="0.00001" style="width:100%;border-color:rgba(255,59,92,0.3);" />
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--green);text-transform:uppercase;margin-bottom:3px;">TP1</div>
+              <input type="number" class="pnl-input" id="scout-tp-${r.pair}" placeholder="TP1" step="0.00001" style="width:100%;border-color:rgba(0,255,136,0.3);" />
+            </div>
+          </div>
+          <div class="notes-row" style="margin-bottom:8px;">
+            <textarea class="notes-input" id="scout-notes-${r.pair}" placeholder="Notes from your analysis..." style="min-height:48px;"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="push-btn" id="scout-save-${r.pair}" onclick="saveScoutTrade('${r.pair}','${escapeHtml(r.displaySymbol || r.pair.replace('_','/'))}','${r.timeframe}','${r.session||''}',${r.newsRisk||false})">Save to Journal</button>
+            <button class="push-btn" onclick="toggleScoutJournal('${r.pair}')" style="border-color:rgba(148,163,184,0.3);background:transparent;color:var(--slate-dim);">Cancel</button>
+          </div>
+        </div>
       </div>
     </div>`;
+  }
+
+  const scoutDirMap = {};
+  function toggleScoutJournal(pair) {
+    const panel = document.getElementById('scout-journal-' + pair);
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    if (panel.style.display === 'flex') panel.style.flexDirection = 'column';
+  }
+  function scoutSetDir(pair, dir) {
+    scoutDirMap[pair] = dir;
+    const longBtn  = document.getElementById('scout-dir-long-'  + pair);
+    const shortBtn = document.getElementById('scout-dir-short-' + pair);
+    if (longBtn)  { longBtn.className  = 'outcome-btn win'  + (dir === 'LONG'  ? ' active-outcome' : ''); }
+    if (shortBtn) { shortBtn.className = 'outcome-btn loss' + (dir === 'SHORT' ? ' active-outcome' : ''); }
+  }
+  async function saveScoutTrade(pair, displaySymbol, timeframe, session, newsRisk) {
+    const dir    = scoutDirMap[pair] || 'LONG';
+    const entry  = parseFloat(document.getElementById('scout-entry-' + pair)?.value);
+    const sl     = parseFloat(document.getElementById('scout-sl-'    + pair)?.value);
+    const tp1    = parseFloat(document.getElementById('scout-tp-'    + pair)?.value);
+    const notes  = document.getElementById('scout-notes-'  + pair)?.value || '';
+    if (!entry || !sl || !tp1) { alert('Entry, Stop Loss, and TP1 are required.'); return; }
+    const risk = Math.abs(entry - sl);
+    const rr1  = risk > 0 ? parseFloat((Math.abs(tp1 - entry) / risk).toFixed(1)) : null;
+    const saveBtn = document.getElementById('scout-save-' + pair);
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+    try {
+      const res = await fetch('/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: pair, displaySymbol, direction: dir, quality: 'DEVELOPING',
+          pattern: 'Scout — manual entry', timeframe,
+          entry, stopLoss: sl, tp1, rr1, session, newsRisk, notes,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const pushBtn = document.getElementById('scout-push-' + pair);
+        if (pushBtn) { pushBtn.textContent = '✓ Journaled'; pushBtn.classList.add('pushed'); pushBtn.disabled = true; }
+        toggleScoutJournal(pair);
+      } else {
+        throw new Error(data.error || 'Save failed');
+      }
+    } catch(e) {
+      alert('Failed to save: ' + e.message);
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save to Journal'; }
+    }
   }
 
   function getPriorityMeta(pair) {
