@@ -692,11 +692,12 @@ export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
 }
 
 export async function debugScan(
-  granularity='H1', minRR=1.5, journalStats: JournalStats = {}
+  granularity='H1', minRR=1.5, journalStats: JournalStats = {}, pairsOverride?: string[]
 ): Promise<DebugResult[]> {
   const htfGran = HTF_MAP[granularity] || 'D';
   const results: DebugResult[] = [];
-  for (const pair of PAIRS) {
+  const pairsToScan = (pairsOverride && pairsOverride.length) ? pairsOverride : PAIRS;
+  for (const pair of pairsToScan) {
     try {
       const [candles, htf] = await Promise.all([
         fetchCandles(pair, granularity, 250),

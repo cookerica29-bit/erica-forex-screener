@@ -234,6 +234,7 @@
       <div class="header-sub">Live OANDA · Price Action</div>
     </div>
     <span class="oanda-badge">OANDA v20</span>
+    <span id="priorityBadge" style="display:none;align-items:center;gap:4px;font-size:10px;padding:2px 8px;border-radius:99px;border:1px solid rgba(245,166,35,0.5);color:#F5A623;background:rgba(245,166,35,0.1);font-weight:700;cursor:default;">⭐ PRIORITY MODE</span>
     <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#22c55e;font-weight:600;">
       <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;display:inline-block;"></span>
       LIVE
@@ -313,7 +314,7 @@
   <div class="empty-state" id="initState">
     <div style="font-size:48px;opacity:0.4">📡</div>
     <div style="color:var(--slate-dim);font-size:13px;">Hit Scan to fetch live OANDA data</div>
-    <div style="color:var(--slate-dim);font-size:11px;opacity:0.6;">Scanning 16 pairs across all sessions</div>
+    <div id="initScanSubtext" style="color:var(--slate-dim);font-size:11px;opacity:0.6;">Scanning 16 pairs across all sessions</div>
   </div>
 </div>
 
@@ -554,8 +555,35 @@
   let autoRefreshTimer = null;
   let nearMissOpen = false;
 
-  const PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
-  const PAIR_LABELS = { XAG_USD:'XAG/USD', XAU_USD:'XAU/USD', GBP_JPY:'GBP/JPY', NZD_USD:'NZD/USD', AUD_USD:'AUD/USD', AUD_JPY:'AUD/JPY', USD_JPY:'USD/JPY', GBP_USD:'GBP/USD', EUR_USD:'EUR/USD' };
+  // Pair list — overwritten on load from /api/priority-pairs; falls back to full 16 pairs
+  let PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
+  let PAIR_LABELS = { XAG_USD:'XAG/USD', XAU_USD:'XAU/USD', GBP_JPY:'GBP/JPY', NZD_USD:'NZD/USD', AUD_USD:'AUD/USD', AUD_JPY:'AUD/JPY', USD_JPY:'USD/JPY', GBP_USD:'GBP/USD', EUR_USD:'EUR/USD' };
+  let priorityPairsActive = false;
+
+  function makePairLabel(p) { return p.replace('_','/'); }
+
+  async function loadPriorityPairs() {
+    try {
+      const res = await fetch('/api/priority-pairs');
+      if (!res.ok) return;
+      const data = await res.json();
+      PAIRS = data.pairs;
+      PAIR_LABELS = Object.fromEntries(data.pairs.map(p => [p, makePairLabel(p)]));
+      priorityPairsActive = data.active;
+      const count = data.pairs.length;
+      const label = data.active
+        ? `Priority mode — scanning ${count} pair${count !== 1 ? 's' : ''}: ${data.pairs.map(makePairLabel).join(', ')}`
+        : `Scanning ${count} pairs across all sessions`;
+      const el = document.getElementById('initScanSubtext');
+      if (el) el.textContent = label;
+      // Show/hide priority badge in header
+      const badge = document.getElementById('priorityBadge');
+      if (badge) {
+        badge.style.display = data.active ? 'inline-flex' : 'none';
+        badge.title = data.setAt ? `Set at ${new Date(data.setAt).toLocaleTimeString()}` : '';
+      }
+    } catch(e) { console.warn('Priority pairs fetch failed:', e); }
+  }
   const HTF_MAP = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };
 
   function isJpy(s) { return s.includes('JPY')||s.includes('XAU')||s.includes('XAG'); }
@@ -979,7 +1007,7 @@
     document.getElementById('s-long').textContent=all.filter(s=>s.direction==='LONG').length||'—';
     document.getElementById('s-short').textContent=all.filter(s=>s.direction==='SHORT').length||'—';
     const main=document.getElementById('mainContent');
-    if(!all.length){main.innerHTML='<div class="empty-state"><div style="font-size:48px;opacity:0.4">📡</div><div>Hit Scan to fetch live OANDA data</div><div style="font-size:11px;opacity:0.6;">Scanning 16 pairs across all sessions</div></div>';document.getElementById('resultCount').textContent='';return;}
+    if(!all.length){const scanLabel=priorityPairsActive?`Priority mode · ${PAIRS.length} pairs: ${PAIRS.map(makePairLabel).join(', ')}`:`Scanning ${PAIRS.length} pairs across all sessions`;main.innerHTML=`<div class="empty-state"><div style="font-size:48px;opacity:0.4">📡</div><div>Hit Scan to fetch live OANDA data</div><div style="font-size:11px;opacity:0.6;">${scanLabel}</div></div>`;document.getElementById('resultCount').textContent='';return;}
     document.getElementById('resultCount').innerHTML=`Showing <span>${filtered.length}</span> setup${filtered.length!==1?'s':''} · min ${minRR}:1 RR`;
     if(!filtered.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No setups match your filters</div></div>';return;}
     main.innerHTML='<div class="setup-grid">'+filtered.map(s => renderCard(s, allSetups.indexOf(s))).join('')+'</div>';
@@ -1170,7 +1198,7 @@
   function setDir(v){dir=v;document.querySelectorAll('[id^="dir-"]').forEach(b=>b.classList.remove('active','green','red'));const b=document.getElementById('dir-'+v);b.classList.add('active');if(v==='LONG')b.classList.add('green');if(v==='SHORT')b.classList.add('red');renderSetups();}
   function setQuality(v){quality=v;document.querySelectorAll('[id^="q-"]').forEach(b=>b.classList.remove('active','gold','blue'));const b=document.getElementById('q-'+v);b.classList.add('active');if(v==='PREMIUM')b.classList.add('gold');if(v==='STRONG')b.classList.add('blue');renderSetups();}
   function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...':' Scan';}
-  function showLoading(){document.getElementById('mainContent').innerHTML='<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · 9 pairs</div></div></div>';document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
+  function showLoading(){const modeLabel=priorityPairsActive?`Priority mode · ${PAIRS.length} pairs`:`${PAIRS.length} pairs`;document.getElementById('mainContent').innerHTML=`<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · ${modeLabel}</div></div></div>`;document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
 
   const journalMap = {};
   let journalEntries = [];
@@ -1853,9 +1881,9 @@
     if (text) text.textContent = pct.toFixed(1) + '% to pass';
   }
 
-  // Populate scanner immediately on page load, then refresh every 15 min
+  // Load priority pairs first, then populate scanner
   updateScanTfLabel();
-  fetchLatestSetups();
+  loadPriorityPairs().then(() => fetchLatestSetups());
   autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
 </script>
 

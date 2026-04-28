@@ -7,7 +7,7 @@ import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats } from './db.js';
-import { debugScan, Setup, JournalStats, fetchCandles, computeStructures } from './scanner.js';
+import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -23,6 +23,23 @@ let latestRejected: Array<{ pair: string; reason: string; detail: any; granulari
 let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
+
+// Priority pairs — pushed by Claude after each forex scan via POST /api/priority-pairs
+// When set, the scanner and frontend only scan these pairs instead of the full 16-pair list.
+interface PriorityPairsData {
+  pairs: string[];       // OANDA format: EUR_USD, XAU_USD, etc.
+  setAt: string;         // ISO timestamp
+  meta?: Record<string, any>; // optional grade/direction info from the scan
+}
+let priorityPairsData: PriorityPairsData | null = null;
+
+// Convert bare symbol (EURUSD, XAU_USD, FX:EURUSD) to OANDA underscore format
+function toOandaFormat(symbol: string): string {
+  const s = symbol.replace(/^[^:]+:/, '').toUpperCase(); // strip exchange prefix
+  if (s.includes('_')) return s;                          // already OANDA format
+  if (s.length === 6) return `${s.slice(0, 3)}_${s.slice(3)}`; // EURUSD → EUR_USD
+  return s;
+}
 
 async function sendTelegram(text: string, parseMode?: 'Markdown') {
   const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -117,7 +134,11 @@ async function scheduledScan(forceTf?: string) {
     // Refresh journal stats for historical edge/weakness scoring
     try { cachedJournalStats = await getPatternStats(); } catch { /* non-fatal */ }
 
-    const debugResults = await Promise.all(tfsToRun.map(tf => debugScan(tf, 1.5, cachedJournalStats)));
+    const pairsOverride = priorityPairsData?.pairs;
+    if (pairsOverride?.length) {
+      console.log(`[Scanner] Priority mode — scanning ${pairsOverride.length} pairs: ${pairsOverride.join(', ')}`);
+    }
+    const debugResults = await Promise.all(tfsToRun.map(tf => debugScan(tf, 1.5, cachedJournalStats, pairsOverride)));
     const h4Debug  = debugResults[0] ?? [];
     const m30Debug = debugResults[1] ?? [];
 
@@ -171,6 +192,42 @@ app.get('/api/debug', async (req, res) => {
 
 app.get('/api/near-misses', (_req, res) => {
   res.json(latestRejected);
+});
+
+// ─── PRIORITY PAIRS API ───────────────────────────────────────────────────────
+// Claude posts here after each forex scan to set the active pair list.
+// GET  /api/priority-pairs  → { active: bool, pairs: string[], setAt, fullList }
+// POST /api/priority-pairs  → { pairs: ["EURUSD","XAUUSD",...], meta?: {...} }
+// DELETE /api/priority-pairs → clears priority mode, reverts to full 16-pair list
+
+app.get('/api/priority-pairs', (_req, res) => {
+  res.json({
+    active: priorityPairsData !== null,
+    pairs: priorityPairsData?.pairs ?? FULL_PAIRS,
+    setAt: priorityPairsData?.setAt ?? null,
+    meta: priorityPairsData?.meta ?? null,
+    fullList: FULL_PAIRS,
+  });
+});
+
+app.post('/api/priority-pairs', (req, res) => {
+  const { pairs, meta } = req.body as { pairs?: unknown; meta?: unknown };
+  if (!Array.isArray(pairs) || pairs.length === 0) {
+    return res.status(400).json({ error: 'Body must include non-empty pairs array' });
+  }
+  const normalized = (pairs as string[]).map(toOandaFormat).filter(p => p.length >= 5);
+  if (normalized.length === 0) {
+    return res.status(400).json({ error: 'No valid pair symbols after normalization' });
+  }
+  priorityPairsData = { pairs: normalized, setAt: new Date().toISOString(), meta: meta as any };
+  console.log(`[Priority] Set to ${normalized.length} pairs: ${normalized.join(', ')}`);
+  res.json({ success: true, pairs: normalized, count: normalized.length });
+});
+
+app.delete('/api/priority-pairs', (_req, res) => {
+  priorityPairsData = null;
+  console.log('[Priority] Cleared — reverting to full 16-pair list');
+  res.json({ success: true, message: 'Priority pairs cleared, reverted to full list' });
 });
 
 const OANDA_API_KEY = process.env.OANDA_API_KEY || '';
