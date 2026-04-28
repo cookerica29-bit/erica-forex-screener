@@ -7,7 +7,7 @@ import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats, getSetting, setSetting, deleteSetting, getSettingsStorageInfo } from './db.js';
-import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS } from './scanner.js';
+import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS, runScoutScan, ScoutReport } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -19,6 +19,7 @@ app.use(express.json());
 app.use(express.text({ type: 'text/plain' }));
 
 let latestSetups: Setup[] = [];
+let latestScoutResults: ScoutReport[] = [];
 let latestRejected: Array<{ pair: string; reason: string; detail: any; granularity: string }> = [];
 let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
@@ -229,6 +230,14 @@ async function scheduledScan(forceTf?: string) {
     lastScanTime = new Date().toISOString();
     console.log(`[Scanner] Found ${latestSetups.length} setups (${tfs}), ${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium, ${latestRejected.length} near-misses`);
     queueSetups(latestSetups);
+
+    // Scout scan — produces a report for every pair (no gate filtering)
+    try {
+      latestScoutResults = await runScoutScan(forceTf || 'H4', pairsOverride);
+      console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
+    } catch (e: any) {
+      console.warn('[Scout] Scan failed:', e.message);
+    }
   } catch(e: any) {
     console.error('[Scanner] Scan failed:', e.message);
   }
@@ -258,6 +267,27 @@ app.post('/api/scan', async (req, res) => {
   const tf = (req.query.tf as string) || undefined;
   await scheduledScan(tf);
   res.json({ setups: latestSetups, lastScanTime, count: latestSetups.length });
+});
+
+// ── Scout API ──────────────────────────────────────────────────────────────────
+app.get('/api/scout', (_req, res) => {
+  res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
+});
+
+app.post('/api/scout', async (req, res) => {
+  const tf = (req.query.tf as string) || 'H4';
+  try {
+    await loadPriorityPairsFromStorage('SCOUT_LOAD');
+    const pairsOverride = priorityPairsData?.pairs;
+    if (pairsOverride?.length) {
+      console.log(`[Scout] Priority mode — ${pairsOverride.length} pairs`);
+    }
+    latestScoutResults = await runScoutScan(tf, pairsOverride);
+    lastScanTime = new Date().toISOString();
+    res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/api/debug', async (req, res) => {

@@ -231,6 +231,30 @@
     .priority-reason { font-size: 10px; color: var(--slate-dim); line-height: 1.4; padding: 7px 8px; border-radius: 6px; background: rgba(148,163,184,0.04); border: 1px solid rgba(148,163,184,0.08); margin-bottom: 8px; }
     .priority-actions { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
     .priority-actions .push-btn:disabled { opacity: .45; cursor: not-allowed; }
+    /* Scout mode */
+    .setup-card.high-interest { border-color: rgba(245,166,35,0.4); }
+    .setup-card.high-interest::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,rgba(245,166,35,0.6),transparent); }
+    .setup-card.medium-interest { border-color: rgba(96,165,250,0.25); }
+    .badge.bullish { color:var(--green); border-color:rgba(0,255,136,0.4); background:rgba(0,255,136,0.06); }
+    .badge.bearish { color:var(--red); border-color:rgba(255,59,92,0.4); background:rgba(255,59,92,0.06); }
+    .badge.neutral { color:var(--slate); border-color:rgba(148,163,184,0.3); background:transparent; }
+    .badge.premium-zone { color:var(--red); border-color:rgba(255,59,92,0.3); background:rgba(255,59,92,0.06); }
+    .badge.discount-zone { color:var(--green); border-color:rgba(0,255,136,0.3); background:rgba(0,255,136,0.06); }
+    .badge.fair-zone { color:var(--slate-dim); border-color:rgba(148,163,184,0.2); background:transparent; }
+    .interest-badge { display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:4px 10px; border-radius:99px; border:1px solid; font-weight:700; }
+    .interest-badge.high { color:var(--gold); border-color:rgba(245,166,35,0.5); background:rgba(245,166,35,0.12); }
+    .interest-badge.medium { color:var(--blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.1); }
+    .interest-badge.low { color:var(--slate-dim); border-color:rgba(148,163,184,0.2); background:transparent; }
+    .scout-levels { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:10px 0; }
+    .scout-level-box { background:rgba(255,255,255,0.03); border-radius:8px; padding:8px 10px; border:1px solid rgba(255,255,255,0.06); }
+    .scout-level-label { font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--slate-dim); margin-bottom:2px; }
+    .scout-level-value { font-size:13px; font-weight:600; }
+    .scout-structure { margin-top:8px; padding:8px 10px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; gap:4px; }
+    .scout-struct-row { display:flex; align-items:center; gap:8px; }
+    .scout-struct-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.05em; min-width:42px; }
+    .scout-indicators { display:flex; gap:14px; margin-top:8px; }
+    .scout-ind-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; display:block; margin-bottom:1px; }
+    .scout-ind-value { font-size:12px; font-weight:600; color:var(--slate); }
     @media (max-width: 768px) {
       .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
       #bot-challenge > div:first-child { grid-template-columns: 1fr !important; }
@@ -299,32 +323,28 @@
 
 <div class="controls">
   <div class="control-group">
-    <span class="control-label">Min RR</span>
-    <button class="pill active gold" onclick="setRR(1.5)" id="rr-1.5">1.5:1</button>
-    <button class="pill" onclick="setRR(2)" id="rr-2">2:1</button>
-    <button class="pill" onclick="setRR(2.5)" id="rr-2.5">2.5:1</button>
-    <button class="pill" onclick="setRR(3)" id="rr-3">3:1</button>
+    <span class="control-label">Interest</span>
+    <button class="pill active" onclick="setInterest('ALL')" id="int-ALL">All</button>
+    <button class="pill" onclick="setInterest('HIGH')" id="int-HIGH">🔥 High</button>
+    <button class="pill" onclick="setInterest('MEDIUM')" id="int-MEDIUM">👀 Medium</button>
+    <button class="pill" onclick="setInterest('LOW')" id="int-LOW">Low</button>
   </div>
   <div class="control-group">
-    <button class="pill active" onclick="setDir('ALL')" id="dir-ALL">All</button>
-    <button class="pill" onclick="setDir('LONG')" id="dir-LONG">Long</button>
-    <button class="pill" onclick="setDir('SHORT')" id="dir-SHORT">Short</button>
-  </div>
-  <div class="control-group">
-    <button class="pill active" onclick="setQuality('ALL')" id="q-ALL">All</button>
-    <button class="pill" onclick="setQuality('PREMIUM')" id="q-PREMIUM">Premium</button>
-    <button class="pill" onclick="setQuality('STRONG')" id="q-STRONG">Strong</button>
-    <button class="pill" onclick="setQuality('DEVELOPING')" id="q-DEVELOPING">Developing</button>
+    <span class="control-label">Bias</span>
+    <button class="pill active" onclick="setBias('ALL')" id="bias-ALL">All</button>
+    <button class="pill" onclick="setBias('BULLISH')" id="bias-BULLISH">Bullish</button>
+    <button class="pill" onclick="setBias('BEARISH')" id="bias-BEARISH">Bearish</button>
+    <button class="pill" onclick="setBias('NEUTRAL')" id="bias-NEUTRAL">Neutral</button>
   </div>
 </div>
 
 <div class="stats-bar">
-  <div class="stat-box"><div class="stat-value" id="s-total" style="color:var(--text)">—</div><div class="stat-label">Total</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-premium" style="color:var(--gold)">—</div><div class="stat-label">Premium</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-strong" style="color:var(--blue)">—</div><div class="stat-label">Strong</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-avgrr" style="color:var(--green)">—</div><div class="stat-label">Avg RR</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-long" style="color:var(--green)">—</div><div class="stat-label">Long</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-short" style="color:var(--red)">—</div><div class="stat-label">Short</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-total" style="color:var(--text)">—</div><div class="stat-label">Scanned</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-high" style="color:var(--gold)">—</div><div class="stat-label">High Interest</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-bullish" style="color:var(--green)">—</div><div class="stat-label">Bullish</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-bearish" style="color:var(--red)">—</div><div class="stat-label">Bearish</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-neutral" style="color:var(--slate)">—</div><div class="stat-label">Neutral</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-choch" style="color:var(--blue)">—</div><div class="stat-label">ChoCH Alert</div></div>
 </div>
 
 <div class="filter-row">
@@ -575,7 +595,7 @@
 </div>
 
 <script>
-  let allSetups = [], allNearMisses = [], minRR = 1.5, dir = 'ALL', quality = 'ALL', scanning = false;
+  let allSetups = [], allNearMisses = [], interestFilter = 'ALL', biasFilter = 'ALL', scanning = false;
   let autoRefreshTimer = null;
   let nearMissOpen = false;
   let priorityPairsPayload = null;
@@ -742,7 +762,10 @@
     return null;
   }
 
-  function analyzeCandles(candles, htfCandles, symbol) {
+  // analyzeCandles is unused in scout mode — analysis runs server-side via /api/scout
+  function analyzeCandles(_candles, _htfCandles, _symbol) { return null; }
+
+  function _analyzeCandles_legacy(candles, htfCandles, symbol) {
     if (candles.length < 210) return null;
 
     const atr = calcATR(candles.slice(-50));
@@ -965,39 +988,18 @@
 
   async function fetchLatestSetups() {
     try {
-      const [setupsRes, nmRes] = await Promise.all([
-        fetch('/api/setups'),
-        fetch('/api/near-misses'),
-      ]);
-      if (!setupsRes.ok) return;
-      const data = await setupsRes.json();
-      // Normalize server Setup objects to match client-side shape
-      allSetups = (data.setups || []).map((s, i) => {
-        const sym = s.symbol || s.pair;
-        const entry = s.entry;
-        const sl = s.sl || s.stopLoss;
-        const risk = sl ? Math.abs(entry - sl) : 0;
-        return {
-          ...s,
-          id:            s.id || `${sym}-${s.timeframe}-server-${i}`,
-          symbol:        sym,
-          displaySymbol: s.displaySymbol || (PAIR_LABELS[sym] || sym.replace('_', '/')),
-          currentPrice:  s.currentPrice || entry,
-          sl:            sl,
-          confluences:   s.confluences || s.confluence || [],
-          rr2:           s.rr2 || (risk > 0 ? parseFloat((Math.abs(s.tp2 - entry) / risk).toFixed(1)) : 0),
-          rr3:           s.rr3 || (risk > 0 ? parseFloat((Math.abs(s.tp3 - entry) / risk).toFixed(1)) : 0),
-        };
-      }).filter(s => isVisiblePair(s.symbol));
-      const nearMisses = nmRes.ok ? await nmRes.json() : [];
-      allNearMisses = nearMisses.filter(nm => isVisiblePair(nm.pair));
-      document.getElementById('lastScan').textContent =
-        `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
+      const res = await fetch('/api/scout');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.reports?.length) return;
+      allSetups = (data.reports || []).filter(r => isVisiblePair(r.pair));
+      allNearMisses = [];
+      if (data.lastScanTime) {
+        document.getElementById('lastScan').textContent = `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
+      }
       renderSetups();
-      await loadPriorityWatchlist();
-      renderNearMisses();
     } catch(e) {
-      console.warn('Could not fetch latest setups:', e.message);
+      console.warn('Could not fetch latest scout:', e.message);
     }
   }
 
@@ -1022,149 +1024,128 @@
   }
 
   async function runScan() {
-    if(scanning) return;
+    if (scanning) return;
     await loadPriorityPairs();
-    scanning=true; updateScanBtn(true); showLoading(); updateScanTfLabel();
-    const tfsToScan = [selectedScanTf];
-    const results=[];
-    for(const gran of tfsToScan){
-      const htfGran = HTF_MAP[gran] || 'D';
-      for(const pair of PAIRS){
-        try{
-          const [c,h]=await Promise.all([fetchCandles(pair,gran,250),fetchCandles(pair,htfGran,100)]);
-          const s=analyzeCandles(c,h,pair);
-          if(s) results.push(s);
-        }catch(e){console.error(`Skip ${pair} ${gran}:`,e.message);}
-      }
-    }
-    const ord={PREMIUM:0,STRONG:1,DEVELOPING:2};
-    results.sort((a,b)=>ord[a.quality]-ord[b.quality]||b.rrRatio-a.rrRatio);
-    allSetups=results; scanning=false; updateScanBtn(false);
-    document.getElementById('lastScan').textContent=`Last scan: ${new Date().toLocaleTimeString()}`;
-    // Trigger backend scan (uses journal-weighted scoring) then fetch near-misses
+    scanning = true; updateScanBtn(true); showLoading(); updateScanTfLabel();
     try {
-      await fetch(`/api/scan?tf=${selectedScanTf}`, { method: 'POST' });
-      const nmRes = await fetch('/api/near-misses');
-      const nearMisses = nmRes.ok ? await nmRes.json() : [];
-      allNearMisses = nearMisses.filter(nm => isVisiblePair(nm.pair));
-    } catch(e) { console.warn('Backend scan failed:', e); }
+      const res = await fetch(`/api/scout?tf=${selectedScanTf}`, { method: 'POST' });
+      if (!res.ok) throw new Error(`Scout scan failed: ${res.status}`);
+      const data = await res.json();
+      allSetups = (data.reports || []).filter(r => isVisiblePair(r.pair));
+      document.getElementById('lastScan').textContent = `Last scan: ${new Date().toLocaleTimeString()}`;
+    } catch (e) {
+      console.error('Scout scan failed:', e);
+      allSetups = [];
+    }
+    scanning = false; updateScanBtn(false);
     renderSetups();
-    await loadPriorityWatchlist();
-    renderNearMisses();
+    // suppress near-misses and priority watchlist in scout mode
+    allNearMisses = [];
+    document.getElementById('nearMissContent').innerHTML = '';
+    document.getElementById('priorityWatchlist').innerHTML = '';
+    void 0;
   }
 
   function getFiltered() {
-    const s=document.getElementById('searchBox').value.toLowerCase();
-    return allSetups.filter(x=>{
-      if(dir!=='ALL'&&x.direction!==dir) return false;
-      if(quality!=='ALL'&&x.quality!==quality) return false;
-      if(x.rrRatio<minRR) return false;
-      if(s&&!x.displaySymbol.toLowerCase().includes(s)&&!x.pattern.toLowerCase().includes(s)) return false;
+    const s = document.getElementById('searchBox').value.toLowerCase();
+    return allSetups.filter(x => {
+      if (interestFilter !== 'ALL' && x.interestLevel !== interestFilter) return false;
+      if (biasFilter !== 'ALL' && x.bias !== biasFilter) return false;
+      if (s && !x.displaySymbol.toLowerCase().includes(s)) return false;
       return true;
     });
   }
 
   function renderSetups() {
-    const filtered=getFiltered(), all=allSetups;
-    document.getElementById('s-total').textContent=all.length||'—';
-    document.getElementById('s-premium').textContent=all.filter(s=>s.quality==='PREMIUM').length||'—';
-    document.getElementById('s-strong').textContent=all.filter(s=>s.quality==='STRONG').length||'—';
-    const avg=all.length?(all.reduce((a,b)=>a+b.rrRatio,0)/all.length).toFixed(1):'—';
-    document.getElementById('s-avgrr').textContent=all.length?avg+':1':'—';
-    document.getElementById('s-long').textContent=all.filter(s=>s.direction==='LONG').length||'—';
-    document.getElementById('s-short').textContent=all.filter(s=>s.direction==='SHORT').length||'—';
-    const main=document.getElementById('mainContent');
-    if(!all.length){const scanLabel=priorityPairsActive?`${currentScanLabel()}: ${PAIRS.map(makePairLabel).join(', ')}`:currentScanLabel();main.innerHTML=`<div class="empty-state"><div style="font-size:48px;opacity:0.4">📡</div><div>Hit Scan to fetch live OANDA data</div><div style="font-size:11px;opacity:0.6;">${scanLabel}</div></div>`;document.getElementById('resultCount').textContent='';return;}
-    document.getElementById('resultCount').innerHTML=`Showing <span>${filtered.length}</span> setup${filtered.length!==1?'s':''} · min ${minRR}:1 RR`;
-    if(!filtered.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No setups match your filters</div></div>';return;}
-    main.innerHTML='<div class="setup-grid">'+filtered.map(s => renderCard(s, allSetups.indexOf(s))).join('')+'</div>';
+    const filtered = getFiltered(), all = allSetups;
+    document.getElementById('s-total').textContent = all.length || '—';
+    document.getElementById('s-high').textContent = all.filter(s => s.interestLevel === 'HIGH').length || '—';
+    document.getElementById('s-bullish').textContent = all.filter(s => s.bias === 'BULLISH').length || '—';
+    document.getElementById('s-bearish').textContent = all.filter(s => s.bias === 'BEARISH').length || '—';
+    document.getElementById('s-neutral').textContent = all.filter(s => s.bias === 'NEUTRAL').length || '—';
+    document.getElementById('s-choch').textContent = all.filter(s => s.recentChoCH).length || '—';
+    const main = document.getElementById('mainContent');
+    if (!all.length) {
+      const scanLabel = priorityPairsActive ? `${currentScanLabel()}: ${PAIRS.map(makePairLabel).join(', ')}` : currentScanLabel();
+      main.innerHTML = `<div class="empty-state"><div style="font-size:48px;opacity:0.4">📡</div><div>Hit Scan to fetch live OANDA data</div><div style="font-size:11px;opacity:0.6;">${scanLabel}</div></div>`;
+      document.getElementById('resultCount').textContent = '';
+      return;
+    }
+    document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of ${all.length} pair${all.length !== 1 ? 's' : ''}`;
+    if (!filtered.length) { main.innerHTML = '<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No pairs match your filters</div></div>'; return; }
+    main.innerHTML = '<div class="setup-grid">' + filtered.map(r => renderScoutCard(r)).join('') + '</div>';
   }
 
-  function renderCard(s, idx) {
-    const isL=s.direction==='LONG', qc=s.quality.toLowerCase();
-    const rrc=s.rrRatio>=3?'rr-great':s.rrRatio>=2?'rr-good':'rr-ok';
-    const cf=s.confluences.length?`<div class="conf-section"><div class="conf-title">Confluences</div><div class="conf-tags">${s.confluences.map(c=>{const cls=c.startsWith('Historical edge')?'conf-tag edge':c.startsWith('Historical weakness')?'conf-tag weakness':'conf-tag';return`<span class="${cls}">${c}</span>`;}).join('')}</div></div>`:'';
-    return `<div class="setup-card ${qc}"><div class="card-body">
-      <div class="card-top">
-        <div class="card-left">
-          <div class="dir-icon ${isL?'long':'short'}">${isL?'↑':'↓'}</div>
-          <div>
-            <div class="symbol">${s.displaySymbol}</div>
-            <div class="badges">
-              <span class="badge ${qc}">${s.quality==='PREMIUM'?'⭐':'⚡'} ${s.quality}</span>
-              <span class="badge ${isL?'long':'short'}">${s.direction}</span>
-              <span class="badge tf">${s.timeframe}</span>
-              ${s.session?`<span class="badge session">${s.session}</span>`:''}
-              ${s.newsRisk?`<span class="news-risk-pill">⚠️ NEWS RISK</span>`:''}
+  function renderCard(s, idx) { return renderScoutCard(s); } // legacy alias
+
+  function renderScoutCard(r) {
+    const biasCls = r.bias === 'BULLISH' ? 'bullish' : r.bias === 'BEARISH' ? 'bearish' : 'neutral';
+    const htfCls  = r.htfBias === 'BULLISH' ? 'bullish' : r.htfBias === 'BEARISH' ? 'bearish' : 'neutral';
+    const zoneCls = r.zone === 'PREMIUM' ? 'premium-zone' : r.zone === 'DISCOUNT' ? 'discount-zone' : 'fair-zone';
+    const intCls  = r.interestLevel === 'HIGH' ? 'high-interest' : r.interestLevel === 'MEDIUM' ? 'medium-interest' : '';
+    const intIcon = r.interestLevel === 'HIGH' ? '🔥' : r.interestLevel === 'MEDIUM' ? '👀' : '·';
+    const biasArrow = r.bias === 'BULLISH' ? '↑' : r.bias === 'BEARISH' ? '↓' : '↔';
+    const biasColor = r.bias === 'BULLISH' ? 'var(--green)' : r.bias === 'BEARISH' ? 'var(--red)' : 'var(--slate)';
+    const isJpy = r.pair && (r.pair.includes('JPY') || r.pair.includes('XAU') || r.pair.includes('XAG'));
+    const dp = isJpy ? 3 : 5;
+    const f = v => v == null ? '—' : Number(v).toFixed(dp);
+    const displaySym = r.displaySymbol || (r.pair || '').replace('_', '/');
+
+    const bosHtml = r.recentBOS
+      ? `<div class="scout-struct-row"><span class="scout-struct-label">BOS</span><span style="font-size:11px;color:${r.recentBOS.type === 'bullish' ? 'var(--green)' : 'var(--red)'};">⚡ ${r.recentBOS.type} @ ${f(r.recentBOS.level)}</span></div>`
+      : `<div class="scout-struct-row"><span class="scout-struct-label">BOS</span><span style="font-size:11px;color:#334155;">—</span></div>`;
+    const chochHtml = r.recentChoCH
+      ? `<div class="scout-struct-row"><span class="scout-struct-label">CHoCH</span><span style="font-size:11px;color:${r.recentChoCH.type === 'bullish' ? 'var(--blue)' : 'var(--gold)'};">⚠ ${r.recentChoCH.type} @ ${f(r.recentChoCH.level)}</span></div>`
+      : `<div class="scout-struct-row"><span class="scout-struct-label">CHoCH</span><span style="font-size:11px;color:#334155;">—</span></div>`;
+    const rsiColor = r.rsi > 70 ? 'var(--red)' : r.rsi < 30 ? 'var(--green)' : 'var(--slate)';
+
+    return `<div class="setup-card ${intCls}" style="position:relative;">
+      <div class="card-body">
+        <div class="card-top">
+          <div class="card-left">
+            <div class="dir-icon ${r.bias === 'BULLISH' ? 'long' : r.bias === 'BEARISH' ? 'short' : ''}" style="${r.bias === 'NEUTRAL' ? 'background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.15);' : ''}">
+              <span style="font-size:16px;color:${biasColor}">${biasArrow}</span>
             </div>
-            <div class="pattern-name">${s.pattern}</div>
+            <div>
+              <div class="symbol">${escapeHtml(displaySym)}</div>
+              <div class="badges">
+                <span class="badge ${biasCls}">${r.bias}</span>
+                <span class="badge ${htfCls}" style="opacity:0.65">HTF: ${r.htfBias}</span>
+                <span class="badge ${zoneCls}">${r.zone}</span>
+                <span class="badge tf">${r.timeframe}</span>
+                ${r.session ? `<span class="badge session">${escapeHtml(r.session)}</span>` : ''}
+                ${r.newsRisk ? `<span class="news-risk-pill">⚠️ NEWS RISK</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div class="interest-badge ${r.interestLevel.toLowerCase()}">${intIcon} ${r.interestLevel}</div>
+            <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Interest</div>
           </div>
         </div>
-        <div class="rr-block"><div class="rr-main ${rrc}">${fmtRR(s.rrRatio)}</div><div class="rr-sub">RR Ratio</div></div>
-      </div>
-      <div class="current-price">Price: <span>${fmt(s.currentPrice,s.symbol)}</span></div>
-      <div class="levels-grid">
-        <div class="level-box"><div class="level-label entry">Entry</div><div class="level-price entry">${fmt(s.entry,s.symbol)}</div></div>
-        <div class="level-box sl"><div class="level-label sl">Stop Loss</div><div class="level-price sl">${fmt(s.sl,s.symbol)}</div></div>
-        <div class="level-box tp1"><div class="level-label tp1">TP1 · ${fmtRR(s.rrRatio)}</div><div class="level-price tp1">${fmt(s.tp1,s.symbol)}</div></div>
-      </div>
-      <div class="levels-grid-ext">
-        <div class="level-box tp2"><div class="level-label tp2">TP2 · ${fmtRR(s.rr2)}</div><div class="level-price tp2">${fmt(s.tp2,s.symbol)}</div></div>
-        <div class="level-box tp3"><div class="level-label tp3">TP3 · ${fmtRR(s.rr3)}</div><div class="level-price tp3">${fmt(s.tp3,s.symbol)}</div></div>
-      </div>
-      ${cf}
-      ${(function(){
-        const c = s.checklist;
-        if (!c) return '';
-        const ci = (cls, icon, label) => `<div class="check-item ${cls}">${icon} ${label}</div>`;
-        const rows = [
-          c.trendConfirmed  ? ci('pass','✅','Trend confirmed')    : '',
-          c.emaSlope        ? ci('pass','✅','EMA slope')          : '',
-          c.pullbackToEMA   ? ci('pass','✅','Pullback to EMA')    : '',
-          c.momentumCandle  ? ci('pass','✅','Momentum candle')    : '',
-          c.rsiInZone       ? ci('pass','✅','RSI in zone')        : '',
-          c.htfAligned      ? ci('pass','✅','HTF aligned')        : '',
-          c.notSandwiched   ? ci('pass','✅','Not sandwiched')     : '',
-          c.minRR           ? ci('pass','✅','Min 2.0 R:R')        : '',
-          c.impulseStrong   !== false ? ci('pass','✅','Strong impulse leg')    : '',
-          c.structureClearance !== false ? ci('pass','✅','Structure clearance') : '',
-          c.tp1Fresh        !== false ? ci('pass','✅','TP1 fresh level')       : '',
-          c.volumeSurge     ? ci('bonus','⭐','Volume surge')      : '',
-          c.liquiditySweep  ? ci('bonus','⭐','Liquidity sweep')   : '',
-          c.pdhlConfluence  ? ci('bonus','⭐','PDH/PDL level')     : '',
-          c.goodSession     ? ci('bonus','⭐','Good session')      : '',
-          c.historicalEdge  ? ci('bonus','⭐','Historical edge')   : '',
-        ].filter(Boolean).join('');
-        if (!rows) return '';
-        return `<div class="checklist" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);">
-          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-dim);margin-bottom:8px;">Conditions Met</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${rows}</div>
-        </div>`;
-      })()}
-      <div class="scanned-at">Scanned: ${new Date(s.scannedAt).toLocaleTimeString()} · Live data via Oanda v20 API</div>
-      <div class="card-actions">
-        <button class="push-btn" onclick="pushToJournal('${s.id}')" id="push-${s.id}">📓 Push to Journal</button>
-        <button class="send-bot-btn" onclick="sendToBot(this,${idx})">🤖 Send to Bot</button>
-        <button class="push-btn" onclick="fillCalculator(${idx})" style="border-color:rgba(148,163,184,0.3);background:rgba(148,163,184,0.05);color:var(--slate);">📊 Calculate</button>
-      </div>
-      <div class="journal-panel" id="journal-${s.id}" style="display:none;">
-        <div class="outcome-row">
-          <span class="outcome-label">Outcome:</span>
-          <button class="outcome-btn win" onclick="setOutcome('${s.id}','WIN')">WIN</button>
-          <button class="outcome-btn loss" onclick="setOutcome('${s.id}','LOSS')">LOSS</button>
-          <button class="outcome-btn be" onclick="setOutcome('${s.id}','BREAKEVEN')">BE</button>
-          <button class="outcome-btn pending active-outcome" onclick="setOutcome('${s.id}','PENDING')">PENDING</button>
+        <div style="font-size:13px;color:var(--blue);font-weight:700;letter-spacing:.5px;margin-bottom:10px;">Price: <span>${f(r.price)}</span></div>
+        <div class="scout-levels">
+          <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
+            <div class="scout-level-label">Resistance</div>
+            <div class="scout-level-value" style="color:var(--red)">${f(r.nearestResistance)}</div>
+          </div>
+          <div class="scout-level-box" style="border-color:rgba(0,255,136,0.2);border-left:3px solid rgba(0,255,136,0.5);">
+            <div class="scout-level-label">Support</div>
+            <div class="scout-level-value" style="color:var(--green)">${f(r.nearestSupport)}</div>
+          </div>
         </div>
-        <div class="pnl-row">
-          <span class="outcome-label">P&L ($):</span>
-          <input type="number" class="pnl-input" id="pnl-${s.id}" placeholder="Click to add P&L" step="0.01" onchange="savePnl('${s.id}')" />
+        <div class="scout-structure">
+          ${bosHtml}
+          ${chochHtml}
         </div>
-        <div class="notes-row">
-          <span class="outcome-label">Notes:</span>
-          <textarea class="notes-input" id="notes-${s.id}" placeholder="Add notes..." onchange="saveNotes('${s.id}')"></textarea>
+        <div class="scout-indicators">
+          <div><span class="scout-ind-label">RSI</span><span class="scout-ind-value" style="color:${rsiColor}">${r.rsi ?? '—'}</span></div>
+          <div><span class="scout-ind-label">ATR</span><span class="scout-ind-value">${r.atr != null ? Number(r.atr).toFixed(dp) : '—'}</span></div>
+          <div><span class="scout-ind-label">EMA20</span><span class="scout-ind-value">${f(r.ema20)}</span></div>
         </div>
+        <div class="scanned-at" style="margin-top:8px;">Scanned: ${new Date(r.scannedAt).toLocaleTimeString()} · OANDA v20</div>
       </div>
-    </div></div>`;
+    </div>`;
   }
 
   function getPriorityMeta(pair) {
@@ -1462,11 +1443,22 @@
     if (chev) { chev.className = 'near-miss-chevron' + (nearMissOpen ? ' open' : ''); }
   }
 
-  function setRR(v){minRR=v;document.querySelectorAll('[id^="rr-"]').forEach(b=>b.classList.remove('active','gold'));const b=document.getElementById('rr-'+v);b.classList.add('active','gold');renderSetups();}
-  function setDir(v){dir=v;document.querySelectorAll('[id^="dir-"]').forEach(b=>b.classList.remove('active','green','red'));const b=document.getElementById('dir-'+v);b.classList.add('active');if(v==='LONG')b.classList.add('green');if(v==='SHORT')b.classList.add('red');renderSetups();}
-  function setQuality(v){quality=v;document.querySelectorAll('[id^="q-"]').forEach(b=>b.classList.remove('active','gold','blue'));const b=document.getElementById('q-'+v);b.classList.add('active');if(v==='PREMIUM')b.classList.add('gold');if(v==='STRONG')b.classList.add('blue');renderSetups();}
+  function setInterest(v) {
+    interestFilter = v;
+    ['ALL','HIGH','MEDIUM','LOW'].forEach(x => { const el = document.getElementById('int-'+x); if(el) { el.className = 'pill' + (x === v ? ' active' : ''); } });
+    renderSetups();
+  }
+  function setBias(v) {
+    biasFilter = v;
+    ['ALL','BULLISH','BEARISH','NEUTRAL'].forEach(x => { const el = document.getElementById('bias-'+x); if(el) { el.className = 'pill' + (x === v ? ' active' : ''); } });
+    renderSetups();
+  }
+  // legacy stubs — controls removed but may still be referenced
+  function setRR(v){renderSetups();}
+  function setDir(v){renderSetups();}
+  function setQuality(v){renderSetups();}
   function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...':' Scan';}
-  function showLoading(){const modeLabel=currentScanLabel();document.getElementById('mainContent').innerHTML=`<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · ${modeLabel}</div></div></div>`;document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
+  function showLoading(){const modeLabel=currentScanLabel();document.getElementById('mainContent').innerHTML=`<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCOUTING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · ${modeLabel}</div></div></div>`;document.getElementById('resultCount').textContent='';['s-total','s-high','s-bullish','s-bearish','s-neutral','s-choch'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='—';});}
 
   const journalMap = {};
   let journalEntries = [];

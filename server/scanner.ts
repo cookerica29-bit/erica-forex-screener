@@ -826,3 +826,148 @@ export function computeStructures(candles: Candle[], margin = 5): TrainerStructu
 
   return { swingHighs, swingLows, bosEvents, chochEvents, supplyZones, demandZones, presentConcepts };
 }
+
+// ── Scout Mode ────────────────────────────────────────────────────────────────
+// Produces a report for every pair — no gate filtering. Used by the scout scan.
+
+export interface ScoutReport {
+  pair: string;
+  displaySymbol: string;
+  price: number;
+  bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  htfBias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  zone: 'PREMIUM' | 'DISCOUNT' | 'FAIR VALUE';
+  nearestResistance: number | null;
+  nearestSupport: number | null;
+  recentBOS: { type: 'bullish' | 'bearish'; level: number } | null;
+  recentChoCH: { type: 'bullish' | 'bearish'; level: number } | null;
+  atr: number;
+  rsi: number;
+  ema20: number;
+  session: string;
+  interestLevel: 'HIGH' | 'MEDIUM' | 'LOW';
+  timeframe: string;
+  scannedAt: string;
+  newsRisk?: boolean;
+}
+
+export function scoutAnalyzeCandles(
+  candles: Candle[], htf: Candle[], pair: string, granularity = 'H1'
+): ScoutReport | null {
+  if (candles.length < 60) return null;
+
+  const price = candles[candles.length - 1].c;
+  const atr = calcATR(candles.slice(-50));
+  const rsiArr = calcRSI(candles, 14);
+  const rsi = rsiArr[candles.length - 1];
+  const ema20arr = calcEMA(candles, 20);
+  const ema20 = ema20arr[candles.length - 1] ?? price;
+
+  // Bias from swing structure of last 100 candles
+  const recentCandles = candles.slice(-100);
+  const swings = findSwings(recentCandles, 3);
+  const trend = getTrend(swings);
+  const bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' =
+    trend === 'LONG' ? 'BULLISH' : trend === 'SHORT' ? 'BEARISH' : 'NEUTRAL';
+
+  // HTF bias
+  const htfSwings = findSwings(htf.slice(-100), 5);
+  const htfTrend = getTrend(htfSwings);
+  const htfBias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' =
+    htfTrend === 'LONG' ? 'BULLISH' : htfTrend === 'SHORT' ? 'BEARISH' : 'NEUTRAL';
+
+  // Zone: premium/discount relative to recent 50-candle range midpoint
+  const recent50 = candles.slice(-50);
+  const rangeHigh = Math.max(...recent50.map(c => c.h));
+  const rangeLow = Math.min(...recent50.map(c => c.l));
+  const midpoint = (rangeHigh + rangeLow) / 2;
+  const threshold = (rangeHigh - rangeLow) * 0.05;
+  const zone: 'PREMIUM' | 'DISCOUNT' | 'FAIR VALUE' =
+    price > midpoint + threshold ? 'PREMIUM' : price < midpoint - threshold ? 'DISCOUNT' : 'FAIR VALUE';
+
+  // Nearest support / resistance from recent swings
+  const swingHighs = swings.filter(s => s.type === 'high');
+  const swingLows  = swings.filter(s => s.type === 'low');
+  const nearestResistance = swingHighs.filter(s => s.price > price).sort((a, b) => a.price - b.price)[0]?.price ?? null;
+  const nearestSupport    = swingLows.filter(s => s.price < price).sort((a, b) => b.price - a.price)[0]?.price ?? null;
+
+  // Recent BOS and ChoCH detection
+  let recentBOS: ScoutReport['recentBOS'] = null;
+  let recentChoCH: ScoutReport['recentChoCH'] = null;
+
+  for (const sh of swingHighs.slice(-4)) {
+    for (let i = sh.index + 1; i < recentCandles.length; i++) {
+      if (recentCandles[i].c > sh.price) {
+        const event = { type: 'bullish' as const, level: sh.price };
+        if (trend === 'SHORT') { if (!recentChoCH) recentChoCH = event; }
+        else { if (!recentBOS) recentBOS = event; }
+        break;
+      }
+    }
+  }
+  for (const sl of swingLows.slice(-4)) {
+    for (let i = sl.index + 1; i < recentCandles.length; i++) {
+      if (recentCandles[i].c < sl.price) {
+        const event = { type: 'bearish' as const, level: sl.price };
+        if (trend === 'LONG') { if (!recentChoCH) recentChoCH = event; }
+        else { if (!recentBOS) recentBOS = event; }
+        break;
+      }
+    }
+  }
+
+  // Interest level: how many bullish factors align
+  let interestScore = 0;
+  if (bias !== 'NEUTRAL') interestScore++;
+  if (htfBias !== 'NEUTRAL' && htfBias === bias) interestScore++;
+  if ((bias === 'BULLISH' && zone === 'DISCOUNT') || (bias === 'BEARISH' && zone === 'PREMIUM')) interestScore++;
+  if (recentChoCH) interestScore++;
+  if (recentBOS) interestScore++;
+
+  const interestLevel: 'HIGH' | 'MEDIUM' | 'LOW' =
+    interestScore >= 4 ? 'HIGH' : interestScore >= 2 ? 'MEDIUM' : 'LOW';
+
+  return {
+    pair,
+    displaySymbol: pair.replace('_', '/'),
+    price,
+    bias,
+    htfBias,
+    zone,
+    nearestResistance,
+    nearestSupport,
+    recentBOS,
+    recentChoCH,
+    atr,
+    rsi: isNaN(rsi) ? 50 : Math.round(rsi * 10) / 10,
+    ema20,
+    session: getSessionLabel(pair),
+    interestLevel,
+    timeframe: granularity,
+    scannedAt: new Date().toISOString(),
+  };
+}
+
+export async function runScoutScan(granularity = 'H1', pairsOverride?: string[]): Promise<ScoutReport[]> {
+  const htfGran = HTF_MAP[granularity] || 'D';
+  const pairsToScan = pairsOverride?.length ? pairsOverride : PAIRS;
+  const results: ScoutReport[] = [];
+  for (const pair of pairsToScan) {
+    try {
+      const [candles, htf] = await Promise.all([
+        fetchCandles(pair, granularity, 150),
+        fetchCandles(pair, htfGran, 100),
+      ]);
+      const report = scoutAnalyzeCandles(candles, htf, pair, granularity);
+      if (report) {
+        report.newsRisk = await checkNewsRisk(pair);
+        results.push(report);
+      }
+    } catch (e: any) {
+      console.error(`Scout skip ${pair}:`, e.message);
+    }
+  }
+  const ord: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+  results.sort((a, b) => ord[a.interestLevel] - ord[b.interestLevel]);
+  return results;
+}
