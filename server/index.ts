@@ -6,7 +6,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats, getSetting, setSetting, deleteSetting } from './db.js';
+import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats, getSetting, setSetting, deleteSetting, getSettingsStorageInfo } from './db.js';
 import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -58,10 +58,12 @@ function parsePriorityPairs(value: string | null): PriorityPairsData | null {
   }
 }
 
-async function loadPriorityPairsFromStorage() {
+async function loadPriorityPairsFromStorage(source = 'LOAD') {
+  const storage = await getSettingsStorageInfo();
   const stored = await getSetting(PRIORITY_PAIRS_SETTING_KEY);
   const parsed = parsePriorityPairs(stored);
   priorityPairsData = parsed?.pairs.length ? parsed : null;
+  console.log(`[Priority] ${source} storage=${storage.backend} durable=${storage.durable} active=${priorityPairsData !== null}${storage.path ? ` path=${storage.path}` : ''}`);
   return priorityPairsData;
 }
 
@@ -155,7 +157,7 @@ async function scheduledScan(forceTf?: string) {
   const tfs = tfsToRun.join(' + ');
   console.log(`[Scanner] Running scan at ${new Date().toISOString()} (${tfs})`);
   try {
-    await loadPriorityPairsFromStorage();
+    await loadPriorityPairsFromStorage('SCAN_LOAD');
     // Refresh journal stats for historical edge/weakness scoring
     try { cachedJournalStats = await getPatternStats(); } catch { /* non-fatal */ }
 
@@ -190,7 +192,7 @@ async function scheduledScan(forceTf?: string) {
 // Load persisted priority pairs from storage, then run first scan
 async function init() {
   try {
-    const restored = await loadPriorityPairsFromStorage();
+    const restored = await loadPriorityPairsFromStorage('STARTUP_LOAD');
     if (restored) {
       console.log(`[Priority] Restored from storage: ${priorityPairsData.pairs.join(', ')}`);
     }
@@ -237,13 +239,15 @@ app.get('/api/near-misses', (_req, res) => {
 // DELETE /api/priority-pairs → clears priority mode, reverts to full 16-pair list
 
 app.get('/api/priority-pairs', async (_req, res) => {
-  await loadPriorityPairsFromStorage();
+  await loadPriorityPairsFromStorage('GET');
+  const storage = await getSettingsStorageInfo();
   res.json({
     active: priorityPairsData !== null,
     pairs: priorityPairsData?.pairs ?? FULL_PAIRS,
     setAt: priorityPairsData?.setAt ?? null,
     meta: priorityPairsData?.meta ?? null,
     fullList: FULL_PAIRS,
+    storage,
   });
 });
 
@@ -259,21 +263,31 @@ app.post('/api/priority-pairs', async (req, res) => {
   const record: PriorityPairsData = { pairs: normalized, setAt: new Date().toISOString(), meta: meta as any };
   const persisted = await setSetting(PRIORITY_PAIRS_SETTING_KEY, JSON.stringify(record));
   if (!persisted) {
-    return res.status(500).json({ error: 'Priority pairs could not be persisted' });
+    const latestStorage = await getSettingsStorageInfo();
+    console.warn(`[Priority] POST failed storage=${latestStorage.backend} durable=${latestStorage.durable} detail=${latestStorage.detail}${latestStorage.path ? ` path=${latestStorage.path}` : ''}`);
+    return res.status(500).json({
+      error: 'Priority pairs could not be persisted',
+      storage: latestStorage,
+      fix: 'Configure DATABASE_URL/MYSQL_URL or attach a Railway volume so RAILWAY_VOLUME_MOUNT_PATH is present.',
+    });
   }
   priorityPairsData = record;
-  console.log(`[Priority] Set to ${normalized.length} pairs: ${normalized.join(', ')}`);
-  res.json({ success: true, active: true, pairs: normalized, count: normalized.length, setAt: record.setAt });
+  const persistedStorage = await getSettingsStorageInfo();
+  console.log(`[Priority] POST storage=${persistedStorage.backend} durable=${persistedStorage.durable} count=${normalized.length}${persistedStorage.path ? ` path=${persistedStorage.path}` : ''}: ${normalized.join(', ')}`);
+  res.json({ success: true, active: true, pairs: normalized, count: normalized.length, setAt: record.setAt, storage: persistedStorage });
 });
 
 app.delete('/api/priority-pairs', async (_req, res) => {
   const persisted = await deleteSetting(PRIORITY_PAIRS_SETTING_KEY);
   if (!persisted) {
-    return res.status(500).json({ error: 'Priority pairs could not be cleared from persistent storage' });
+    const latestStorage = await getSettingsStorageInfo();
+    console.warn(`[Priority] DELETE failed storage=${latestStorage.backend} durable=${latestStorage.durable} detail=${latestStorage.detail}${latestStorage.path ? ` path=${latestStorage.path}` : ''}`);
+    return res.status(500).json({ error: 'Priority pairs could not be cleared from persistent storage', storage: latestStorage });
   }
   priorityPairsData = null;
-  console.log('[Priority] Cleared — reverting to full 16-pair list');
-  res.json({ success: true, message: 'Priority pairs cleared, reverted to full list' });
+  const persistedStorage = await getSettingsStorageInfo();
+  console.log(`[Priority] DELETE storage=${persistedStorage.backend} durable=${persistedStorage.durable}${persistedStorage.path ? ` path=${persistedStorage.path}` : ''} — reverting to full 16-pair list`);
+  res.json({ success: true, message: 'Priority pairs cleared, reverted to full list', storage: persistedStorage });
 });
 
 const OANDA_API_KEY = process.env.OANDA_API_KEY || '';

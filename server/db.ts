@@ -8,24 +8,79 @@ import path from 'path';
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: mysql.Pool | null = null;
 
-const SETTINGS_FILE =
-  process.env.SETTINGS_FILE ||
-  process.env.PRIORITY_PAIRS_STORE ||
-  '/data/settings.json';
-
 type SettingsRecord = Record<string, string>;
+type SettingsStorageInfo = {
+  backend: 'mysql' | 'file' | 'unavailable';
+  durable: boolean;
+  detail: string;
+  path?: string;
+};
+
+function getDatabaseUrl(): { url: string; source: string } | null {
+  const url =
+    process.env.DATABASE_URL ||
+    process.env.MYSQL_URL ||
+    process.env.MYSQL_PRIVATE_URL ||
+    process.env.MYSQL_PUBLIC_URL;
+
+  if (url) {
+    return {
+      url,
+      source: process.env.DATABASE_URL ? 'DATABASE_URL' :
+        process.env.MYSQL_URL ? 'MYSQL_URL' :
+        process.env.MYSQL_PRIVATE_URL ? 'MYSQL_PRIVATE_URL' : 'MYSQL_PUBLIC_URL',
+    };
+  }
+
+  const { MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE } = process.env;
+  if (MYSQLHOST && MYSQLPORT && MYSQLUSER && MYSQLPASSWORD && MYSQLDATABASE) {
+    return {
+      url: `mysql://${encodeURIComponent(MYSQLUSER)}:${encodeURIComponent(MYSQLPASSWORD)}@${MYSQLHOST}:${MYSQLPORT}/${MYSQLDATABASE}`,
+      source: 'MYSQLHOST/MYSQLPORT/MYSQLUSER/MYSQLPASSWORD/MYSQLDATABASE',
+    };
+  }
+
+  return null;
+}
+
+function isRailwayRuntime() {
+  return Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
+}
+
+function getSettingsFilePath(): { filePath: string; durable: boolean; detail: string } | null {
+  const configuredPath = process.env.SETTINGS_FILE || process.env.PRIORITY_PAIRS_STORE;
+  if (configuredPath) {
+    return { filePath: configuredPath, durable: true, detail: 'configured file path' };
+  }
+
+  if (process.env.RAILWAY_VOLUME_MOUNT_PATH) {
+    return {
+      filePath: path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'settings.json'),
+      durable: true,
+      detail: `Railway volume ${process.env.RAILWAY_VOLUME_NAME || '(unnamed)'}`,
+    };
+  }
+
+  if (isRailwayRuntime()) {
+    return null;
+  }
+
+  return { filePath: '/tmp/erica-forex-settings.json', durable: false, detail: 'local development fallback' };
+}
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  const dbConfig = getDatabaseUrl();
+  if (!_db && dbConfig) {
     try {
       _pool = mysql.createPool({
-        uri: process.env.DATABASE_URL,
+        uri: dbConfig.url,
         waitForConnections: true,
         connectionLimit: 5,
         queueLimit: 0,
       });
       _db = drizzle(_pool);
       await initSchema(_pool);
+      console.log(`[Database] Connected using ${dbConfig.source}`);
     } catch (error) {
       console.warn('[Database] Failed to connect:', error);
       _db = null;
@@ -187,8 +242,10 @@ export async function clearAllJournalEntries() {
 // ── Settings (persistent key-value) ─────────────────────────────────────────
 
 async function readFileSettings(): Promise<SettingsRecord> {
+  const file = getSettingsFilePath();
+  if (!file) return {};
   try {
-    const raw = await fs.readFile(SETTINGS_FILE, 'utf8');
+    const raw = await fs.readFile(file.filePath, 'utf8');
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as SettingsRecord : {};
   } catch (e: any) {
@@ -198,11 +255,16 @@ async function readFileSettings(): Promise<SettingsRecord> {
 }
 
 async function writeFileSettings(settings: SettingsRecord): Promise<boolean> {
+  const file = getSettingsFilePath();
+  if (!file) {
+    console.warn('[Settings] no durable file backend available: attach a Railway volume or configure MySQL');
+    return false;
+  }
   try {
-    await fs.mkdir(path.dirname(SETTINGS_FILE), { recursive: true });
-    const tmp = `${SETTINGS_FILE}.${process.pid}.tmp`;
+    await fs.mkdir(path.dirname(file.filePath), { recursive: true });
+    const tmp = `${file.filePath}.${process.pid}.tmp`;
     await fs.writeFile(tmp, JSON.stringify(settings, null, 2), 'utf8');
-    await fs.rename(tmp, SETTINGS_FILE);
+    await fs.rename(tmp, file.filePath);
     return true;
   } catch (e) {
     console.warn('[Settings] file write failed:', e);
@@ -255,6 +317,29 @@ export async function deleteSetting(key: string): Promise<boolean> {
   const settings = await readFileSettings();
   delete settings[key];
   return writeFileSettings(settings);
+}
+
+export async function getSettingsStorageInfo(): Promise<SettingsStorageInfo> {
+  await getDb();
+  if (_pool) {
+    return { backend: 'mysql', durable: true, detail: 'settings table' };
+  }
+
+  const file = getSettingsFilePath();
+  if (file) {
+    return {
+      backend: 'file',
+      durable: file.durable,
+      detail: file.detail,
+      path: file.filePath,
+    };
+  }
+
+  return {
+    backend: 'unavailable',
+    durable: false,
+    detail: 'No MySQL config and no Railway volume mount path. Set DATABASE_URL/MYSQL_URL or attach a Railway volume.',
+  };
 }
 
 // Returns win/loss counts keyed by "pattern|||timeframe" for journal-weighted scoring

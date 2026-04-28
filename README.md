@@ -12,6 +12,14 @@ XAG/USD · XAU/USD · GBP/JPY · NZD/USD · AUD/USD · AUD/JPY · USD/JPY · GBP
 ## Deploy to Railway
 Push to GitHub, connect to Railway, add OANDA_API_KEY env var.
 
+Priority pairs require durable runtime storage in production. Configure one of:
+
+1. A Railway MySQL database with `DATABASE_URL`, `MYSQL_URL`, or Railway's `MYSQLHOST`/`MYSQLPORT`/`MYSQLUSER`/`MYSQLPASSWORD`/`MYSQLDATABASE` variables.
+2. A Railway volume mounted on the service. The app uses `RAILWAY_VOLUME_MOUNT_PATH/settings.json` when Railway exposes `RAILWAY_VOLUME_MOUNT_PATH`.
+3. An explicit durable file path via `SETTINGS_FILE` or `PRIORITY_PAIRS_STORE`.
+
+If Railway has no database and no mounted volume, `POST /api/priority-pairs` returns a 500 instead of pretending the priority pairs were persisted.
+
 ## TradingView to Telegram paper alerts
 TradingView can send webhook alerts to the scanner, and the scanner will:
 
