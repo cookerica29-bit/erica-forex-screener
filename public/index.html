@@ -1218,20 +1218,20 @@
 
   function extractNumber(value) {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
-    const match = String(value || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+    const match = String(value || '').replace(/,/g, '').match(/\d+(?:\.\d+)?/);
     return match ? Number(match[0]) : null;
   }
 
   function extractEntry(value) {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
-    const nums = String(value || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) || [];
+    const nums = String(value || '').replace(/,/g, '').match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) || [];
     if (nums.length >= 2) return (nums[0] + nums[1]) / 2;
     return nums[0] ?? null;
   }
 
   function buildPriorityJournalSetup(row) {
     const entry = extractEntry(row.entryZone);
-    const stopLoss = extractNumber(row.stopLoss) ?? extractNumber(row.invalidation);
+    const stopLoss = extractNumber(row.stopLoss);
     const direction = normalizePriorityBias(row.bias);
     const target1 = extractNumber(row.target1);
     const target2 = extractNumber(row.target2);
@@ -1247,31 +1247,7 @@
       row.rejectionReason ? `Scanner rejection: ${row.rejectionReason}` : '',
     ].filter(Boolean).join('\n');
 
-    if (row.validSetup) {
-      const setupEntry = entry ?? row.validSetup.entry;
-      const setupSl = stopLoss ?? row.validSetup.sl ?? row.validSetup.stopLoss;
-      const risk = setupEntry && setupSl ? Math.abs(setupEntry - setupSl) : 0;
-      const setupTp1 = target1 ?? row.validSetup.tp1;
-      const setupTp2 = target2 ?? row.validSetup.tp2;
-      return {
-        ...row.validSetup,
-        entry: setupEntry,
-        sl: setupSl,
-        tp1: setupTp1,
-        tp2: setupTp2,
-        rrRatio: rrEstimate ?? row.validSetup.rrRatio,
-        rr2: setupTp2 && risk ? Number((Math.abs(setupTp2 - setupEntry) / risk).toFixed(1)) : row.validSetup.rr2,
-        notes: [row.validSetup.notes || '', priorityNotes].filter(Boolean).join('\n'),
-      };
-    }
-
-    if (!entry || !stopLoss || (direction !== 'LONG' && direction !== 'SHORT')) return null;
-    const risk = Math.abs(entry - stopLoss);
-    if (!risk) return null;
-    const tp1 = target1 ?? (direction === 'LONG' ? entry + risk : entry - risk);
-    const tp2 = target2;
-    const rr1 = rrEstimate ?? Number((Math.abs(tp1 - entry) / risk).toFixed(1));
-    const rr2 = tp2 ? Number((Math.abs(tp2 - entry) / risk).toFixed(1)) : undefined;
+    if (!entry || !stopLoss || !target1 || (direction !== 'LONG' && direction !== 'SHORT')) return null;
     return {
       id: `priority-${row.pair}`,
       symbol: row.pair,
@@ -1282,10 +1258,9 @@
       timeframe: selectedScanTf,
       entry,
       sl: stopLoss,
-      tp1,
-      tp2,
-      rrRatio: rr1,
-      rr2,
+      tp1: target1,
+      tp2: target2,
+      rrRatio: rrEstimate,
       confluences: [
         row.reason ? `Claude reason: ${row.reason}` : '',
         row.rejectionReason ? `Scanner rejected: ${row.rejectionReason}` : '',
@@ -1358,7 +1333,7 @@
     const cards = priorityWatchlistRows.map(row => {
       const statusClass = row.status.toLowerCase();
       const journalSetup = buildPriorityJournalSetup(row);
-      const disabled = journalSetup ? '' : 'disabled title="Needs Claude bias, entry zone, and stop loss or invalidation to save"';
+      const disabled = journalSetup ? '' : 'disabled title="Needs Claude bias, entry zone, stop loss, and target 1 to save"';
       const reason = row.reason ? `<div class="priority-reason"><strong>Claude:</strong> ${escapeHtml(row.reason)}</div>` : '';
       const rejection = row.rejectionReason ? `<div class="priority-reason"><strong>Scanner:</strong> ${escapeHtml(row.rejectionReason)}</div>` : '';
       return `<div class="priority-card ${statusClass}">
@@ -2096,7 +2071,7 @@
           tp1: setup.tp1,
           tp2: setup.tp2,
           tp3: setup.tp3,
-          rr1: setup.rrRatio || setup.rr1 || 1,
+          rr1: setup.rrRatio ?? setup.rr1,
           rr2: setup.rr2,
           rr3: setup.rr3,
           confluences: setup.confluences || setup.confluence || [],
