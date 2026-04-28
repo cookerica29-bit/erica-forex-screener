@@ -209,6 +209,28 @@
     .nm-dir.short { color: var(--red); background: rgba(255,59,92,0.08); border: 1px solid rgba(255,59,92,0.25); }
     .nm-reason { font-size: 11px; color: var(--slate-dim); margin-bottom: 5px; line-height: 1.4; }
     .nm-stats { font-size: 10px; color: #334155; }
+    .priority-watchlist { margin: 14px 0 12px; border-top: 1px solid rgba(245,166,35,0.22); padding-top: 12px; }
+    .priority-watchlist-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .priority-watchlist-title { font-size: 11px; color: var(--gold); font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
+    .priority-watchlist-sub { font-size: 10px; color: var(--slate-dim); margin-left: auto; }
+    .priority-watchlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+    .priority-card { background: var(--card); border: 1px solid rgba(245,166,35,0.2); border-radius: 10px; padding: 12px; }
+    .priority-card.valid { border-color: rgba(0,255,136,0.28); }
+    .priority-card.rejected { border-color: rgba(255,59,92,0.28); }
+    .priority-card.waiting { border-color: rgba(96,165,250,0.25); }
+    .priority-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+    .priority-pair { font-size: 16px; font-weight: 800; color: var(--text); }
+    .priority-status { font-size: 9px; padding: 2px 8px; border-radius: 99px; border: 1px solid; font-weight: 800; }
+    .priority-status.valid { color: var(--green); border-color: rgba(0,255,136,0.4); background: rgba(0,255,136,0.08); }
+    .priority-status.rejected { color: var(--red); border-color: rgba(255,59,92,0.4); background: rgba(255,59,92,0.08); }
+    .priority-status.waiting { color: var(--blue); border-color: rgba(96,165,250,0.4); background: rgba(96,165,250,0.08); }
+    .priority-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-bottom: 8px; }
+    .priority-field { background: rgba(148,163,184,0.05); border: 1px solid rgba(148,163,184,0.08); border-radius: 6px; padding: 6px 8px; min-height: 42px; }
+    .priority-label { font-size: 8px; color: var(--slate-dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
+    .priority-value { font-size: 11px; color: var(--slate); line-height: 1.35; word-break: break-word; }
+    .priority-reason { font-size: 10px; color: var(--slate-dim); line-height: 1.4; padding: 7px 8px; border-radius: 6px; background: rgba(148,163,184,0.04); border: 1px solid rgba(148,163,184,0.08); margin-bottom: 8px; }
+    .priority-actions { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+    .priority-actions .push-btn:disabled { opacity: .45; cursor: not-allowed; }
     @media (max-width: 768px) {
       .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
       #bot-challenge > div:first-child { grid-template-columns: 1fr !important; }
@@ -317,6 +339,8 @@
     <div id="initScanSubtext" style="color:var(--slate-dim);font-size:11px;opacity:0.6;">Scanning 16 pairs across all sessions</div>
   </div>
 </div>
+
+<div id="priorityWatchlist"></div>
 
 <div id="nearMissContent"></div>
 
@@ -554,6 +578,8 @@
   let allSetups = [], allNearMisses = [], minRR = 1.5, dir = 'ALL', quality = 'ALL', scanning = false;
   let autoRefreshTimer = null;
   let nearMissOpen = false;
+  let priorityPairsPayload = null;
+  let priorityWatchlistRows = [];
 
   const FULL_SCAN_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','AUD_USD','NZD_USD','EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY','EUR_GBP','EUR_AUD','XAU_USD','XAG_USD'];
   // Pair list — overwritten on load from /api/priority-pairs; falls back to full 16 pairs
@@ -562,6 +588,9 @@
   let priorityPairsActive = false;
 
   function makePairLabel(p) { return p.replace('_','/'); }
+  function escapeHtml(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
   function toCalcPairValue(p) { return p.replace('_', ''); }
   function currentScanLabel() {
     return priorityPairsActive
@@ -600,6 +629,7 @@
         return;
       }
       const data = await res.json();
+      priorityPairsPayload = data;
       priorityPairsActive = data.active === true;
       PAIRS = priorityPairsActive ? data.pairs : (data.fullList || FULL_SCAN_PAIRS);
       PAIR_LABELS = Object.fromEntries(PAIRS.map(p => [p, makePairLabel(p)]));
@@ -611,6 +641,7 @@
       renderCalculatorPairs();
       updatePriorityBadge(data);
     } catch(e) {
+      priorityPairsPayload = null;
       priorityPairsActive = false;
       updatePriorityBadge(null);
       console.warn('Priority pairs fetch failed:', e);
@@ -963,6 +994,7 @@
       document.getElementById('lastScan').textContent =
         `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
       renderSetups();
+      await loadPriorityWatchlist();
       renderNearMisses();
     } catch(e) {
       console.warn('Could not fetch latest setups:', e.message);
@@ -1017,6 +1049,7 @@
       allNearMisses = nearMisses.filter(nm => isVisiblePair(nm.pair));
     } catch(e) { console.warn('Backend scan failed:', e); }
     renderSetups();
+    await loadPriorityWatchlist();
     renderNearMisses();
   }
 
@@ -1132,6 +1165,186 @@
         </div>
       </div>
     </div></div>`;
+  }
+
+  function getPriorityMeta(pair) {
+    const meta = priorityPairsPayload?.meta;
+    if (!meta || typeof meta !== 'object') return {};
+    const compact = pair.replace('_', '');
+    const label = makePairLabel(pair);
+    const candidates = [
+      meta[pair], meta[compact], meta[label],
+      meta.pairs?.[pair], meta.pairs?.[compact], meta.pairs?.[label],
+      meta.priorityPairs?.[pair], meta.priorityPairs?.[compact], meta.priorityPairs?.[label],
+      meta.watchlist?.[pair], meta.watchlist?.[compact], meta.watchlist?.[label],
+    ].filter(Boolean);
+    if (Array.isArray(meta.pairs)) candidates.push(meta.pairs.find(x => {
+      const s = String(x?.pair || x?.symbol || x?.ticker || '').replace('/', '_').toUpperCase();
+      return s === pair || s.replace('_', '') === compact;
+    }));
+    if (Array.isArray(meta.priorityPairs)) candidates.push(meta.priorityPairs.find(x => {
+      const s = String(x?.pair || x?.symbol || x?.ticker || '').replace('/', '_').toUpperCase();
+      return s === pair || s.replace('_', '') === compact;
+    }));
+    if (Array.isArray(meta.watchlist)) candidates.push(meta.watchlist.find(x => {
+      const s = String(x?.pair || x?.symbol || x?.ticker || '').replace('/', '_').toUpperCase();
+      return s === pair || s.replace('_', '') === compact;
+    }));
+    return candidates.find(x => x && typeof x === 'object') || {};
+  }
+
+  function firstValue(obj, keys) {
+    for (const key of keys) {
+      if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+    }
+    return '';
+  }
+
+  function normalizePriorityBias(value) {
+    const raw = String(value || '').trim();
+    const upper = raw.toUpperCase();
+    if (upper === 'BUY' || upper === 'BULLISH' || upper === 'LONG') return 'LONG';
+    if (upper === 'SELL' || upper === 'BEARISH' || upper === 'SHORT') return 'SHORT';
+    return raw;
+  }
+
+  function gradeToQuality(grade) {
+    const g = String(grade || '').toUpperCase();
+    if (g.includes('PREMIUM') || g.startsWith('A')) return 'PREMIUM';
+    if (g.includes('STRONG') || g.startsWith('B')) return 'STRONG';
+    return 'DEVELOPING';
+  }
+
+  function extractNumber(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    const match = String(value || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : null;
+  }
+
+  function extractEntry(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    const nums = String(value || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) || [];
+    if (nums.length >= 2) return (nums[0] + nums[1]) / 2;
+    return nums[0] ?? null;
+  }
+
+  function buildPriorityJournalSetup(row) {
+    if (row.validSetup) return row.validSetup;
+    const entry = extractEntry(row.entryZone);
+    const stopLoss = extractNumber(row.invalidation);
+    const direction = normalizePriorityBias(row.bias);
+    if (!entry || !stopLoss || (direction !== 'LONG' && direction !== 'SHORT')) return null;
+    const risk = Math.abs(entry - stopLoss);
+    if (!risk) return null;
+    const tp1 = direction === 'LONG' ? entry + risk : entry - risk;
+    return {
+      id: `priority-${row.pair}`,
+      symbol: row.pair,
+      displaySymbol: makePairLabel(row.pair),
+      direction,
+      quality: gradeToQuality(row.grade),
+      pattern: 'Claude Priority Watchlist',
+      timeframe: selectedScanTf,
+      entry,
+      sl: stopLoss,
+      tp1,
+      rrRatio: 1,
+      confluences: [
+        row.reason ? `Claude reason: ${row.reason}` : '',
+        row.rejectionReason ? `Scanner rejected: ${row.rejectionReason}` : '',
+      ].filter(Boolean),
+      session: getSession(),
+      newsRisk: false,
+      notes: [
+        row.reason ? `Claude reason: ${row.reason}` : '',
+        row.rejectionReason ? `Scanner rejection: ${row.rejectionReason}` : '',
+      ].filter(Boolean).join('\n'),
+    };
+  }
+
+  async function loadPriorityWatchlist() {
+    const container = document.getElementById('priorityWatchlist');
+    if (!container) return;
+    if (!priorityPairsActive || !PAIRS.length) {
+      priorityWatchlistRows = [];
+      container.innerHTML = '';
+      return;
+    }
+
+    let debugRows = [];
+    try {
+      const res = await fetch(`/api/debug?tf=${selectedScanTf}`);
+      debugRows = res.ok ? await res.json() : [];
+    } catch(e) {
+      console.warn('Priority debug fetch failed:', e);
+    }
+
+    const setupByPair = new Map(allSetups.map(s => [s.symbol || s.pair, s]));
+    const debugByPair = new Map(debugRows.filter(r => PAIRS.includes(r.pair)).map(r => [r.pair, r]));
+    priorityWatchlistRows = PAIRS.map(pair => {
+      const meta = getPriorityMeta(pair);
+      const debug = debugByPair.get(pair);
+      const validSetup = setupByPair.get(pair) || (debug?.result === 'SETUP' ? debug.setup : null);
+      const status = validSetup ? 'VALID' : debug?.result === 'REJECTED' || debug?.result === 'ERROR' ? 'REJECTED' : 'WAITING';
+      const bias = normalizePriorityBias(firstValue(meta, ['bias','direction','side','action','tradeDirection','claudeBias']));
+      const grade = firstValue(meta, ['grade','quality','rating','score']);
+      const entryZone = firstValue(meta, ['entryZone','entry_zone','entry','entryPrice','zone']);
+      const invalidation = firstValue(meta, ['invalidation','invalid','stop','stopLoss','sl']);
+      const reason = firstValue(meta, ['reason','claudeReason','rationale','notes','thesis']);
+      return {
+        pair,
+        bias,
+        grade,
+        entryZone,
+        invalidation,
+        reason,
+        status,
+        rejectionReason: validSetup ? '' : (debug?.reason || ''),
+        validSetup,
+      };
+    });
+    renderPriorityWatchlist();
+  }
+
+  function renderPriorityWatchlist() {
+    const container = document.getElementById('priorityWatchlist');
+    if (!container) return;
+    if (!priorityPairsActive || !priorityWatchlistRows.length) {
+      container.innerHTML = '';
+      return;
+    }
+    const cards = priorityWatchlistRows.map(row => {
+      const statusClass = row.status.toLowerCase();
+      const journalSetup = buildPriorityJournalSetup(row);
+      const disabled = journalSetup ? '' : 'disabled title="Needs Claude bias, entry zone, and invalidation to save"';
+      const reason = row.reason ? `<div class="priority-reason"><strong>Claude:</strong> ${escapeHtml(row.reason)}</div>` : '';
+      const rejection = row.rejectionReason ? `<div class="priority-reason"><strong>Scanner:</strong> ${escapeHtml(row.rejectionReason)}</div>` : '';
+      return `<div class="priority-card ${statusClass}">
+        <div class="priority-top">
+          <div class="priority-pair">${escapeHtml(makePairLabel(row.pair))}</div>
+          <span class="priority-status ${statusClass}">${row.status}</span>
+        </div>
+        <div class="priority-fields">
+          <div class="priority-field"><div class="priority-label">Claude Bias</div><div class="priority-value">${escapeHtml(row.bias || '—')}</div></div>
+          <div class="priority-field"><div class="priority-label">Grade</div><div class="priority-value">${escapeHtml(row.grade || '—')}</div></div>
+          <div class="priority-field"><div class="priority-label">Entry Zone</div><div class="priority-value">${escapeHtml(row.entryZone || '—')}</div></div>
+          <div class="priority-field"><div class="priority-label">Invalidation</div><div class="priority-value">${escapeHtml(row.invalidation || '—')}</div></div>
+        </div>
+        ${reason}
+        ${rejection}
+        <div class="priority-actions">
+          <button class="push-btn" id="priority-save-${row.pair}" onclick="savePriorityToJournal('${row.pair}')" ${disabled}>📓 Save to Journal</button>
+        </div>
+      </div>`;
+    }).join('');
+    container.innerHTML = `<div class="priority-watchlist">
+      <div class="priority-watchlist-head">
+        <span class="priority-watchlist-title">Priority Watchlist</span>
+        <span class="near-miss-count">${priorityWatchlistRows.length} pairs</span>
+        <span class="priority-watchlist-sub">Tracked separately from scanner validity</span>
+      </div>
+      <div class="priority-watchlist-grid">${cards}</div>
+    </div>`;
   }
 
   function fillCalculator(idx) {
@@ -1797,6 +2010,7 @@
           confluences: setup.confluences,
           session: setup.session,
           newsRisk: setup.newsRisk ?? false,
+          notes: setup.notes || '',
         }),
       });
       const data = await res.json();
@@ -1808,6 +2022,53 @@
         if (panel) panel.style.display = 'flex';
       }
     } catch(e) { console.error('Push failed:', e); }
+  }
+
+  async function savePriorityToJournal(pair) {
+    const row = priorityWatchlistRows.find(r => r.pair === pair);
+    if (!row) return;
+    const setup = buildPriorityJournalSetup(row);
+    const btn = document.getElementById('priority-save-' + pair);
+    if (!setup) {
+      if (btn) btn.textContent = 'Needs levels';
+      return;
+    }
+    try {
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+      const res = await fetch('/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: setup.symbol || setup.pair,
+          displaySymbol: setup.displaySymbol || makePairLabel(setup.symbol || setup.pair),
+          direction: setup.direction,
+          quality: setup.quality,
+          pattern: setup.pattern,
+          timeframe: setup.timeframe || selectedScanTf,
+          entry: setup.entry,
+          stopLoss: setup.sl || setup.stopLoss,
+          tp1: setup.tp1,
+          tp2: setup.tp2,
+          tp3: setup.tp3,
+          rr1: setup.rrRatio || setup.rr1 || 1,
+          rr2: setup.rr2,
+          rr3: setup.rr3,
+          confluences: setup.confluences || setup.confluence || [],
+          session: setup.session,
+          newsRisk: setup.newsRisk ?? false,
+          notes: setup.notes || [
+            row.reason ? `Claude reason: ${row.reason}` : '',
+            row.rejectionReason ? `Scanner rejection: ${row.rejectionReason}` : '',
+          ].filter(Boolean).join('\n'),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Save failed');
+      if (btn) { btn.textContent = '✓ Journaled'; btn.classList.add('pushed'); }
+    } catch(e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save failed'; }
+      console.error('Priority journal save failed:', e);
+    }
   }
 
   async function setOutcome(setupId, outcome) {

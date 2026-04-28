@@ -370,6 +370,7 @@ app.post('/api/journal', async (req, res) => {
       confluences:   b.confluences || b.confluence,
       session:       b.session,
       newsRisk:      b.newsRisk ?? b.news_risk ?? false,
+      notes:         b.notes,
     };
     const id = await createJournalEntry(normalized);
     return res.json({ success: true, id });
