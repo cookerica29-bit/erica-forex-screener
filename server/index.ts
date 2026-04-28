@@ -32,6 +32,7 @@ interface PriorityPairsData {
   meta?: Record<string, any>; // optional grade/direction info from the scan
 }
 let priorityPairsData: PriorityPairsData | null = null;
+const PRIORITY_PAIRS_SETTING_KEY = 'priority_pairs';
 
 // Convert bare symbol (EURUSD, XAU_USD, FX:EURUSD) to OANDA underscore format
 function toOandaFormat(symbol: string): string {
@@ -39,6 +40,29 @@ function toOandaFormat(symbol: string): string {
   if (s.includes('_')) return s;                          // already OANDA format
   if (s.length === 6) return `${s.slice(0, 3)}_${s.slice(3)}`; // EURUSD → EUR_USD
   return s;
+}
+
+function parsePriorityPairs(value: string | null): PriorityPairsData | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<PriorityPairsData>;
+    if (!Array.isArray(parsed.pairs) || parsed.pairs.length === 0 || !parsed.setAt) return null;
+    return {
+      pairs: parsed.pairs.map(toOandaFormat).filter(p => p.length >= 5),
+      setAt: parsed.setAt,
+      meta: parsed.meta,
+    };
+  } catch (e) {
+    console.warn('[Priority] Stored priority pairs are invalid:', e);
+    return null;
+  }
+}
+
+async function loadPriorityPairsFromStorage() {
+  const stored = await getSetting(PRIORITY_PAIRS_SETTING_KEY);
+  const parsed = parsePriorityPairs(stored);
+  priorityPairsData = parsed?.pairs.length ? parsed : null;
+  return priorityPairsData;
 }
 
 async function sendTelegram(text: string, parseMode?: 'Markdown') {
@@ -131,6 +155,7 @@ async function scheduledScan(forceTf?: string) {
   const tfs = tfsToRun.join(' + ');
   console.log(`[Scanner] Running scan at ${new Date().toISOString()} (${tfs})`);
   try {
+    await loadPriorityPairsFromStorage();
     // Refresh journal stats for historical edge/weakness scoring
     try { cachedJournalStats = await getPatternStats(); } catch { /* non-fatal */ }
 
@@ -162,16 +187,15 @@ async function scheduledScan(forceTf?: string) {
   }
 }
 
-// Load persisted priority pairs from DB, then run first scan
+// Load persisted priority pairs from storage, then run first scan
 async function init() {
   try {
-    const stored = await getSetting('priority_pairs');
-    if (stored) {
-      priorityPairsData = JSON.parse(stored) as PriorityPairsData;
-      console.log(`[Priority] Restored from DB: ${priorityPairsData.pairs.join(', ')}`);
+    const restored = await loadPriorityPairsFromStorage();
+    if (restored) {
+      console.log(`[Priority] Restored from storage: ${priorityPairsData.pairs.join(', ')}`);
     }
   } catch (e) {
-    console.warn('[Priority] Could not load from DB on startup:', e);
+    console.warn('[Priority] Could not load from storage on startup:', e);
   }
   scheduledScan();
   setInterval(scheduledScan, 15 * 60 * 1000);
@@ -212,7 +236,8 @@ app.get('/api/near-misses', (_req, res) => {
 // POST /api/priority-pairs  → { pairs: ["EURUSD","XAUUSD",...], meta?: {...} }
 // DELETE /api/priority-pairs → clears priority mode, reverts to full 16-pair list
 
-app.get('/api/priority-pairs', (_req, res) => {
+app.get('/api/priority-pairs', async (_req, res) => {
+  await loadPriorityPairsFromStorage();
   res.json({
     active: priorityPairsData !== null,
     pairs: priorityPairsData?.pairs ?? FULL_PAIRS,
@@ -232,15 +257,21 @@ app.post('/api/priority-pairs', async (req, res) => {
     return res.status(400).json({ error: 'No valid pair symbols after normalization' });
   }
   const record: PriorityPairsData = { pairs: normalized, setAt: new Date().toISOString(), meta: meta as any };
+  const persisted = await setSetting(PRIORITY_PAIRS_SETTING_KEY, JSON.stringify(record));
+  if (!persisted) {
+    return res.status(500).json({ error: 'Priority pairs could not be persisted' });
+  }
   priorityPairsData = record;
-  await setSetting('priority_pairs', JSON.stringify(record));
   console.log(`[Priority] Set to ${normalized.length} pairs: ${normalized.join(', ')}`);
-  res.json({ success: true, pairs: normalized, count: normalized.length });
+  res.json({ success: true, active: true, pairs: normalized, count: normalized.length, setAt: record.setAt });
 });
 
 app.delete('/api/priority-pairs', async (_req, res) => {
+  const persisted = await deleteSetting(PRIORITY_PAIRS_SETTING_KEY);
+  if (!persisted) {
+    return res.status(500).json({ error: 'Priority pairs could not be cleared from persistent storage' });
+  }
   priorityPairsData = null;
-  await deleteSetting('priority_pairs');
   console.log('[Priority] Cleared — reverting to full 16-pair list');
   res.json({ success: true, message: 'Priority pairs cleared, reverted to full list' });
 });
