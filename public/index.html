@@ -555,27 +555,49 @@
   let autoRefreshTimer = null;
   let nearMissOpen = false;
 
+  const FULL_SCAN_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','AUD_USD','NZD_USD','EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY','EUR_GBP','EUR_AUD','XAU_USD','XAG_USD'];
   // Pair list — overwritten on load from /api/priority-pairs; falls back to full 16 pairs
-  let PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
-  let PAIR_LABELS = { XAG_USD:'XAG/USD', XAU_USD:'XAU/USD', GBP_JPY:'GBP/JPY', NZD_USD:'NZD/USD', AUD_USD:'AUD/USD', AUD_JPY:'AUD/JPY', USD_JPY:'USD/JPY', GBP_USD:'GBP/USD', EUR_USD:'EUR/USD' };
+  let PAIRS = [...FULL_SCAN_PAIRS];
+  let PAIR_LABELS = Object.fromEntries(FULL_SCAN_PAIRS.map(p => [p, makePairLabel(p)]));
   let priorityPairsActive = false;
 
   function makePairLabel(p) { return p.replace('_','/'); }
+  function toCalcPairValue(p) { return p.replace('_', ''); }
+  function currentScanLabel() {
+    return priorityPairsActive
+      ? `Scanning ${PAIRS.length} priority pair${PAIRS.length !== 1 ? 's' : ''}`
+      : `Scanning ${PAIRS.length} pairs across all sessions`;
+  }
+  function activePairSet() { return new Set(PAIRS); }
+  function isVisiblePair(pair) {
+    if (!priorityPairsActive) return true;
+    return activePairSet().has(pair);
+  }
+
+  function renderCalculatorPairs() {
+    const select = document.getElementById('calc-pair');
+    if (!select) return;
+    const previous = select.value;
+    select.innerHTML = PAIRS.map(p => `<option value="${toCalcPairValue(p)}">${makePairLabel(p)}</option>`).join('');
+    if (PAIRS.some(p => toCalcPairValue(p) === previous)) select.value = previous;
+    else if (PAIRS.length) select.value = toCalcPairValue(PAIRS[0]);
+    calcPosition();
+  }
 
   async function loadPriorityPairs() {
     try {
       const res = await fetch('/api/priority-pairs');
       if (!res.ok) return;
       const data = await res.json();
-      PAIRS = data.pairs;
-      PAIR_LABELS = Object.fromEntries(data.pairs.map(p => [p, makePairLabel(p)]));
-      priorityPairsActive = data.active;
-      const count = data.pairs.length;
-      const label = data.active
-        ? `Priority mode — scanning ${count} pair${count !== 1 ? 's' : ''}: ${data.pairs.map(makePairLabel).join(', ')}`
-        : `Scanning ${count} pairs across all sessions`;
+      priorityPairsActive = Boolean(data.active);
+      PAIRS = priorityPairsActive ? data.pairs : (data.fullList || FULL_SCAN_PAIRS);
+      PAIR_LABELS = Object.fromEntries(PAIRS.map(p => [p, makePairLabel(p)]));
+      const label = priorityPairsActive
+        ? `${currentScanLabel()}: ${PAIRS.map(makePairLabel).join(', ')}`
+        : currentScanLabel();
       const el = document.getElementById('initScanSubtext');
       if (el) el.textContent = label;
+      renderCalculatorPairs();
       // Show/hide priority badge in header
       const badge = document.getElementById('priorityBadge');
       if (badge) {
@@ -908,9 +930,8 @@
       ]);
       if (!setupsRes.ok) return;
       const data = await setupsRes.json();
-      if (!data.setups || data.setups.length === 0) return;
       // Normalize server Setup objects to match client-side shape
-      allSetups = data.setups.map((s, i) => {
+      allSetups = (data.setups || []).map((s, i) => {
         const sym = s.symbol || s.pair;
         const entry = s.entry;
         const sl = s.sl || s.stopLoss;
@@ -926,8 +947,9 @@
           rr2:           s.rr2 || (risk > 0 ? parseFloat((Math.abs(s.tp2 - entry) / risk).toFixed(1)) : 0),
           rr3:           s.rr3 || (risk > 0 ? parseFloat((Math.abs(s.tp3 - entry) / risk).toFixed(1)) : 0),
         };
-      });
-      allNearMisses = nmRes.ok ? await nmRes.json() : [];
+      }).filter(s => isVisiblePair(s.symbol));
+      const nearMisses = nmRes.ok ? await nmRes.json() : [];
+      allNearMisses = nearMisses.filter(nm => isVisiblePair(nm.pair));
       document.getElementById('lastScan').textContent =
         `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
       renderSetups();
@@ -959,6 +981,7 @@
 
   async function runScan() {
     if(scanning) return;
+    await loadPriorityPairs();
     scanning=true; updateScanBtn(true); showLoading(); updateScanTfLabel();
     const tfsToScan = [selectedScanTf];
     const results=[];
@@ -980,7 +1003,8 @@
     try {
       await fetch(`/api/scan?tf=${selectedScanTf}`, { method: 'POST' });
       const nmRes = await fetch('/api/near-misses');
-      allNearMisses = nmRes.ok ? await nmRes.json() : [];
+      const nearMisses = nmRes.ok ? await nmRes.json() : [];
+      allNearMisses = nearMisses.filter(nm => isVisiblePair(nm.pair));
     } catch(e) { console.warn('Backend scan failed:', e); }
     renderSetups();
     renderNearMisses();
@@ -1007,7 +1031,7 @@
     document.getElementById('s-long').textContent=all.filter(s=>s.direction==='LONG').length||'—';
     document.getElementById('s-short').textContent=all.filter(s=>s.direction==='SHORT').length||'—';
     const main=document.getElementById('mainContent');
-    if(!all.length){const scanLabel=priorityPairsActive?`Priority mode · ${PAIRS.length} pairs: ${PAIRS.map(makePairLabel).join(', ')}`:`Scanning ${PAIRS.length} pairs across all sessions`;main.innerHTML=`<div class="empty-state"><div style="font-size:48px;opacity:0.4">📡</div><div>Hit Scan to fetch live OANDA data</div><div style="font-size:11px;opacity:0.6;">${scanLabel}</div></div>`;document.getElementById('resultCount').textContent='';return;}
+    if(!all.length){const scanLabel=priorityPairsActive?`${currentScanLabel()}: ${PAIRS.map(makePairLabel).join(', ')}`:currentScanLabel();main.innerHTML=`<div class="empty-state"><div style="font-size:48px;opacity:0.4">📡</div><div>Hit Scan to fetch live OANDA data</div><div style="font-size:11px;opacity:0.6;">${scanLabel}</div></div>`;document.getElementById('resultCount').textContent='';return;}
     document.getElementById('resultCount').innerHTML=`Showing <span>${filtered.length}</span> setup${filtered.length!==1?'s':''} · min ${minRR}:1 RR`;
     if(!filtered.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No setups match your filters</div></div>';return;}
     main.innerHTML='<div class="setup-grid">'+filtered.map(s => renderCard(s, allSetups.indexOf(s))).join('')+'</div>';
@@ -1198,7 +1222,7 @@
   function setDir(v){dir=v;document.querySelectorAll('[id^="dir-"]').forEach(b=>b.classList.remove('active','green','red'));const b=document.getElementById('dir-'+v);b.classList.add('active');if(v==='LONG')b.classList.add('green');if(v==='SHORT')b.classList.add('red');renderSetups();}
   function setQuality(v){quality=v;document.querySelectorAll('[id^="q-"]').forEach(b=>b.classList.remove('active','gold','blue'));const b=document.getElementById('q-'+v);b.classList.add('active');if(v==='PREMIUM')b.classList.add('gold');if(v==='STRONG')b.classList.add('blue');renderSetups();}
   function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...':' Scan';}
-  function showLoading(){const modeLabel=priorityPairsActive?`Priority mode · ${PAIRS.length} pairs`:`${PAIRS.length} pairs`;document.getElementById('mainContent').innerHTML=`<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · ${modeLabel}</div></div></div>`;document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
+  function showLoading(){const modeLabel=currentScanLabel();document.getElementById('mainContent').innerHTML=`<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · ${modeLabel}</div></div></div>`;document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
 
   const journalMap = {};
   let journalEntries = [];
@@ -1216,6 +1240,7 @@
     if (tab === 'calculator') { document.getElementById('calc-account').value = '25308'; calcPosition(); }
     clearInterval(autoRefreshTimer);
     if (tab === 'scanner') {
+      await loadPriorityPairs();
       fetchLatestSetups();
       autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
     }
@@ -2286,7 +2311,7 @@
     },
   };
 
-  const PAIRS = ['EUR/USD','GBP/USD','USD/JPY','EUR/JPY','GBP/JPY','AUD/USD','NZD/USD','USD/CAD'];
+  const TRAINER_PAIRS = ['EUR/USD','GBP/USD','USD/JPY','EUR/JPY','GBP/JPY','AUD/USD','NZD/USD','USD/CAD'];
   const TFS   = ['H1','H4','D1'];
 
   // ── State helpers ─────────────────────────────────────────────────────────
