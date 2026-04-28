@@ -1175,6 +1175,7 @@
     const candidates = [
       meta[pair], meta[compact], meta[label],
       meta.pairs?.[pair], meta.pairs?.[compact], meta.pairs?.[label],
+      meta.byPair?.[pair], meta.byPair?.[compact], meta.byPair?.[label],
       meta.priorityPairs?.[pair], meta.priorityPairs?.[compact], meta.priorityPairs?.[label],
       meta.watchlist?.[pair], meta.watchlist?.[compact], meta.watchlist?.[label],
     ].filter(Boolean);

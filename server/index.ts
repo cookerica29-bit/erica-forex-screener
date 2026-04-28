@@ -58,6 +58,42 @@ function parsePriorityPairs(value: string | null): PriorityPairsData | null {
   }
 }
 
+function normalizePriorityPairsInput(pairs: unknown[], meta: unknown) {
+  const normalized: string[] = [];
+  const structuredMeta: Record<string, any> = meta && typeof meta === 'object' && !Array.isArray(meta)
+    ? { ...(meta as Record<string, any>) }
+    : {};
+  const byPair: Record<string, any> = {};
+
+  for (const item of pairs) {
+    const rawPair = typeof item === 'string'
+      ? item
+      : item && typeof item === 'object'
+        ? (item as any).pair || (item as any).symbol || (item as any).ticker
+        : '';
+    const pair = toOandaFormat(String(rawPair || '').trim());
+    if (pair.length < 5) continue;
+    if (!normalized.includes(pair)) normalized.push(pair);
+    if (item && typeof item === 'object' && !Array.isArray(item)) {
+      const { pair: _pair, symbol: _symbol, ticker: _ticker, ...fields } = item as Record<string, any>;
+      byPair[pair] = { ...(byPair[pair] || {}), ...fields, pair };
+    }
+  }
+
+  for (const [key, value] of Object.entries(structuredMeta)) {
+    const pair = toOandaFormat(String(key));
+    if (normalized.includes(pair) && value && typeof value === 'object' && !Array.isArray(value)) {
+      byPair[pair] = { ...(byPair[pair] || {}), ...(value as Record<string, any>), pair };
+    }
+  }
+
+  if (Object.keys(byPair).length) {
+    structuredMeta.byPair = { ...(structuredMeta.byPair || {}), ...byPair };
+  }
+
+  return { normalized, structuredMeta };
+}
+
 async function loadPriorityPairsFromStorage(source = 'LOAD') {
   const storage = await getSettingsStorageInfo();
   const stored = await getSetting(PRIORITY_PAIRS_SETTING_KEY);
@@ -276,11 +312,11 @@ app.post('/api/priority-pairs', async (req, res) => {
   if (!Array.isArray(pairs) || pairs.length === 0) {
     return res.status(400).json({ error: 'Body must include non-empty pairs array' });
   }
-  const normalized = (pairs as string[]).map(toOandaFormat).filter(p => p.length >= 5);
+  const { normalized, structuredMeta } = normalizePriorityPairsInput(pairs, meta);
   if (normalized.length === 0) {
     return res.status(400).json({ error: 'No valid pair symbols after normalization' });
   }
-  const record: PriorityPairsData = { pairs: normalized, setAt: new Date().toISOString(), meta: meta as any };
+  const record: PriorityPairsData = { pairs: normalized, setAt: new Date().toISOString(), meta: structuredMeta };
   const persisted = await setSetting(PRIORITY_PAIRS_SETTING_KEY, JSON.stringify(record));
   if (!persisted) {
     const latestStorage = await getSettingsStorageInfo();
@@ -294,7 +330,7 @@ app.post('/api/priority-pairs', async (req, res) => {
   priorityPairsData = record;
   const persistedStorage = await getSettingsStorageInfo();
   console.log(`[Priority] POST storage=${persistedStorage.backend} durable=${persistedStorage.durable} count=${normalized.length}${persistedStorage.path ? ` path=${persistedStorage.path}` : ''}: ${normalized.join(', ')}`);
-  res.json({ success: true, active: true, pairs: normalized, count: normalized.length, setAt: record.setAt, storage: persistedStorage });
+  res.json({ success: true, active: true, pairs: normalized, count: normalized.length, setAt: record.setAt, meta: record.meta, storage: persistedStorage });
 });
 
 app.delete('/api/priority-pairs', async (_req, res) => {
