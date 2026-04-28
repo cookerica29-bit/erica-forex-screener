@@ -1230,14 +1230,48 @@
   }
 
   function buildPriorityJournalSetup(row) {
-    if (row.validSetup) return row.validSetup;
     const entry = extractEntry(row.entryZone);
-    const stopLoss = extractNumber(row.invalidation);
+    const stopLoss = extractNumber(row.stopLoss) ?? extractNumber(row.invalidation);
     const direction = normalizePriorityBias(row.bias);
+    const target1 = extractNumber(row.target1);
+    const target2 = extractNumber(row.target2);
+    const rrEstimate = extractNumber(row.rrEstimate);
+    const priorityNotes = [
+      row.reason ? `Claude reason: ${row.reason}` : '',
+      row.entryZone ? `Entry zone: ${row.entryZone}` : '',
+      row.stopLoss ? `Stop loss: ${row.stopLoss}` : '',
+      row.target1 ? `Target 1: ${row.target1}` : '',
+      row.target2 ? `Target 2: ${row.target2}` : '',
+      row.rrEstimate ? `RR estimate: ${row.rrEstimate}` : '',
+      row.invalidation ? `Invalidation: ${row.invalidation}` : '',
+      row.rejectionReason ? `Scanner rejection: ${row.rejectionReason}` : '',
+    ].filter(Boolean).join('\n');
+
+    if (row.validSetup) {
+      const setupEntry = entry ?? row.validSetup.entry;
+      const setupSl = stopLoss ?? row.validSetup.sl ?? row.validSetup.stopLoss;
+      const risk = setupEntry && setupSl ? Math.abs(setupEntry - setupSl) : 0;
+      const setupTp1 = target1 ?? row.validSetup.tp1;
+      const setupTp2 = target2 ?? row.validSetup.tp2;
+      return {
+        ...row.validSetup,
+        entry: setupEntry,
+        sl: setupSl,
+        tp1: setupTp1,
+        tp2: setupTp2,
+        rrRatio: rrEstimate ?? row.validSetup.rrRatio,
+        rr2: setupTp2 && risk ? Number((Math.abs(setupTp2 - setupEntry) / risk).toFixed(1)) : row.validSetup.rr2,
+        notes: [row.validSetup.notes || '', priorityNotes].filter(Boolean).join('\n'),
+      };
+    }
+
     if (!entry || !stopLoss || (direction !== 'LONG' && direction !== 'SHORT')) return null;
     const risk = Math.abs(entry - stopLoss);
     if (!risk) return null;
-    const tp1 = direction === 'LONG' ? entry + risk : entry - risk;
+    const tp1 = target1 ?? (direction === 'LONG' ? entry + risk : entry - risk);
+    const tp2 = target2;
+    const rr1 = rrEstimate ?? Number((Math.abs(tp1 - entry) / risk).toFixed(1));
+    const rr2 = tp2 ? Number((Math.abs(tp2 - entry) / risk).toFixed(1)) : undefined;
     return {
       id: `priority-${row.pair}`,
       symbol: row.pair,
@@ -1249,17 +1283,16 @@
       entry,
       sl: stopLoss,
       tp1,
-      rrRatio: 1,
+      tp2,
+      rrRatio: rr1,
+      rr2,
       confluences: [
         row.reason ? `Claude reason: ${row.reason}` : '',
         row.rejectionReason ? `Scanner rejected: ${row.rejectionReason}` : '',
       ].filter(Boolean),
       session: getSession(),
       newsRisk: false,
-      notes: [
-        row.reason ? `Claude reason: ${row.reason}` : '',
-        row.rejectionReason ? `Scanner rejection: ${row.rejectionReason}` : '',
-      ].filter(Boolean).join('\n'),
+      notes: priorityNotes,
     };
   }
 
@@ -1290,13 +1323,21 @@
       const bias = normalizePriorityBias(firstValue(meta, ['bias','direction','side','action','tradeDirection','claudeBias']));
       const grade = firstValue(meta, ['grade','quality','rating','score']);
       const entryZone = firstValue(meta, ['entryZone','entry_zone','entry','entryPrice','zone']);
-      const invalidation = firstValue(meta, ['invalidation','invalid','stop','stopLoss','sl']);
+      const stopLoss = firstValue(meta, ['stop_loss','stopLoss','sl','stop']);
+      const target1 = firstValue(meta, ['target_1','target1','tp1','takeProfit1']);
+      const target2 = firstValue(meta, ['target_2','target2','tp2','takeProfit2']);
+      const rrEstimate = firstValue(meta, ['rr_estimate','rrEstimate','rr','riskReward','risk_reward']);
+      const invalidation = firstValue(meta, ['invalidation','invalid','invalidatedBy']);
       const reason = firstValue(meta, ['reason','claudeReason','rationale','notes','thesis']);
       return {
         pair,
         bias,
         grade,
         entryZone,
+        stopLoss,
+        target1,
+        target2,
+        rrEstimate,
         invalidation,
         reason,
         status,
@@ -1317,7 +1358,7 @@
     const cards = priorityWatchlistRows.map(row => {
       const statusClass = row.status.toLowerCase();
       const journalSetup = buildPriorityJournalSetup(row);
-      const disabled = journalSetup ? '' : 'disabled title="Needs Claude bias, entry zone, and invalidation to save"';
+      const disabled = journalSetup ? '' : 'disabled title="Needs Claude bias, entry zone, and stop loss or invalidation to save"';
       const reason = row.reason ? `<div class="priority-reason"><strong>Claude:</strong> ${escapeHtml(row.reason)}</div>` : '';
       const rejection = row.rejectionReason ? `<div class="priority-reason"><strong>Scanner:</strong> ${escapeHtml(row.rejectionReason)}</div>` : '';
       return `<div class="priority-card ${statusClass}">
@@ -1329,6 +1370,10 @@
           <div class="priority-field"><div class="priority-label">Claude Bias</div><div class="priority-value">${escapeHtml(row.bias || '—')}</div></div>
           <div class="priority-field"><div class="priority-label">Grade</div><div class="priority-value">${escapeHtml(row.grade || '—')}</div></div>
           <div class="priority-field"><div class="priority-label">Entry Zone</div><div class="priority-value">${escapeHtml(row.entryZone || '—')}</div></div>
+          <div class="priority-field"><div class="priority-label">Stop Loss</div><div class="priority-value">${escapeHtml(row.stopLoss || '—')}</div></div>
+          <div class="priority-field"><div class="priority-label">Target 1</div><div class="priority-value">${escapeHtml(row.target1 || '—')}</div></div>
+          <div class="priority-field"><div class="priority-label">Target 2</div><div class="priority-value">${escapeHtml(row.target2 || '—')}</div></div>
+          <div class="priority-field"><div class="priority-label">RR Estimate</div><div class="priority-value">${escapeHtml(row.rrEstimate || '—')}</div></div>
           <div class="priority-field"><div class="priority-label">Invalidation</div><div class="priority-value">${escapeHtml(row.invalidation || '—')}</div></div>
         </div>
         ${reason}

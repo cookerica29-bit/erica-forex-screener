@@ -76,14 +76,14 @@ function normalizePriorityPairsInput(pairs: unknown[], meta: unknown) {
     if (!normalized.includes(pair)) normalized.push(pair);
     if (item && typeof item === 'object' && !Array.isArray(item)) {
       const { pair: _pair, symbol: _symbol, ticker: _ticker, ...fields } = item as Record<string, any>;
-      byPair[pair] = { ...(byPair[pair] || {}), ...fields, pair };
+      byPair[pair] = { ...(byPair[pair] || {}), ...normalizePriorityMetadataFields(fields), pair };
     }
   }
 
   for (const [key, value] of Object.entries(structuredMeta)) {
     const pair = toOandaFormat(String(key));
     if (normalized.includes(pair) && value && typeof value === 'object' && !Array.isArray(value)) {
-      byPair[pair] = { ...(byPair[pair] || {}), ...(value as Record<string, any>), pair };
+      byPair[pair] = { ...(byPair[pair] || {}), ...normalizePriorityMetadataFields(value as Record<string, any>), pair };
     }
   }
 
@@ -92,6 +92,15 @@ function normalizePriorityPairsInput(pairs: unknown[], meta: unknown) {
   }
 
   return { normalized, structuredMeta };
+}
+
+function normalizePriorityMetadataFields(fields: Record<string, any>) {
+  const normalized = { ...fields };
+  if (normalized.stop_loss === undefined && normalized.stopLoss !== undefined) normalized.stop_loss = normalized.stopLoss;
+  if (normalized.target_1 === undefined && normalized.target1 !== undefined) normalized.target_1 = normalized.target1;
+  if (normalized.target_2 === undefined && normalized.target2 !== undefined) normalized.target_2 = normalized.target2;
+  if (normalized.rr_estimate === undefined && normalized.rrEstimate !== undefined) normalized.rr_estimate = normalized.rrEstimate;
+  return normalized;
 }
 
 async function loadPriorityPairsFromStorage(source = 'LOAD') {
