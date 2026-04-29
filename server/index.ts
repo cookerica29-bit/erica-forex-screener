@@ -231,9 +231,11 @@ async function scheduledScan(forceTf?: string) {
     console.log(`[Scanner] Found ${latestSetups.length} setups (${tfs}), ${latestSetups.filter(s=>s.quality==='PREMIUM').length} premium, ${latestRejected.length} near-misses`);
     queueSetups(latestSetups);
 
-    // Scout scan — produces a report for every pair (no gate filtering)
+    // Scout scan — produces a report for every pair (no gate filtering).
+    // Keep this independent from priority setup queueing so LOW-interest
+    // and non-priority pairs still render in scout mode.
     try {
-      latestScoutResults = await runScoutScan(forceTf || 'H4', pairsOverride);
+      latestScoutResults = await runScoutScan(forceTf || 'H4');
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
@@ -278,11 +280,10 @@ app.post('/api/scout', async (req, res) => {
   const tf = (req.query.tf as string) || 'H4';
   try {
     await loadPriorityPairsFromStorage('SCOUT_LOAD');
-    const pairsOverride = priorityPairsData?.pairs;
-    if (pairsOverride?.length) {
-      console.log(`[Scout] Priority mode — ${pairsOverride.length} pairs`);
+    if (priorityPairsData?.pairs?.length) {
+      console.log(`[Scout] Priority mode active for setup queue, ignored for scout card coverage (${priorityPairsData.pairs.length} priority pairs)`);
     }
-    latestScoutResults = await runScoutScan(tf, pairsOverride);
+    latestScoutResults = await runScoutScan(tf);
     lastScanTime = new Date().toISOString();
     res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
   } catch (e: any) {

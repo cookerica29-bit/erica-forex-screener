@@ -992,7 +992,7 @@
       if (!res.ok) return;
       const data = await res.json();
       if (!data.reports?.length) return;
-      allSetups = (data.reports || []).filter(r => isVisiblePair(r.pair));
+      allSetups = data.reports || [];
       allNearMisses = [];
       if (data.lastScanTime) {
         document.getElementById('lastScan').textContent = `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
@@ -1031,7 +1031,7 @@
       const res = await fetch(`/api/scout?tf=${selectedScanTf}`, { method: 'POST' });
       if (!res.ok) throw new Error(`Scout scan failed: ${res.status}`);
       const data = await res.json();
-      allSetups = (data.reports || []).filter(r => isVisiblePair(r.pair));
+      allSetups = data.reports || [];
       document.getElementById('lastScan').textContent = `Last scan: ${new Date().toLocaleTimeString()}`;
     } catch (e) {
       console.error('Scout scan failed:', e);
