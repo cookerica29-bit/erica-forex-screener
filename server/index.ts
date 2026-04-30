@@ -25,6 +25,45 @@ let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
 
+function getStockScannerBaseUrl(): string | null {
+  const raw = process.env.STOCK_SCANNER_URL?.trim();
+  if (!raw) return null;
+  return raw.replace(/\/+$/, '');
+}
+
+async function proxyStockScanner(route: string, pathname: string, query: Record<string, unknown>, res: express.Response) {
+  const baseUrl = getStockScannerBaseUrl();
+  if (!baseUrl) {
+    return res.status(503).json({
+      ok: false,
+      route,
+      configured: false,
+      error: 'STOCK_SCANNER_URL is not configured',
+    });
+  }
+
+  const url = new URL(`${baseUrl}${pathname}`);
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) url.searchParams.append(key, String(item));
+    } else {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  try {
+    const response = await fetch(url);
+    const text = await response.text();
+    res.status(response.status);
+    res.type(response.headers.get('content-type') || 'application/json');
+    return res.send(text);
+  } catch (e: any) {
+    console.error('[Stock Proxy] Request failed:', e?.message || e);
+    return res.status(502).json({ error: 'Stock scanner unavailable' });
+  }
+}
+
 // Priority pairs — pushed by Claude after each forex scan via POST /api/priority-pairs
 // When set, the scanner and frontend only scan these pairs instead of the full 16-pair list.
 interface PriorityPairsData {
@@ -289,6 +328,17 @@ app.post('/api/scout', async (req, res) => {
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── Stock Scout Proxy API ────────────────────────────────────────────────────
+// Thin proxy to the existing stock scanner service. Keeps stock logic outside
+// this app and avoids coupling it to forex scheduled scans.
+app.get('/api/stock/scan', async (req, res) => {
+  return proxyStockScanner('/api/stock/scan', '/api/scan', req.query, res);
+});
+
+app.get('/api/stock/watchlist', async (req, res) => {
+  return proxyStockScanner('/api/stock/watchlist', '/api/watchlist', req.query, res);
 });
 
 app.get('/api/debug', async (req, res) => {

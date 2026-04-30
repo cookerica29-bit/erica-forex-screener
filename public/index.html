@@ -275,8 +275,40 @@
     .scout-indicators { display:flex; gap:14px; margin-top:8px; }
     .scout-ind-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; display:block; margin-bottom:1px; }
     .scout-ind-value { font-size:12px; font-weight:600; color:var(--slate); }
+    .stock-page { padding: 0 0 24px; }
+    .stock-controls { padding: 14px 20px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; border-bottom:1px solid var(--border); }
+    .stock-input { flex:1; min-width:260px; max-width:440px; padding:8px 12px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:12px; font-family:inherit; outline:none; }
+    .stock-input::placeholder { color:var(--slate-dim); }
+    .stock-summary { padding:12px 20px 0; color:var(--slate-dim); font-size:11px; }
+    .stock-grid { padding:16px 24px; display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:16px; }
+    .stock-card { background:linear-gradient(135deg, #0D1117 0%, #0a0f16 100%); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .stock-card.ready { border-color:rgba(0,255,136,0.32); }
+    .stock-card.building { border-color:rgba(245,166,35,0.32); }
+    .stock-card.no-trade { border-color:rgba(255,59,92,0.22); opacity:.88; }
+    .stock-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:14px; border-bottom:1px solid rgba(255,255,255,0.06); }
+    .stock-ticker { font-size:20px; font-weight:900; letter-spacing:.05em; }
+    .stock-price { font-size:12px; color:var(--blue); margin-top:3px; font-weight:700; }
+    .stock-stage { font-size:10px; font-weight:900; text-transform:uppercase; border-radius:99px; border:1px solid; padding:4px 9px; white-space:nowrap; }
+    .stock-stage.ready { color:var(--green); border-color:rgba(0,255,136,0.42); background:rgba(0,255,136,0.09); }
+    .stock-stage.building { color:var(--gold); border-color:rgba(245,166,35,0.42); background:rgba(245,166,35,0.09); }
+    .stock-stage.no-trade { color:var(--red); border-color:rgba(255,59,92,0.36); background:rgba(255,59,92,0.08); }
+    .stock-body { padding:14px; }
+    .stock-metrics { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:7px; margin-bottom:10px; }
+    .stock-metric { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); border-radius:7px; padding:7px 9px; min-width:0; }
+    .stock-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px; }
+    .stock-value { font-size:11px; color:var(--text); line-height:1.35; overflow-wrap:anywhere; }
+    .stock-value.blocked { color:var(--red); }
+    .stock-coach, .stock-missing { border-radius:7px; padding:8px 10px; font-size:11px; line-height:1.45; margin-top:8px; }
+    .stock-coach { border:1px solid rgba(245,166,35,0.22); background:rgba(245,166,35,0.06); color:#fcd34d; }
+    .stock-missing { border:1px solid rgba(96,165,250,0.2); background:rgba(96,165,250,0.06); color:#c7d2fe; }
+    .stock-panel-title { color:var(--text); font-weight:900; text-transform:uppercase; letter-spacing:.08em; font-size:10px; margin-bottom:5px; }
+    .stock-list-item + .stock-list-item { margin-top:4px; }
+    .stock-near-title { padding:4px 24px 0; color:var(--slate-dim); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
     @media (max-width: 768px) {
       .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
+      .stock-grid { grid-template-columns:1fr; padding:12px; }
+      .stock-controls { align-items:stretch; }
+      .stock-input, .stock-controls .scan-btn { width:100%; max-width:none; }
       #bot-challenge > div:first-child { grid-template-columns: 1fr !important; }
       .tbl-wrap { overflow-x: auto; }
       #bot-positions-body td { font-size: 11px; padding: 8px 6px; }
@@ -332,6 +364,7 @@
 
 <div class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
+  <button class="tab-btn" onclick="switchTab('stock')" id="tab-stock">📈 Stock Scout</button>
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
   <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
   <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">🧮 Calculator</button>
@@ -436,6 +469,35 @@
 
 <div id="nearMissContent"></div>
 
+</div>
+
+<div id="content-stock" class="tab-content">
+  <div class="stock-page">
+    <div class="stock-controls">
+      <input class="stock-input" type="text" id="stockTickerInput" placeholder="Custom tickers (e.g. TSLA,META,NVDA) — leave blank for full stock watchlist" />
+      <div class="control-group">
+        <span class="control-label">Stage</span>
+        <button class="pill active" onclick="setStockStageFilter('ALL')" id="stock-stage-ALL">All</button>
+        <button class="pill" onclick="setStockStageFilter('A+ READY')" id="stock-stage-A_READY">A+</button>
+        <button class="pill" onclick="setStockStageFilter('BUILDING / WATCHLIST')" id="stock-stage-BUILDING">Building</button>
+        <button class="pill" onclick="setStockStageFilter('RANGE / NO TRADE')" id="stock-stage-NO_TRADE">No Trade</button>
+      </div>
+      <button class="scan-btn" onclick="runStockScan()" id="stockScanBtn">
+        <span id="stockScanIcon">↻</span> Scan Stocks
+      </button>
+      <button class="push-btn" onclick="clearStockScout()" style="border-color:rgba(148,163,184,0.25);background:transparent;color:var(--slate);">Clear</button>
+      <span id="stockStatus" style="font-size:11px;color:var(--slate-dim);"></span>
+    </div>
+    <div class="stock-summary" id="stockSummary">Stock Scout uses the existing stock scanner service through STOCK_SCANNER_URL.</div>
+    <div id="stockMain">
+      <div class="empty-state">
+        <div style="font-size:48px;opacity:0.35">📈</div>
+        <div>Scan stocks from the existing Stock Scanner service</div>
+        <div id="stockWatchlistHint" style="font-size:11px;opacity:0.65;">Loading watchlist...</div>
+      </div>
+    </div>
+    <div id="stockNearMiss"></div>
+  </div>
 </div>
 
 <div id="content-calculator" class="tab-content">
@@ -672,6 +734,10 @@
   let nearMissOpen = false;
   let priorityPairsPayload = null;
   let priorityWatchlistRows = [];
+  let stockRows = [];
+  let stockNearMissRows = [];
+  let stockStageFilter = 'ALL';
+  let stockWatchlistLoaded = false;
 
   const FULL_SCAN_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','AUD_USD','NZD_USD','EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY','EUR_GBP','EUR_AUD','XAU_USD','XAG_USD'];
   // Pair list — overwritten on load from /api/priority-pairs; falls back to full 16 pairs
@@ -1625,6 +1691,157 @@
   function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...':' Scan';}
   function showLoading(){const modeLabel=currentScanLabel();document.getElementById('mainContent').innerHTML=`<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCOUTING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · ${modeLabel}</div></div></div>`;document.getElementById('resultCount').textContent='';['s-total','s-high','s-bullish','s-bearish','s-neutral','s-choch'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='—';});}
 
+  function stockStageClass(stage) {
+    if (stage === 'A+ READY') return 'ready';
+    if (stage === 'BUILDING / WATCHLIST') return 'building';
+    return 'no-trade';
+  }
+
+  function stockStageButtonId(stage) {
+    if (stage === 'A+ READY') return 'A_READY';
+    if (stage === 'BUILDING / WATCHLIST') return 'BUILDING';
+    if (stage === 'RANGE / NO TRADE') return 'NO_TRADE';
+    return 'ALL';
+  }
+
+  function setStockStageFilter(stage) {
+    stockStageFilter = stage;
+    ['ALL','A_READY','BUILDING','NO_TRADE'].forEach(id => {
+      const el = document.getElementById('stock-stage-' + id);
+      if (el) el.className = 'pill' + (stockStageButtonId(stage) === id ? ' active' : '');
+    });
+    renderStockScout();
+  }
+
+  async function loadStockWatchlist() {
+    if (stockWatchlistLoaded) return;
+    const hint = document.getElementById('stockWatchlistHint');
+    try {
+      const res = await fetch('/api/stock/watchlist');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Stock watchlist failed: ${res.status}`);
+      const list = data.watchlist || [];
+      stockWatchlistLoaded = true;
+      if (hint) hint.textContent = list.length ? `Default watchlist: ${list.slice(0, 10).join(', ')}${list.length > 10 ? ` +${list.length - 10} more` : ''}` : 'Default stock watchlist ready';
+    } catch (e) {
+      if (hint) hint.textContent = e.message || 'Stock scanner URL not configured';
+    }
+  }
+
+  function setStockScanLoading(loading) {
+    const btn = document.getElementById('stockScanBtn');
+    const icon = document.getElementById('stockScanIcon');
+    if (btn) btn.disabled = loading;
+    if (icon) icon.className = loading ? 'spin' : '';
+  }
+
+  async function runStockScan() {
+    const input = document.getElementById('stockTickerInput')?.value?.trim() || '';
+    const status = document.getElementById('stockStatus');
+    setStockScanLoading(true);
+    if (status) status.textContent = 'Scanning...';
+    document.getElementById('stockMain').innerHTML = '<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCOUTING STOCK WATCHLIST...</div><div class="loading-sub">Proxying existing stock scanner service</div></div></div>';
+    document.getElementById('stockNearMiss').innerHTML = '';
+    try {
+      const url = input ? `/api/stock/scan?tickers=${encodeURIComponent(input)}` : '/api/stock/scan';
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Stock scan failed: ${res.status}`);
+      stockRows = data.rows || [];
+      stockNearMissRows = data.near_miss || [];
+      if (status) status.textContent = `Done · ${new Date().toLocaleTimeString()}`;
+      renderStockScout();
+    } catch (e) {
+      stockRows = [];
+      stockNearMissRows = [];
+      if (status) status.textContent = `Error: ${e.message}`;
+      document.getElementById('stockMain').innerHTML = `<div class="empty-state"><div style="font-size:32px;opacity:0.3">⚠</div><div>${escapeHtml(e.message || 'Stock scan failed')}</div><div style="font-size:11px;opacity:0.65;">Check STOCK_SCANNER_URL and the stock scanner service.</div></div>`;
+    } finally {
+      setStockScanLoading(false);
+    }
+  }
+
+  function clearStockScout() {
+    stockRows = [];
+    stockNearMissRows = [];
+    document.getElementById('stockStatus').textContent = '';
+    document.getElementById('stockSummary').textContent = 'Stock Scout uses the existing stock scanner service through STOCK_SCANNER_URL.';
+    document.getElementById('stockMain').innerHTML = '<div class="empty-state"><div style="font-size:48px;opacity:0.35">📈</div><div>Scan stocks from the existing Stock Scanner service</div><div style="font-size:11px;opacity:0.65;">Forex logic and scheduled scans remain separate.</div></div>';
+    document.getElementById('stockNearMiss').innerHTML = '';
+  }
+
+  function stockPassesStage(row) {
+    if (stockStageFilter === 'ALL') return true;
+    return (row.trade_eval?.trade_stage || 'RANGE / NO TRADE') === stockStageFilter;
+  }
+
+  function renderStockScout() {
+    const rows = stockRows.filter(stockPassesStage);
+    const near = stockNearMissRows.filter(stockPassesStage);
+    const total = stockRows.length + stockNearMissRows.length;
+    const visible = rows.length + near.length;
+    const ready = [...stockRows, ...stockNearMissRows].filter(s => s.trade_eval?.trade_stage === 'A+ READY').length;
+    const building = [...stockRows, ...stockNearMissRows].filter(s => s.trade_eval?.trade_stage === 'BUILDING / WATCHLIST').length;
+    const noTrade = total - ready - building;
+    document.getElementById('stockSummary').textContent = `${visible} of ${total} stock scout card${total !== 1 ? 's' : ''} shown · ${ready} A+ Ready · ${building} Building · ${noTrade} No Trade`;
+    document.getElementById('stockMain').innerHTML = rows.length
+      ? `<div class="stock-grid">${rows.map(renderStockCard).join('')}</div>`
+      : '<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔎</div><div>No qualified stock setups match this filter</div></div>';
+    document.getElementById('stockNearMiss').innerHTML = near.length
+      ? `<div class="stock-near-title">Scout Cards — Developing / No Trade (${near.length})</div><div class="stock-grid">${near.map(renderStockCard).join('')}</div>`
+      : '';
+  }
+
+  function formatStockMoney(v) {
+    return v == null || Number.isNaN(Number(v)) ? '—' : `$${Number(v).toFixed(2)}`;
+  }
+
+  function renderStockList(title, items, cls) {
+    const list = (items || []).filter(Boolean);
+    if (!list.length) return '';
+    return `<div class="${cls}"><div class="stock-panel-title">${title}</div>${list.map(x => `<div class="stock-list-item">${escapeHtml(x)}</div>`).join('')}</div>`;
+  }
+
+  function renderStockCard(s) {
+    const ev = s.trade_eval || {};
+    const q = s.quality || {};
+    const room = ev.room_to_target || {};
+    const stage = ev.trade_stage || 'RANGE / NO TRADE';
+    const stageCls = stockStageClass(stage);
+    const roomTarget = room.target != null ? formatStockMoney(room.target) : '—';
+    const roomPct = room.percent_to_target != null ? `${room.percent_to_target}%` : '—';
+    const rr = room.estimated_rr != null ? `${Number(room.estimated_rr).toFixed(2)}R` : '—';
+    const dir = s.direction || s.trend || 'NEUTRAL';
+    const dirCls = dir === 'LONG' || dir === 'BULLISH' ? 'long' : dir === 'SHORT' || dir === 'BEARISH' ? 'short' : 'neutral';
+    return `<div class="stock-card ${stageCls}">
+      <div class="stock-card-head">
+        <div>
+          <div class="stock-ticker">${escapeHtml(s.ticker || '—')}</div>
+          <div class="stock-price">${formatStockMoney(s.price)} · RSI ${s.rsi ?? '—'} · ATR ${formatStockMoney(s.atr)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
+          <div class="stock-stage ${stageCls}">${escapeHtml(ev.stage_badge || stage)}</div>
+          <div class="badges" style="justify-content:flex-end;">
+            ${q.grade ? `<span class="badge ${q.grade?.startsWith('A') ? 'bullish' : q.grade?.startsWith('B') ? 'strong' : 'neutral'}">Grade ${escapeHtml(q.grade)}</span>` : ''}
+            <span class="badge ${dirCls}">${escapeHtml(dir)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="stock-body">
+        <div class="stock-metrics">
+          <div class="stock-metric"><div class="stock-label">Location</div><div class="stock-value">${escapeHtml(ev.location || q.location || '—')}${ev.location_percentile != null ? ` · ${ev.location_percentile}%` : ''}</div></div>
+          <div class="stock-metric"><div class="stock-label">Structure Quality</div><div class="stock-value">${escapeHtml(ev.structure_quality || '—')}</div></div>
+          <div class="stock-metric"><div class="stock-label">Displacement</div><div class="stock-value">${escapeHtml(ev.displacement || '—')}${ev.displacement_score ? ` · ${ev.displacement_score} ATR` : ''}</div></div>
+          <div class="stock-metric"><div class="stock-label">Setup Type</div><div class="stock-value">${escapeHtml(ev.setup_type || 'NONE')}</div></div>
+          <div class="stock-metric"><div class="stock-label">BOS / OB</div><div class="stock-value">BOS ${formatStockMoney(s.bos_level)} · OB ${formatStockMoney(s.ob_low)}-${formatStockMoney(s.ob_high)}</div></div>
+          <div class="stock-metric"><div class="stock-label">Room to Target</div><div class="stock-value ${room.blocked ? 'blocked' : ''}">${roomPct} to ${roomTarget} · RR ${rr}${room.blocked ? ' · BLOCKED' : room.clear ? ' · CLEAR' : ''}</div></div>
+        </div>
+        ${renderStockList('Missing for A+', ev.missing_for_a_plus, 'stock-missing')}
+        ${renderStockList('What would make this tradeable?', ev.coaching, 'stock-coach')}
+      </div>
+    </div>`;
+  }
+
   const journalMap = {};
   let journalEntries = [];
   let _journalEntries = [];
@@ -1644,6 +1861,9 @@
       await loadPriorityPairs();
       fetchLatestSetups();
       autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
+    }
+    if (tab === 'stock') {
+      await loadStockWatchlist();
     }
   }
 
