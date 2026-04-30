@@ -245,6 +245,26 @@
     .interest-badge.high { color:var(--gold); border-color:rgba(245,166,35,0.5); background:rgba(245,166,35,0.12); }
     .interest-badge.medium { color:var(--blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.1); }
     .interest-badge.low { color:var(--slate-dim); border-color:rgba(148,163,184,0.2); background:transparent; }
+    .aplus-panel { margin: 0 20px 14px; background: linear-gradient(135deg, rgba(13,17,23,0.98), rgba(8,11,16,0.98)); border: 1px solid rgba(245,166,35,0.22); border-radius: 10px; padding: 14px; }
+    .aplus-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .aplus-title { font-size:13px; color:var(--text); font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+    .aplus-status { font-size:11px; font-weight:900; border-radius:99px; border:1px solid rgba(255,59,92,0.45); color:var(--red); background:rgba(255,59,92,0.08); padding:5px 12px; white-space:nowrap; }
+    .aplus-status.ready { color:var(--green); border-color:rgba(0,255,136,0.45); background:rgba(0,255,136,0.09); }
+    .aplus-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:10px; }
+    .aplus-section { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px; }
+    .aplus-section-title { font-size:9px; color:var(--gold); text-transform:uppercase; letter-spacing:.11em; font-weight:800; margin-bottom:8px; }
+    .aplus-check { display:flex; align-items:center; gap:8px; min-height:26px; color:var(--slate); font-size:11px; cursor:pointer; user-select:none; }
+    .aplus-check input { appearance:none; width:14px; height:14px; border-radius:4px; border:1px solid rgba(148,163,184,0.35); background:var(--inner); display:grid; place-items:center; flex-shrink:0; cursor:pointer; }
+    .aplus-check input:checked { border-color:rgba(0,255,136,0.55); background:rgba(0,255,136,0.12); }
+    .aplus-check input:checked::after { content:''; width:6px; height:3px; border-left:2px solid var(--green); border-bottom:2px solid var(--green); transform:rotate(-45deg); margin-top:-1px; }
+    .aplus-check:has(input:checked) { color:var(--text); }
+    .aplus-entry-row { display:flex; flex-wrap:wrap; gap:8px; }
+    .aplus-entry { display:flex; align-items:center; gap:7px; flex:1; min-width:170px; padding:8px 10px; border:1px solid rgba(96,165,250,0.18); border-radius:8px; background:rgba(96,165,250,0.04); color:var(--slate); font-size:11px; cursor:pointer; user-select:none; }
+    .aplus-entry input { accent-color:var(--blue); }
+    .aplus-entry span { color:var(--text); font-weight:700; }
+    .aplus-actions { display:flex; justify-content:flex-end; margin-top:10px; }
+    .aplus-reset { padding:5px 12px; border-radius:6px; border:1px solid rgba(148,163,184,0.22); background:transparent; color:var(--slate-dim); font-size:10px; font-family:inherit; cursor:pointer; }
+    .aplus-reset:hover { color:var(--text); border-color:rgba(148,163,184,0.45); }
     .scout-levels { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:10px 0; }
     .scout-level-box { background:rgba(255,255,255,0.03); border-radius:8px; padding:8px 10px; border:1px solid rgba(255,255,255,0.06); }
     .scout-level-label { font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--slate-dim); margin-bottom:2px; }
@@ -350,6 +370,58 @@
 <div class="filter-row">
   <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
   <span id="resultCount" class="result-count"></span>
+</div>
+
+<div class="aplus-panel" id="aplusPanel">
+  <div class="aplus-head">
+    <div>
+      <div class="aplus-title">A+ Eval Checklist</div>
+      <div style="font-size:10px;color:var(--slate-dim);margin-top:3px;">Manual pre-trade gate</div>
+    </div>
+    <div class="aplus-status" id="aplusStatus">NO TRADE</div>
+  </div>
+  <div class="aplus-grid">
+    <div class="aplus-section">
+      <div class="aplus-section-title">Bias</div>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">HTF aligned</label>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Clear direction</label>
+    </div>
+    <div class="aplus-section">
+      <div class="aplus-section-title">Location</div>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Premium/Discount valid</label>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Fib 61-79 zone</label>
+    </div>
+    <div class="aplus-section">
+      <div class="aplus-section-title">Liquidity</div>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Sweep taken</label>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Stops cleared</label>
+    </div>
+    <div class="aplus-section">
+      <div class="aplus-section-title">Confirmation</div>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Strong displacement</label>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Real BOS, not weak</label>
+    </div>
+    <div class="aplus-section">
+      <div class="aplus-section-title">Risk/Reward</div>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">1:2 minimum</label>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Clean path to TP</label>
+    </div>
+    <div class="aplus-section">
+      <div class="aplus-section-title">Mental State</div>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Not forcing</label>
+      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Okay missing trade</label>
+    </div>
+  </div>
+  <div class="aplus-section" style="margin-top:10px;">
+    <div class="aplus-section-title">Entry Type</div>
+    <div class="aplus-entry-row">
+      <label class="aplus-entry"><input type="radio" name="aplusEntryType"><div><span>Continuation:</span> break + retest</div></label>
+      <label class="aplus-entry"><input type="radio" name="aplusEntryType"><div><span>Reversal:</span> sweep + displacement</div></label>
+    </div>
+  </div>
+  <div class="aplus-actions">
+    <button class="aplus-reset" onclick="resetAPlusChecklist()">Reset Checklist</button>
+  </div>
 </div>
 
 <div id="mainContent">
@@ -1533,6 +1605,18 @@
     biasFilter = v;
     ['ALL','BULLISH','BEARISH','NEUTRAL'].forEach(x => { const el = document.getElementById('bias-'+x); if(el) { el.className = 'pill' + (x === v ? ' active' : ''); } });
     renderSetups();
+  }
+  function updateAPlusChecklist() {
+    const boxes = Array.from(document.querySelectorAll('[data-aplus-required]'));
+    const ready = boxes.length > 0 && boxes.every(box => box.checked);
+    const status = document.getElementById('aplusStatus');
+    if (!status) return;
+    status.textContent = ready ? 'A+ READY' : 'NO TRADE';
+    status.className = 'aplus-status' + (ready ? ' ready' : '');
+  }
+  function resetAPlusChecklist() {
+    document.querySelectorAll('#aplusPanel input').forEach(input => { input.checked = false; });
+    updateAPlusChecklist();
   }
   // legacy stubs — controls removed but may still be referenced
   function setRR(v){renderSetups();}
