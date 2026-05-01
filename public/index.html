@@ -177,6 +177,17 @@
     .journal-edit-btn { font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--slate-dim); cursor: pointer; font-family: inherit; }
     .journal-edit-btn:hover { color: var(--text); border-color: var(--slate); }
     .journal-edit-panel { margin-top: 10px; padding: 10px; background: var(--inner); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+    .stock-journal-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; }
+    .stock-journal-card.ready { border-color:rgba(0,255,136,0.3); }
+    .stock-journal-card.building { border-color:rgba(245,166,35,0.3); }
+    .stock-journal-card.no-trade { border-color:rgba(255,59,92,0.24); }
+    .stock-journal-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; }
+    .stock-journal-symbol { font-size:17px; font-weight:900; letter-spacing:.04em; }
+    .stock-journal-meta { display:flex; flex-wrap:wrap; gap:5px; margin-top:4px; }
+    .stock-journal-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:7px; margin:10px 0; }
+    .stock-journal-missing { margin-top:8px; padding:8px 10px; border-radius:8px; border:1px solid rgba(96,165,250,0.18); background:rgba(96,165,250,0.05); color:#c7d2fe; font-size:11px; line-height:1.45; }
+    .stock-journal-note { width:100%; min-height:54px; margin-top:8px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--inner); color:var(--text); font-size:11px; font-family:inherit; resize:vertical; }
+    .stock-journal-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
     @media (max-width: 600px) { .journal-stats { grid-template-columns: repeat(3, 1fr); } .journal-levels { grid-template-columns: repeat(3, 1fr); } }
     .breakdown-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .breakdown-label { font-size: 11px; color: var(--slate); min-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -370,6 +381,7 @@
 <div class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
   <button class="tab-btn" onclick="switchTab('stock')" id="tab-stock">📈 Stock Scout</button>
+  <button class="tab-btn" onclick="switchTab('stockjournal')" id="tab-stockjournal">📒 Stock Journal</button>
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
   <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
   <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">🧮 Calculator</button>
@@ -729,6 +741,33 @@
         <div style="font-size:32px;opacity:0.3">📓</div>
         <div>No journal entries yet</div>
         <div style="font-size:11px;">Push setups from the Scanner tab to start tracking</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="content-stockjournal" class="tab-content">
+  <div class="journal-page">
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:14px;font-weight:900;color:var(--text);letter-spacing:.04em;">Stock Journal</div>
+        <div style="font-size:11px;color:var(--slate-dim);margin-top:3px;">Local entries saved from Stock Scout cards.</div>
+      </div>
+      <button onclick="exportStockJournalCSV()" style="margin-left:auto;padding:6px 14px;border-radius:8px;border:1px solid rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);color:var(--green);font-size:11px;font-family:inherit;cursor:pointer;font-weight:600;">Export Stock CSV</button>
+      <button onclick="clearStockJournal()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,59,92,0.28);background:rgba(255,59,92,0.06);color:var(--red);font-size:11px;font-family:inherit;cursor:pointer;font-weight:600;">Clear Stock Journal</button>
+    </div>
+    <div class="journal-stats">
+      <div class="stat-box"><div class="stat-value" id="sj-total" style="color:var(--text)">—</div><div class="stat-label">Total</div></div>
+      <div class="stat-box"><div class="stat-value" id="sj-ready" style="color:var(--green)">—</div><div class="stat-label">A+ Ready</div></div>
+      <div class="stat-box"><div class="stat-value" id="sj-building" style="color:var(--gold)">—</div><div class="stat-label">Building</div></div>
+      <div class="stat-box"><div class="stat-value" id="sj-no-trade" style="color:var(--red)">—</div><div class="stat-label">No Trade</div></div>
+      <div class="stat-box"><div class="stat-value" id="sj-avg-rr" style="color:var(--blue)">—</div><div class="stat-label">Avg RR</div></div>
+    </div>
+    <div id="stockJournalList" class="journal-list">
+      <div class="empty-journal">
+        <div style="font-size:32px;opacity:0.3">📒</div>
+        <div>No stock journal entries yet</div>
+        <div style="font-size:11px;">Click Add to Journal on a Stock Scout card.</div>
       </div>
     </div>
   </div>
@@ -1840,7 +1879,8 @@
     const entries = loadStockJournal();
     entries.push(buildStockJournalEntry(setup));
     localStorage.setItem(STOCK_JOURNAL_KEY, JSON.stringify(entries));
-    showStockToast('Saved to journal');
+    renderStockJournal();
+    showStockToast('Saved to Stock Journal.');
   }
 
   function showStockToast(message) {
@@ -1850,6 +1890,124 @@
     toast.classList.add('show');
     clearTimeout(stockToastTimer);
     stockToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+  }
+
+  function stockJournalStageClass(stage) {
+    if (stage === 'A+ READY') return 'ready';
+    if (stage === 'BUILDING / WATCHLIST') return 'building';
+    return 'no-trade';
+  }
+
+  function renderStockJournal() {
+    const entries = loadStockJournal();
+    const total = entries.length;
+    const ready = entries.filter(e => e.a_plus_ready || e.trade_stage === 'A+ READY').length;
+    const building = entries.filter(e => e.trade_stage === 'BUILDING / WATCHLIST').length;
+    const noTrade = total - ready - building;
+    const rrValues = entries.map(e => Number(e.rr)).filter(Number.isFinite);
+    const avgRr = rrValues.length ? (rrValues.reduce((a, b) => a + b, 0) / rrValues.length).toFixed(2) : '—';
+
+    const statMap = {
+      'sj-total': total,
+      'sj-ready': ready,
+      'sj-building': building,
+      'sj-no-trade': noTrade,
+      'sj-avg-rr': avgRr,
+    };
+    Object.entries(statMap).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    });
+
+    const list = document.getElementById('stockJournalList');
+    if (!list) return;
+    if (!entries.length) {
+      list.innerHTML = '<div class="empty-journal"><div style="font-size:32px;opacity:0.3">📒</div><div>No stock journal entries yet</div><div style="font-size:11px;">Click Add to Journal on a Stock Scout card.</div></div>';
+      return;
+    }
+
+    list.innerHTML = entries.slice().reverse().map((entry, reverseIdx) => {
+      const idx = entries.length - 1 - reverseIdx;
+      const stage = entry.trade_stage || 'RANGE / NO TRADE';
+      const cls = stockJournalStageClass(stage);
+      const missing = Array.isArray(entry.missing_for_a_plus) ? entry.missing_for_a_plus : [];
+      const date = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : 'No timestamp';
+      const rr = entry.rr == null || Number.isNaN(Number(entry.rr)) ? '—' : `${Number(entry.rr).toFixed(2)}R`;
+      return `<div class="stock-journal-card ${cls}">
+        <div class="stock-journal-top">
+          <div>
+            <div class="stock-journal-symbol">${escapeHtml(entry.ticker || '—')}</div>
+            <div class="stock-journal-meta">
+              <span class="stock-stage ${cls}">${escapeHtml(stage)}</span>
+              <span class="badge ${entry.direction === 'LONG' || entry.direction === 'BULLISH' ? 'long' : entry.direction === 'SHORT' || entry.direction === 'BEARISH' ? 'short' : 'neutral'}">${escapeHtml(entry.direction || '—')}</span>
+              <span class="badge neutral">STOCK</span>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div class="journal-rr ${Number(entry.rr) >= 2 ? 'positive' : ''}">${rr}</div>
+            <div style="font-size:10px;color:var(--slate-dim);">${escapeHtml(date)}</div>
+          </div>
+        </div>
+        <div class="stock-journal-grid">
+          <div class="stock-metric"><div class="stock-label">Price</div><div class="stock-value">${formatStockMoney(entry.price)}</div></div>
+          <div class="stock-metric"><div class="stock-label">Setup Type</div><div class="stock-value">${escapeHtml(entry.setup_type || '—')}</div></div>
+          <div class="stock-metric"><div class="stock-label">Structure</div><div class="stock-value">${escapeHtml(entry.structure || '—')}</div></div>
+          <div class="stock-metric"><div class="stock-label">A+ Ready</div><div class="stock-value">${entry.a_plus_ready ? 'Yes' : 'No'}</div></div>
+        </div>
+        ${missing.length ? `<div class="stock-journal-missing"><div class="stock-panel-title">Missing for A+</div>${missing.map(x => `<div class="stock-list-item">${escapeHtml(x)}</div>`).join('')}</div>` : ''}
+        <textarea class="stock-journal-note" placeholder="Notes..." oninput="updateStockJournalNote(${idx}, this.value)">${escapeHtml(entry.notes || '')}</textarea>
+        <div class="stock-journal-actions">
+          <button class="journal-edit-btn" onclick="setStockJournalOutcome(${idx}, null)">Pending</button>
+          <button class="journal-edit-btn" onclick="setStockJournalOutcome(${idx}, 'WIN')">Win</button>
+          <button class="journal-edit-btn" onclick="setStockJournalOutcome(${idx}, 'LOSS')">Loss</button>
+          <button class="journal-edit-btn" onclick="deleteStockJournalEntry(${idx})">Delete</button>
+          <span style="font-size:10px;color:var(--slate-dim);">Outcome: ${escapeHtml(entry.outcome || 'Pending')}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function updateStockJournalNote(idx, notes) {
+    const entries = loadStockJournal();
+    if (!entries[idx]) return;
+    entries[idx].notes = notes;
+    localStorage.setItem(STOCK_JOURNAL_KEY, JSON.stringify(entries));
+  }
+
+  function setStockJournalOutcome(idx, outcome) {
+    const entries = loadStockJournal();
+    if (!entries[idx]) return;
+    entries[idx].outcome = outcome;
+    localStorage.setItem(STOCK_JOURNAL_KEY, JSON.stringify(entries));
+    renderStockJournal();
+  }
+
+  function deleteStockJournalEntry(idx) {
+    const entries = loadStockJournal();
+    if (!entries[idx]) return;
+    entries.splice(idx, 1);
+    localStorage.setItem(STOCK_JOURNAL_KEY, JSON.stringify(entries));
+    renderStockJournal();
+  }
+
+  function clearStockJournal() {
+    if (!confirm('Clear all local stock journal entries?')) return;
+    localStorage.removeItem(STOCK_JOURNAL_KEY);
+    renderStockJournal();
+  }
+
+  function exportStockJournalCSV() {
+    const entries = loadStockJournal();
+    if (!entries.length) { alert('No stock journal entries to export.'); return; }
+    const headers = ['timestamp','ticker','direction','trade_stage','setup_type','structure','price','rr','a_plus_ready','missing_for_a_plus','notes','outcome'];
+    const rows = entries.map(e => headers.map(h => {
+      const value = Array.isArray(e[h]) ? e[h].join('; ') : e[h] ?? '';
+      return `"${String(value).replace(/"/g, '""')}"`;
+    }).join(','));
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent([headers.join(','), ...rows].join('\n'));
+    a.download = `stock_journal_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
   }
 
   function renderStockList(title, items, cls) {
@@ -1914,6 +2072,7 @@
     document.getElementById('tab-' + tab).classList.add('active');
     document.getElementById('content-' + tab).classList.add('active');
     if (tab === 'journal') await loadJournal();
+    if (tab === 'stockjournal') renderStockJournal();
     if (tab === 'analytics') await loadAnalytics();
     if (tab === 'calculator') { document.getElementById('calc-account').value = '25308'; calcPosition(); }
     clearInterval(autoRefreshTimer);
