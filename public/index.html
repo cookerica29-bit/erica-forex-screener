@@ -304,6 +304,11 @@
     .stock-panel-title { color:var(--text); font-weight:900; text-transform:uppercase; letter-spacing:.08em; font-size:10px; margin-bottom:5px; }
     .stock-list-item + .stock-list-item { margin-top:4px; }
     .stock-near-title { padding:4px 24px 0; color:var(--slate-dim); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+    .stock-card-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 14px 14px; }
+    .stock-journal-btn { padding:7px 12px; border-radius:7px; border:1px solid rgba(96,165,250,0.35); background:rgba(96,165,250,0.08); color:var(--blue); font-size:11px; font-weight:800; font-family:inherit; cursor:pointer; }
+    .stock-journal-btn:hover { background:rgba(96,165,250,0.16); border-color:rgba(96,165,250,0.55); }
+    .stock-toast { position:fixed; right:18px; bottom:18px; z-index:1000; border:1px solid rgba(0,255,136,0.45); background:rgba(8,11,16,0.96); color:var(--green); border-radius:8px; box-shadow:0 12px 32px rgba(0,0,0,0.35); font-size:12px; font-weight:800; opacity:0; padding:10px 14px; pointer-events:none; transform:translateY(8px); transition:opacity .18s, transform .18s; }
+    .stock-toast.show { opacity:1; transform:translateY(0); }
     @media (max-width: 768px) {
       .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
       .stock-grid { grid-template-columns:1fr; padding:12px; }
@@ -489,6 +494,7 @@
       <span id="stockStatus" style="font-size:11px;color:var(--slate-dim);"></span>
     </div>
     <div class="stock-summary" id="stockSummary">Stock Scout uses the existing stock scanner service through STOCK_SCANNER_URL.</div>
+    <div id="stockJournalBuildMarker" style="margin:10px 24px 0;padding:8px 10px;border:1px solid rgba(0,255,136,0.42);border-radius:8px;background:rgba(0,255,136,0.08);color:var(--green);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">Stock Journal Button Build Active</div>
     <div id="stockMain">
       <div class="empty-state">
         <div style="font-size:48px;opacity:0.35">📈</div>
@@ -728,7 +734,10 @@
   </div>
 </div>
 
+<div id="stockToast" class="stock-toast" role="status" aria-live="polite"></div>
+
 <script>
+  const STOCK_JOURNAL_KEY = 'stock_journal';
   let allSetups = [], allNearMisses = [], interestFilter = 'ALL', biasFilter = 'ALL', scanning = false;
   let autoRefreshTimer = null;
   let nearMissOpen = false;
@@ -738,6 +747,7 @@
   let stockNearMissRows = [];
   let stockStageFilter = 'ALL';
   let stockWatchlistLoaded = false;
+  let stockToastTimer = null;
 
   const FULL_SCAN_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','AUD_USD','NZD_USD','EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY','EUR_GBP','EUR_AUD','XAU_USD','XAG_USD'];
   // Pair list — overwritten on load from /api/priority-pairs; falls back to full 16 pairs
@@ -1796,6 +1806,52 @@
     return v == null || Number.isNaN(Number(v)) ? '—' : `$${Number(v).toFixed(2)}`;
   }
 
+  function loadStockJournal() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STOCK_JOURNAL_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function buildStockJournalEntry(setup) {
+    const ev = setup?.trade_eval || {};
+    const room = ev.room_to_target || {};
+    const tradeStage = ev.trade_stage || 'RANGE / NO TRADE';
+    return {
+      timestamp: new Date().toISOString(),
+      ticker: setup?.ticker || '',
+      direction: setup?.direction || setup?.trend || '',
+      trade_stage: tradeStage,
+      setup_type: ev.setup_type || '',
+      structure: setup?.structureLabel || ev.structure_quality || setup?.structure || setup?.trend || '',
+      price: setup?.price == null ? null : Number(setup.price),
+      rr: room.estimated_rr == null ? null : Number(room.estimated_rr),
+      a_plus_ready: tradeStage === 'A+ READY',
+      missing_for_a_plus: Array.isArray(ev.missing_for_a_plus) ? ev.missing_for_a_plus : [],
+      notes: '',
+      outcome: null,
+    };
+  }
+
+  function addStockSetupToJournal(setupJson) {
+    const setup = typeof setupJson === 'string' ? JSON.parse(setupJson) : setupJson;
+    const entries = loadStockJournal();
+    entries.push(buildStockJournalEntry(setup));
+    localStorage.setItem(STOCK_JOURNAL_KEY, JSON.stringify(entries));
+    showStockToast('Saved to journal');
+  }
+
+  function showStockToast(message) {
+    const toast = document.getElementById('stockToast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(stockToastTimer);
+    stockToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+  }
+
   function renderStockList(title, items, cls) {
     const list = (items || []).filter(Boolean);
     if (!list.length) return '';
@@ -1813,6 +1869,7 @@
     const rr = room.estimated_rr != null ? `${Number(room.estimated_rr).toFixed(2)}R` : '—';
     const dir = s.direction || s.trend || 'NEUTRAL';
     const dirCls = dir === 'LONG' || dir === 'BULLISH' ? 'long' : dir === 'SHORT' || dir === 'BEARISH' ? 'short' : 'neutral';
+    const encoded = encodeURIComponent(JSON.stringify(s)).replace(/'/g, '%27');
     return `<div class="stock-card ${stageCls}">
       <div class="stock-card-head">
         <div>
@@ -1838,6 +1895,9 @@
         </div>
         ${renderStockList('Missing for A+', ev.missing_for_a_plus, 'stock-missing')}
         ${renderStockList('What would make this tradeable?', ev.coaching, 'stock-coach')}
+      </div>
+      <div class="stock-card-actions">
+        <button class="stock-journal-btn" onclick="addStockSetupToJournal(decodeURIComponent('${encoded}'))">Add to Journal</button>
       </div>
     </div>`;
   }
