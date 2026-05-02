@@ -293,6 +293,9 @@
     .stock-summary { padding:12px 20px 0; color:var(--slate-dim); font-size:11px; }
     .stock-grid { padding:16px 24px; display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:16px; }
     .stock-card { background:linear-gradient(135deg, #0D1117 0%, #0a0f16 100%); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .stock-card.a-plus-alert { border-color:rgba(0,255,136,0.85); box-shadow:0 0 0 1px rgba(0,255,136,0.42), 0 0 24px rgba(0,255,136,0.24); animation:stockAPlusPulse 1.4s ease-in-out 3; }
+    .stock-card.a-plus-alert .stock-card-head { background:rgba(0,255,136,0.07); }
+    @keyframes stockAPlusPulse { 0%,100%{box-shadow:0 0 0 1px rgba(0,255,136,0.32),0 0 16px rgba(0,255,136,0.14);} 50%{box-shadow:0 0 0 2px rgba(0,255,136,0.75),0 0 32px rgba(0,255,136,0.34);} }
     .stock-card.ready { border-color:rgba(0,255,136,0.32); }
     .stock-card.building { border-color:rgba(245,166,35,0.32); }
     .stock-card.no-trade { border-color:rgba(255,59,92,0.22); opacity:.88; }
@@ -316,6 +319,9 @@
     .stock-list-item + .stock-list-item { margin-top:4px; }
     .stock-near-title { padding:4px 24px 0; color:var(--slate-dim); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
     .stock-card-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 14px 14px; }
+    .stock-sound-status { color:var(--slate-dim); font-size:11px; font-weight:700; }
+    .stock-sound-status.enabled { color:var(--green); }
+    .stock-sound-status.muted { color:var(--slate-dim); }
     .stock-journal-btn { padding:7px 12px; border-radius:7px; border:1px solid rgba(96,165,250,0.35); background:rgba(96,165,250,0.08); color:var(--blue); font-size:11px; font-weight:800; font-family:inherit; cursor:pointer; }
     .stock-journal-btn:hover { background:rgba(96,165,250,0.16); border-color:rgba(96,165,250,0.55); }
     .stock-toast { position:fixed; right:18px; bottom:18px; z-index:1000; border:1px solid rgba(0,255,136,0.45); background:rgba(8,11,16,0.96); color:var(--green); border-radius:8px; box-shadow:0 12px 32px rgba(0,0,0,0.35); font-size:12px; font-weight:800; opacity:0; padding:10px 14px; pointer-events:none; transform:translateY(8px); transition:opacity .18s, transform .18s; }
@@ -499,6 +505,8 @@
         <button class="pill" onclick="setStockStageFilter('BUILDING / WATCHLIST')" id="stock-stage-BUILDING">Building</button>
         <button class="pill" onclick="setStockStageFilter('RANGE / NO TRADE')" id="stock-stage-NO_TRADE">No Trade</button>
       </div>
+      <button class="push-btn" onclick="toggleStockSoundAlerts()" id="stockSoundBtn" style="border-color:rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);color:var(--green);">Enable Sound Alerts</button>
+      <span id="stockSoundStatus" class="stock-sound-status muted">Sound alerts muted</span>
       <button class="scan-btn" onclick="runStockScan()" id="stockScanBtn">
         <span id="stockScanIcon">↻</span> Scan Stocks
       </button>
@@ -777,6 +785,7 @@
 
 <script>
   const STOCK_JOURNAL_KEY = 'stock_journal';
+  const STOCK_SOUND_ALERTS_KEY = 'stock_sound_alerts_enabled';
   let allSetups = [], allNearMisses = [], interestFilter = 'ALL', biasFilter = 'ALL', scanning = false;
   let autoRefreshTimer = null;
   let nearMissOpen = false;
@@ -787,6 +796,10 @@
   let stockStageFilter = 'ALL';
   let stockWatchlistLoaded = false;
   let stockToastTimer = null;
+  let stockSoundAlertsEnabled = localStorage.getItem(STOCK_SOUND_ALERTS_KEY) === 'true';
+  let stockAudioContext = null;
+  let previousStockTradeStages = new Map();
+  let stockAPlusAlertTickers = new Set();
 
   const FULL_SCAN_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','AUD_USD','NZD_USD','EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY','EUR_GBP','EUR_AUD','XAU_USD','XAG_USD'];
   // Pair list — overwritten on load from /api/priority-pairs; falls back to full 16 pairs
@@ -1784,6 +1797,101 @@
     if (icon) icon.className = loading ? 'spin' : '';
   }
 
+  function getStockStage(row) {
+    return row?.trade_eval?.trade_stage || 'RANGE / NO TRADE';
+  }
+
+  function getStockStageKey(row) {
+    return String(row?.ticker || '').trim().toUpperCase();
+  }
+
+  function detectStockAPlusTransitions(setups) {
+    const nextStages = new Map();
+    const alerts = [];
+    setups.forEach(setup => {
+      const ticker = getStockStageKey(setup);
+      if (!ticker) return;
+      const currentStage = getStockStage(setup);
+      const previousStage = previousStockTradeStages.get(ticker);
+      nextStages.set(ticker, currentStage);
+      if (previousStage !== undefined && previousStage !== 'A+ READY' && currentStage === 'A+ READY') {
+        alerts.push({ ticker, setup, previousStage, currentStage });
+      }
+    });
+    previousStockTradeStages = nextStages;
+    return alerts;
+  }
+
+  function updateStockSoundUi() {
+    const btn = document.getElementById('stockSoundBtn');
+    const status = document.getElementById('stockSoundStatus');
+    if (btn) btn.textContent = stockSoundAlertsEnabled ? 'Disable Sound Alerts' : 'Enable Sound Alerts';
+    if (status) {
+      status.textContent = stockSoundAlertsEnabled ? 'Sound alerts enabled' : 'Sound alerts muted';
+      status.className = `stock-sound-status ${stockSoundAlertsEnabled ? 'enabled' : 'muted'}`;
+    }
+  }
+
+  function ensureStockAudioContext() {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return null;
+    if (!stockAudioContext) stockAudioContext = new AudioCtor();
+    if (stockAudioContext.state === 'suspended') stockAudioContext.resume().catch(() => {});
+    return stockAudioContext;
+  }
+
+  function playStockAPlusPing() {
+    if (!stockSoundAlertsEnabled) return;
+    const ctx = ensureStockAudioContext();
+    if (!ctx) return;
+    const start = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, start);
+    osc.frequency.setValueAtTime(1175, start + 0.08);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.18, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + 0.24);
+  }
+
+  function maybeSendStockAPlusNotification(alert) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const price = alert.setup?.price != null ? formatStockMoney(alert.setup.price) : 'price unavailable';
+    const direction = alert.setup?.direction || alert.setup?.trend || 'direction unavailable';
+    new Notification(`${alert.ticker} A+ READY`, {
+      body: `${alert.previousStage} → ${alert.currentStage} · ${direction} · ${price}`,
+      tag: `stock-a-plus-ready-${alert.ticker}`,
+      renotify: true,
+    });
+  }
+
+  function handleStockAPlusAlert(alert) {
+    console.log(`[STOCK A+ READY] ${alert.ticker} changed from ${alert.previousStage} to ${alert.currentStage}`, alert.setup);
+    playStockAPlusPing();
+    maybeSendStockAPlusNotification(alert);
+  }
+
+  async function toggleStockSoundAlerts() {
+    stockSoundAlertsEnabled = !stockSoundAlertsEnabled;
+    localStorage.setItem(STOCK_SOUND_ALERTS_KEY, stockSoundAlertsEnabled ? 'true' : 'false');
+    if (stockSoundAlertsEnabled) {
+      ensureStockAudioContext();
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+      playStockAPlusPing();
+      showStockToast('Sound alerts enabled');
+    } else {
+      showStockToast('Sound alerts muted');
+    }
+    updateStockSoundUi();
+  }
+
   async function runStockScan() {
     const input = document.getElementById('stockTickerInput')?.value?.trim() || '';
     const status = document.getElementById('stockStatus');
@@ -1796,13 +1904,19 @@
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Stock scan failed: ${res.status}`);
-      stockRows = data.rows || [];
-      stockNearMissRows = data.near_miss || [];
+      const nextRows = data.rows || [];
+      const nextNearMissRows = data.near_miss || [];
+      const aPlusAlerts = detectStockAPlusTransitions([...nextRows, ...nextNearMissRows]);
+      stockAPlusAlertTickers = new Set(aPlusAlerts.map(a => a.ticker));
+      aPlusAlerts.forEach(handleStockAPlusAlert);
+      stockRows = nextRows;
+      stockNearMissRows = nextNearMissRows;
       if (status) status.textContent = `Done · ${new Date().toLocaleTimeString()}`;
       renderStockScout();
     } catch (e) {
       stockRows = [];
       stockNearMissRows = [];
+      stockAPlusAlertTickers = new Set();
       if (status) status.textContent = `Error: ${e.message}`;
       document.getElementById('stockMain').innerHTML = `<div class="empty-state"><div style="font-size:32px;opacity:0.3">⚠</div><div>${escapeHtml(e.message || 'Stock scan failed')}</div><div style="font-size:11px;opacity:0.65;">Check STOCK_SCANNER_URL and the stock scanner service.</div></div>`;
     } finally {
@@ -1813,6 +1927,8 @@
   function clearStockScout() {
     stockRows = [];
     stockNearMissRows = [];
+    previousStockTradeStages = new Map();
+    stockAPlusAlertTickers = new Set();
     document.getElementById('stockStatus').textContent = '';
     document.getElementById('stockSummary').textContent = 'Stock Scout uses the existing stock scanner service through STOCK_SCANNER_URL.';
     document.getElementById('stockMain').innerHTML = '<div class="empty-state"><div style="font-size:48px;opacity:0.35">📈</div><div>Scan stocks from the existing Stock Scanner service</div><div style="font-size:11px;opacity:0.65;">Forex logic and scheduled scans remain separate.</div></div>';
@@ -2028,7 +2144,8 @@
     const dir = s.direction || s.trend || 'NEUTRAL';
     const dirCls = dir === 'LONG' || dir === 'BULLISH' ? 'long' : dir === 'SHORT' || dir === 'BEARISH' ? 'short' : 'neutral';
     const encoded = encodeURIComponent(JSON.stringify(s)).replace(/'/g, '%27');
-    return `<div class="stock-card ${stageCls}">
+    const isAPlusAlert = stockAPlusAlertTickers.has(getStockStageKey(s));
+    return `<div class="stock-card ${stageCls}${isAPlusAlert ? ' a-plus-alert' : ''}">
       <div class="stock-card-head">
         <div>
           <div class="stock-ticker">${escapeHtml(s.ticker || '—')}</div>
@@ -2066,6 +2183,8 @@
   let jFilter = 'ALL';
   let journalView = 'active';
 
+  updateStockSoundUi();
+
   async function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -2082,6 +2201,7 @@
       autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
     }
     if (tab === 'stock') {
+      updateStockSoundUi();
       await loadStockWatchlist();
     }
   }
