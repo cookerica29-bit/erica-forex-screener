@@ -532,7 +532,7 @@
 
       <div class="stat-box" style="text-align:left;padding:20px;margin-bottom:16px;">
         <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px;">🧮 Position Size Calculator</div>
-        <div style="font-size:11px;color:var(--slate-dim);margin-bottom:16px;">💡 Tip: Click "Send to Bot" on any scanner card to auto-fill these values</div>
+        <div style="font-size:11px;color:var(--slate-dim);margin-bottom:16px;">💡 Tip: Click "Send to Calculator" on any scanner card to auto-fill these values</div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
           <div>
@@ -1290,6 +1290,7 @@
     const dp = isJpy ? 3 : 5;
     const f = v => v == null ? '—' : Number(v).toFixed(dp);
     const displaySym = r.displaySymbol || (r.pair || '').replace('_', '/');
+    const encoded = encodeURIComponent(JSON.stringify(r)).replace(/'/g, '%27');
 
     const bosHtml = r.recentBOS
       ? `<div class="scout-struct-row"><span class="scout-struct-label">BOS</span><span style="font-size:11px;color:${r.recentBOS.type === 'bullish' ? 'var(--green)' : 'var(--red)'};">⚡ ${r.recentBOS.type} @ ${f(r.recentBOS.level)}</span></div>`
@@ -1345,6 +1346,7 @@
         </div>
         <div class="scanned-at" style="margin-top:8px;">Scanned: ${new Date(r.scannedAt).toLocaleTimeString()} · OANDA v20</div>
         <div class="card-actions" style="margin-top:10px;">
+          <button class="send-bot-btn" onclick="sendSetupToCalculator(decodeURIComponent('${encoded}'))">Send to Calculator</button>
           <button class="push-btn" id="scout-push-${r.pair}" onclick="toggleScoutJournal('${r.pair}')">📓 Log Trade</button>
         </div>
         <div class="journal-panel" id="scout-journal-${r.pair}" style="display:none;">
@@ -1630,9 +1632,7 @@
     </div>`;
   }
 
-  function fillCalculator(idx) {
-    const setup = allSetups[idx];
-    if (!setup) return;
+  function normalizeCalculatorPair(setup) {
     const pairMap = {
       'EUR_USD':'EURUSD','GBP_USD':'GBPUSD','USD_JPY':'USDJPY',
       'USD_CAD':'USDCAD','USD_CHF':'USDCHF','AUD_USD':'AUDUSD',
@@ -1640,16 +1640,40 @@
       'NZD_JPY':'NZDJPY','CAD_JPY':'CADJPY','EUR_JPY':'EURJPY',
       'EUR_GBP':'EURGBP','EUR_AUD':'EURAUD','XAU_USD':'XAUUSD','XAG_USD':'XAGUSD'
     };
-    const pair = pairMap[setup.symbol || setup.pair] || 'EURUSD';
-    document.getElementById('calc-pair').value = pair;
-    document.getElementById('calc-entry').value = setup.entry || '';
-    document.getElementById('calc-sl').value = setup.sl || setup.stopLoss || '';
-    document.getElementById('calc-tp1').value = setup.tp1 || '';
-    document.getElementById('calc-tp2').value = setup.tp2 || '';
-    document.getElementById('calc-tp3').value = setup.tp3 || '';
+    const raw = String(setup?.symbol || setup?.pair || setup?.displaySymbol || '').trim().toUpperCase();
+    return pairMap[raw] || raw.replace('/', '').replace('_', '') || 'EURUSD';
+  }
+
+  function setCalculatorValue(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = value ?? '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function sendSetupToCalculator(setupJson) {
+    const setup = typeof setupJson === 'string' ? JSON.parse(setupJson) : setupJson;
+    if (!setup) return;
+    const pair = normalizeCalculatorPair(setup);
+    const pairSelect = document.getElementById('calc-pair');
+    if (pairSelect && !Array.from(pairSelect.options).some(o => o.value === pair)) {
+      pairSelect.add(new Option(pair, pair));
+    }
+    setCalculatorValue('calc-pair', pair);
+    setCalculatorValue('calc-entry', setup.entry ?? setup.entryPrice ?? setup.price ?? '');
+    setCalculatorValue('calc-sl', setup.sl ?? setup.stopLoss ?? setup.stop ?? '');
+    setCalculatorValue('calc-tp1', setup.tp1 ?? setup.target1 ?? setup.takeProfit1 ?? '');
+    setCalculatorValue('calc-tp2', setup.tp2 ?? setup.target2 ?? setup.takeProfit2 ?? '');
+    setCalculatorValue('calc-tp3', setup.tp3 ?? setup.target3 ?? setup.takeProfit3 ?? '');
     switchTab('calculator');
     calcPosition();
     window.scrollTo(0, 0);
+  }
+
+  function fillCalculator(idx) {
+    const setup = allSetups[idx];
+    sendSetupToCalculator(setup);
   }
 
   function renderNearMisses() {
