@@ -179,7 +179,7 @@ function detectMomentum(c: Candle, p: Candle, dir: string, atr: number, structur
   const body=Math.abs(c.c-c.o), range=c.h-c.l, bodyRatio=range>0?body/range:0;
   const uw=c.h-Math.max(c.c,c.o), lw=Math.min(c.c,c.o)-c.l;
   const pBody=Math.abs(p.c-p.o), pHigh=Math.max(p.c,p.o), pLow=Math.min(p.c,p.o);
-  if (body < 0.3 * atr) return null;
+  if (body < 0.15 * atr) return null;
   if (dir==='LONG'&&c.c>c.o&&Math.min(c.o,c.c)<=pLow&&Math.max(c.o,c.c)>=pHigh&&body>pBody*0.9)
     return {type:'ENGULFING',strength:80};
   if (dir==='SHORT'&&c.c<c.o&&Math.max(c.o,c.c)>=pHigh&&Math.min(c.o,c.c)<=pLow&&body>pBody*0.9)
@@ -313,8 +313,8 @@ export function analyzeCandles(
   detail.emaSlope  = emaSlope;
   const emaSlopeStrong = Math.abs(emaSlope) > 0.5 * atr;
 
-  if (direction === 'LONG'  && emaSlope <= 0) return { setup: null, reason: `20 EMA not rising for LONG (slope=${emaSlope.toFixed(5)})`, detail };
-  if (direction === 'SHORT' && emaSlope >= 0) return { setup: null, reason: `20 EMA not falling for SHORT (slope=${emaSlope.toFixed(5)})`, detail };
+  // EMA slope is a scoring factor only — flat/counter slope downgrades quality but doesn't reject
+  const emaSlopeAligned = direction === 'LONG' ? emaSlope > 0 : emaSlope < 0;
 
   // 1c. HTF alignment: no counter-trend trades
   const htfSwings     = findSwings(htf.slice(-100));
@@ -322,34 +322,22 @@ export function analyzeCandles(
   const htfSwingLows  = htfSwings.filter(s => s.type === 'low');
   const htfTrend      = getTrend(htfSwings);
   detail.htfTrend = htfTrend;
-  if (htfTrend && htfTrend !== direction) {
-    return { setup: null, reason: `HTF conflict — Daily is ${htfTrend} but setup is ${direction}`, detail };
-  }
+  // HTF conflict downgrades quality to DEVELOPING but no longer hard-rejects
+  const htfConflict = htfTrend !== null && htfTrend !== direction;
 
   // ── GATE 2: PULLBACK QUALITY ───────────────────────────────────────────────
-  // 2a. Not sandwiched between EMA20 and EMA50 (no-man's-land)
-  if (direction === 'LONG') {
-    if (price < ema50 && price > ema20) {
-      return { setup: null, reason: `Price sandwiched between 20 and 50 EMA (${price.toFixed(5)} between ${ema20.toFixed(5)} and ${ema50.toFixed(5)}) — no man's land`, detail };
-    }
-  }
-  if (direction === 'SHORT') {
-    if (price > ema50 && price < ema20) {
-      return { setup: null, reason: `Price sandwiched between 20 and 50 EMA (${price.toFixed(5)} between ${ema50.toFixed(5)} and ${ema20.toFixed(5)}) — no man's land`, detail };
-    }
-  }
-
-  // 2b. Pullback to EMA20: one of the last 3 candles must have touched within 0.5×ATR
+  // 2b. Pullback to EMA20: one of the last 8 candles must have touched within 1.5×ATR
+  // Sandwiched check removed — was blocking valid continuation setups
   let pullbackCandle: Candle | null = null;
   let pullbackIdx = -1;
-  for (let i = lastIdx; i >= lastIdx - 2; i--) {
+  for (let i = lastIdx; i >= lastIdx - 7; i--) {
     const c   = candles[i];
     const ema = ema20arr[i];
     if (!ema) continue;
     const touchDist = direction === 'LONG'
       ? Math.abs(c.l - ema)
       : Math.abs(c.h - ema);
-    if (touchDist <= 0.5 * atr) {
+    if (touchDist <= 1.5 * atr) {
       pullbackCandle = c;
       pullbackIdx    = i;
       break;
@@ -357,7 +345,7 @@ export function analyzeCandles(
   }
   if (!pullbackCandle) return {
     setup: null,
-    reason: `No pullback to 20 EMA in last 3 candles (EMA20=${ema20.toFixed(5)}, price=${price.toFixed(5)})`,
+    reason: `No pullback to 20 EMA in last 8 candles (EMA20=${ema20.toFixed(5)}, price=${price.toFixed(5)})`,
     detail,
   };
 
@@ -374,16 +362,16 @@ export function analyzeCandles(
     const bounceBody = Math.abs(pullbackCandle.c - pullbackCandle.o);
     if (
       direction === 'LONG' &&
-      pullbackCandle.l <= pullbackEma + 0.5 * atr &&
-      pullbackCandle.c > pullbackEma + 0.2 * atr &&
-      bounceBody >= 0.4 * atr
+      pullbackCandle.l <= pullbackEma + 0.75 * atr &&
+      pullbackCandle.c > pullbackEma &&
+      bounceBody >= 0.25 * atr
     ) {
       patternType = 'EMA_BOUNCE';
     } else if (
       direction === 'SHORT' &&
-      pullbackCandle.h >= pullbackEma - 0.5 * atr &&
-      pullbackCandle.c < pullbackEma - 0.2 * atr &&
-      bounceBody >= 0.4 * atr
+      pullbackCandle.h >= pullbackEma - 0.75 * atr &&
+      pullbackCandle.c < pullbackEma &&
+      bounceBody >= 0.25 * atr
     ) {
       patternType = 'EMA_BOUNCE';
     }
@@ -396,11 +384,11 @@ export function analyzeCandles(
 
   // ── GATE 4: RSI ────────────────────────────────────────────────────────────
   if (direction === 'LONG') {
-    if (rsi > 70) return { setup: null, reason: `RSI overbought for LONG (${rsi.toFixed(1)} > 70)`, detail };
-    if (rsi < 40 || rsi > 68) return { setup: null, reason: `RSI outside LONG zone (${rsi.toFixed(1)}, need 40–68)`, detail };
+    if (rsi > 80) return { setup: null, reason: `RSI overbought for LONG (${rsi.toFixed(1)} > 80)`, detail };
+    if (rsi < 25) return { setup: null, reason: `RSI too low for LONG continuation (${rsi.toFixed(1)} < 25)`, detail };
   } else {
-    if (rsi < 30) return { setup: null, reason: `RSI oversold for SHORT (${rsi.toFixed(1)} < 30)`, detail };
-    if (rsi < 35 || rsi > 60) return { setup: null, reason: `RSI outside SHORT zone (${rsi.toFixed(1)}, need 35–60)`, detail };
+    if (rsi < 20) return { setup: null, reason: `RSI oversold for SHORT (${rsi.toFixed(1)} < 20)`, detail };
+    if (rsi > 75) return { setup: null, reason: `RSI too high for SHORT continuation (${rsi.toFixed(1)} > 75)`, detail };
   }
 
   // ── SL / TP (prerequisite for Gate 5) ─────────────────────────────────────
@@ -464,14 +452,14 @@ export function analyzeCandles(
   // ── GATE 5: VIABILITY (COMPOSITE) ─────────────────────────────────────────
   // All five sub-checks must pass. Returns specific sub-reason on failure.
 
-  // 5a. Structure clearance — entry-TF swings (1.5×ATR required)
+  // 5a. Structure clearance — entry-TF swings (0.75×ATR required, down from 1.5)
   if (direction === 'SHORT') {
     const nearestSupport = swingLows
       .filter(s => s.price < price)
       .sort((a, b) => b.price - a.price)[0];
     if (nearestSupport) {
       const dist = price - nearestSupport.price;
-      if (dist < 1.5 * atr) {
+      if (dist < 0.75 * atr) {
         return { setup: null, reason: `Entry too close to support (${granularity}): swing low ${nearestSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
       }
     }
@@ -482,35 +470,12 @@ export function analyzeCandles(
       .sort((a, b) => a.price - b.price)[0];
     if (nearestResistance) {
       const dist = nearestResistance.price - price;
-      if (dist < 1.5 * atr) {
+      if (dist < 0.75 * atr) {
         return { setup: null, reason: `Entry too close to resistance (${granularity}): swing high ${nearestResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
       }
     }
   }
-
-  // 5b. Structure clearance — HTF swings (2.0×ATR required)
-  if (direction === 'SHORT') {
-    const nearestHTFSupport = htfSwingLows
-      .filter(s => s.price < price)
-      .sort((a, b) => b.price - a.price)[0];
-    if (nearestHTFSupport) {
-      const dist = price - nearestHTFSupport.price;
-      if (dist < 2.0 * atr) {
-        return { setup: null, reason: `Entry too close to HTF support: ${HTF_MAP[granularity]} swing low ${nearestHTFSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
-      }
-    }
-  }
-  if (direction === 'LONG') {
-    const nearestHTFResistance = htfSwingHighs
-      .filter(s => s.price > price)
-      .sort((a, b) => a.price - b.price)[0];
-    if (nearestHTFResistance) {
-      const dist = nearestHTFResistance.price - price;
-      if (dist < 2.0 * atr) {
-        return { setup: null, reason: `Entry too close to HTF resistance: ${HTF_MAP[granularity]} swing high ${nearestHTFResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
-      }
-    }
-  }
+  // 5b. HTF structure clearance removed — HTF swings are informational via htfConflict flag
 
   // 5c. Impulse leg strength: last directional swing ≥1.5×ATR (filters chop)
   if (direction === 'LONG') {
@@ -519,7 +484,7 @@ export function analyzeCandles(
     const lastImpulseHigh = impulseHighs[impulseHighs.length - 1];
     if (lastSwingLow && lastImpulseHigh) {
       const impulseSize = lastImpulseHigh.price - lastSwingLow.price;
-      if (impulseSize < 1.5 * atr) {
+      if (impulseSize < 1.0 * atr) {
         return { setup: null, reason: `Weak impulse leg: last upswing ${impulseSize.toFixed(5)} = ${(impulseSize / atr).toFixed(1)}×ATR — likely chop not trend`, detail };
       }
     }
@@ -530,7 +495,7 @@ export function analyzeCandles(
     const lastImpulseLow = impulseLows[impulseLows.length - 1];
     if (lastSwingHigh && lastImpulseLow) {
       const impulseSize = lastSwingHigh.price - lastImpulseLow.price;
-      if (impulseSize < 1.5 * atr) {
+      if (impulseSize < 1.0 * atr) {
         return { setup: null, reason: `Weak impulse leg: last downswing ${impulseSize.toFixed(5)} = ${(impulseSize / atr).toFixed(1)}×ATR — likely chop not trend`, detail };
       }
     }
@@ -541,8 +506,8 @@ export function analyzeCandles(
     if (direction === 'LONG')  return c.h >= tp1 - 0.5 * atr && c.c < tp1;
     else                       return c.l <= tp1 + 0.5 * atr && c.c > tp1;
   }).length;
-  if (tp1RejectCount >= 2) {
-    return { setup: null, reason: `TP1 at ${tp1.toFixed(5)} is a tested/rejected level (${tp1RejectCount} failed closes in last 50 candles) — likely to block again`, detail };
+  if (tp1RejectCount >= 3) {
+    return { setup: null, reason: `TP1 at ${tp1.toFixed(5)} is a heavily tested level (${tp1RejectCount} failed closes in last 50 candles) — likely to block again`, detail };
   }
 
   // 5e. Minimum R:R
@@ -585,6 +550,7 @@ export function analyzeCandles(
   if (patternType === 'STRONG_CLOSE') confluence.push('Strong close off 20 EMA');
   if (patternType === 'EMA_BOUNCE')   confluence.push('EMA bounce close');
   if (htfTrend === direction)         confluence.push('HTF aligned');
+  if (htfConflict)                    confluence.push(`HTF counter-trend (${htfTrend})`);
   if (emaSlopeStrong)                 confluence.push('Strong EMA slope');
   if (rsiIdeal)                       confluence.push('RSI ideal zone');
   if (volRatio >= 1.2)                confluence.push('Volume surge');
@@ -621,8 +587,11 @@ export function analyzeCandles(
 
   const historicalEdge = confluence.some(c => c.startsWith('Historical edge'));
 
-  const quality: 'PREMIUM'|'STRONG'|'DEVELOPING' =
+  // HTF conflict or counter-slope caps at DEVELOPING
+  const qualityRaw: 'PREMIUM'|'STRONG'|'DEVELOPING' =
     score >= 95 ? 'PREMIUM' : score >= 75 ? 'STRONG' : 'DEVELOPING';
+  const quality: 'PREMIUM'|'STRONG'|'DEVELOPING' =
+    (htfConflict || !emaSlopeAligned) ? 'DEVELOPING' : qualityRaw;
 
   const dl = direction === 'LONG' ? 'Bullish' : 'Bearish';
   const patternNames: Record<string,string> = {
@@ -666,7 +635,7 @@ export function analyzeCandles(
   return { setup, reason: 'OK', detail };
 }
 
-export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
+export async function runScan(granularity='H1', minRR=1.3): Promise<Setup[]> {
   const htfGran = HTF_MAP[granularity] || 'D';
   const results: Setup[] = [];
   for (const pair of PAIRS) {
@@ -692,7 +661,7 @@ export async function runScan(granularity='H1', minRR=1.5): Promise<Setup[]> {
 }
 
 export async function debugScan(
-  granularity='H1', minRR=1.5, journalStats: JournalStats = {}, pairsOverride?: string[]
+  granularity='H1', minRR=1.3, journalStats: JournalStats = {}, pairsOverride?: string[]
 ): Promise<DebugResult[]> {
   const htfGran = HTF_MAP[granularity] || 'D';
   const results: DebugResult[] = [];
