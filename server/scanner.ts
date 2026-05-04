@@ -179,7 +179,7 @@ function detectMomentum(c: Candle, p: Candle, dir: string, atr: number, structur
   const body=Math.abs(c.c-c.o), range=c.h-c.l, bodyRatio=range>0?body/range:0;
   const uw=c.h-Math.max(c.c,c.o), lw=Math.min(c.c,c.o)-c.l;
   const pBody=Math.abs(p.c-p.o), pHigh=Math.max(p.c,p.o), pLow=Math.min(p.c,p.o);
-  if (body < 0.15 * atr) return null;
+  if (body < 0.2 * atr) return null;
   if (dir==='LONG'&&c.c>c.o&&Math.min(c.o,c.c)<=pLow&&Math.max(c.o,c.c)>=pHigh&&body>pBody*0.9)
     return {type:'ENGULFING',strength:80};
   if (dir==='SHORT'&&c.c<c.o&&Math.max(c.o,c.c)>=pHigh&&Math.min(c.o,c.c)<=pLow&&body>pBody*0.9)
@@ -330,14 +330,14 @@ export function analyzeCandles(
   // Sandwiched check removed — was blocking valid continuation setups
   let pullbackCandle: Candle | null = null;
   let pullbackIdx = -1;
-  for (let i = lastIdx; i >= lastIdx - 7; i--) {
+  for (let i = lastIdx; i >= lastIdx - 4; i--) {
     const c   = candles[i];
     const ema = ema20arr[i];
     if (!ema) continue;
     const touchDist = direction === 'LONG'
       ? Math.abs(c.l - ema)
       : Math.abs(c.h - ema);
-    if (touchDist <= 1.5 * atr) {
+    if (touchDist <= 1.0 * atr) {
       pullbackCandle = c;
       pullbackIdx    = i;
       break;
@@ -345,7 +345,7 @@ export function analyzeCandles(
   }
   if (!pullbackCandle) return {
     setup: null,
-    reason: `No pullback to 20 EMA in last 8 candles (EMA20=${ema20.toFixed(5)}, price=${price.toFixed(5)})`,
+    reason: `No pullback to 20 EMA in last 5 candles (EMA20=${ema20.toFixed(5)}, price=${price.toFixed(5)})`,
     detail,
   };
 
@@ -384,11 +384,9 @@ export function analyzeCandles(
 
   // ── GATE 4: RSI ────────────────────────────────────────────────────────────
   if (direction === 'LONG') {
-    if (rsi > 80) return { setup: null, reason: `RSI overbought for LONG (${rsi.toFixed(1)} > 80)`, detail };
-    if (rsi < 25) return { setup: null, reason: `RSI too low for LONG continuation (${rsi.toFixed(1)} < 25)`, detail };
+    if (rsi < 35 || rsi > 72) return { setup: null, reason: `RSI outside LONG zone (${rsi.toFixed(1)}, need 35–72)`, detail };
   } else {
-    if (rsi < 20) return { setup: null, reason: `RSI oversold for SHORT (${rsi.toFixed(1)} < 20)`, detail };
-    if (rsi > 75) return { setup: null, reason: `RSI too high for SHORT continuation (${rsi.toFixed(1)} > 75)`, detail };
+    if (rsi < 30 || rsi > 65) return { setup: null, reason: `RSI outside SHORT zone (${rsi.toFixed(1)}, need 30–65)`, detail };
   }
 
   // ── SL / TP (prerequisite for Gate 5) ─────────────────────────────────────
@@ -459,7 +457,7 @@ export function analyzeCandles(
       .sort((a, b) => b.price - a.price)[0];
     if (nearestSupport) {
       const dist = price - nearestSupport.price;
-      if (dist < 0.75 * atr) {
+      if (dist < 1.0 * atr) {
         return { setup: null, reason: `Entry too close to support (${granularity}): swing low ${nearestSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
       }
     }
@@ -470,7 +468,7 @@ export function analyzeCandles(
       .sort((a, b) => a.price - b.price)[0];
     if (nearestResistance) {
       const dist = nearestResistance.price - price;
-      if (dist < 0.75 * atr) {
+      if (dist < 1.0 * atr) {
         return { setup: null, reason: `Entry too close to resistance (${granularity}): swing high ${nearestResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
       }
     }
