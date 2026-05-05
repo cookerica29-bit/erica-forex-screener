@@ -884,11 +884,18 @@ export function scoutAnalyzeCandles(
     }
   }
 
+  // ChoCH override: if the most recent structural event is a ChoCH, it defines the new bias.
+  // This matches how the indicator works — a confirmed ChoCH flips the trend read
+  // regardless of what getTrend says about older swing sequences.
+  let finalBias = bias;
+  if (recentChoCH?.type === 'bearish') finalBias = 'BEARISH';
+  else if (recentChoCH?.type === 'bullish') finalBias = 'BULLISH';
+
   // Interest level: how many bullish factors align
   let interestScore = 0;
-  if (bias !== 'NEUTRAL') interestScore++;
-  if (htfBias !== 'NEUTRAL' && htfBias === bias) interestScore++;
-  if ((bias === 'BULLISH' && zone === 'DISCOUNT') || (bias === 'BEARISH' && zone === 'PREMIUM')) interestScore++;
+  if (finalBias !== 'NEUTRAL') interestScore++;
+  if (htfBias !== 'NEUTRAL' && htfBias === finalBias) interestScore++;
+  if ((finalBias === 'BULLISH' && zone === 'DISCOUNT') || (finalBias === 'BEARISH' && zone === 'PREMIUM')) interestScore++;
   if (recentChoCH) interestScore++;
   if (recentBOS) interestScore++;
 
@@ -899,7 +906,7 @@ export function scoutAnalyzeCandles(
     pair,
     displaySymbol: pair.replace('_', '/'),
     price,
-    bias,
+    bias: finalBias,
     htfBias,
     zone,
     nearestResistance,
