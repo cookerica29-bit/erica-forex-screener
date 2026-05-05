@@ -845,8 +845,8 @@ export function scoutAnalyzeCandles(
   const bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' =
     trend === 'LONG' ? 'BULLISH' : trend === 'SHORT' ? 'BEARISH' : 'NEUTRAL';
 
-  // HTF bias — 50 candles as well for consistency
-  const htfSwings = findSwings(htf.slice(-50), 5);
+  // HTF bias — use all available HTF candles with margin=3 to ensure enough swings for getTrend
+  const htfSwings = findSwings(htf, 3);
   const htfTrend = getTrend(htfSwings);
   const htfBias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' =
     htfTrend === 'LONG' ? 'BULLISH' : htfTrend === 'SHORT' ? 'BEARISH' : 'NEUTRAL';
