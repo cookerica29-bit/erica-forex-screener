@@ -827,6 +827,7 @@ export interface ScoutReport {
 export function scoutAnalyzeCandles(
   candles: Candle[], htf: Candle[], pair: string, granularity = 'H1'
 ): ScoutReport | null {
+  // v2 — 2R minimum TP filter
   if (candles.length < 60) return null;
 
   const price = candles[candles.length - 1].c;
@@ -926,24 +927,34 @@ export function scoutAnalyzeCandles(
     if (isLong) {
       const slBase = nearestSupport ?? (entry - 2 * atr);
       sl = Math.round((Math.min(slBase, entry - atr) - 0.3 * atr) * 1e5) / 1e5;
-      // TP: first swing high above entry + 1 ATR (skip minor structure)
-      const minTp = entry + atr;
+      const risk = Math.abs(entry - sl);
+      // TP: first swing high giving >= 2R (skip minor structure)
+      const minTp = entry + Math.max(atr, 2 * risk);
+      console.log(`[scout-v2] ${pair} LONG risk=${risk.toFixed(5)} minTp=${minTp.toFixed(5)}`);
       const tpCandidates = swingHighs
         .filter(s => s.price > minTp)
         .sort((a, b) => a.price - b.price);
-      if (tpCandidates[0]) tp1 = Math.round(tpCandidates[0].price * 1e5) / 1e5;
-      else if (nearestResistance && nearestResistance > minTp) tp1 = Math.round(nearestResistance * 1e5) / 1e5;
-      if (tpCandidates[1]) tp2 = Math.round(tpCandidates[1].price * 1e5) / 1e5;
+      tp1 = tpCandidates[0]
+        ? Math.round(tpCandidates[0].price * 1e5) / 1e5
+        : Math.round((entry + 2 * risk) * 1e5) / 1e5;
+      tp2 = tpCandidates[1]
+        ? Math.round(tpCandidates[1].price * 1e5) / 1e5
+        : Math.round((entry + 3 * risk) * 1e5) / 1e5;
     } else {
       const slBase = nearestResistance ?? (entry + 2 * atr);
       sl = Math.round((Math.max(slBase, entry + atr) + 0.3 * atr) * 1e5) / 1e5;
-      const minTp = entry - atr;
+      const risk = Math.abs(entry - sl);
+      // TP: first swing low giving >= 2R (skip minor structure)
+      const minTp = entry - Math.max(atr, 2 * risk);
       const tpCandidates = swingLows
         .filter(s => s.price < minTp)
         .sort((a, b) => b.price - a.price);
-      if (tpCandidates[0]) tp1 = Math.round(tpCandidates[0].price * 1e5) / 1e5;
-      else if (nearestSupport && nearestSupport < minTp) tp1 = Math.round(nearestSupport * 1e5) / 1e5;
-      if (tpCandidates[1]) tp2 = Math.round(tpCandidates[1].price * 1e5) / 1e5;
+      tp1 = tpCandidates[0]
+        ? Math.round(tpCandidates[0].price * 1e5) / 1e5
+        : Math.round((entry - 2 * risk) * 1e5) / 1e5;
+      tp2 = tpCandidates[1]
+        ? Math.round(tpCandidates[1].price * 1e5) / 1e5
+        : Math.round((entry - 3 * risk) * 1e5) / 1e5;
     }
 
     if (entry !== null && sl !== null && tp1 !== null) {
