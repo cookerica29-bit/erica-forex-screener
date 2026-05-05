@@ -816,6 +816,12 @@ export interface ScoutReport {
   timeframe: string;
   scannedAt: string;
   newsRisk?: boolean;
+  // Trade levels — derived from EMA20 + ATR + nearest structural target
+  entry: number | null;
+  sl: number | null;
+  tp1: number | null;
+  tp2: number | null;
+  rrRatio: number | null;
 }
 
 export function scoutAnalyzeCandles(
@@ -902,6 +908,51 @@ export function scoutAnalyzeCandles(
   const interestLevel: 'HIGH' | 'MEDIUM' | 'LOW' =
     interestScore >= 4 ? 'HIGH' : interestScore >= 2 ? 'MEDIUM' : 'LOW';
 
+  // ── Trade levels ──────────────────────────────────────────────────────────
+  // Entry: EMA20 for pullback longs/shorts (best location near the dynamic level)
+  // SL: 1×ATR beyond the nearest swing low/high
+  // TP1: nearest structural target beyond entry + 1×ATR (skip minor structure)
+  // TP2: second structural level
+  let entry: number | null = null;
+  let sl: number | null = null;
+  let tp1: number | null = null;
+  let tp2: number | null = null;
+  let rrRatio: number | null = null;
+
+  if (finalBias !== 'NEUTRAL') {
+    const isLong = finalBias === 'BULLISH';
+    entry = Math.round(ema20 * 1e5) / 1e5;
+
+    if (isLong) {
+      const slBase = nearestSupport ?? (entry - 2 * atr);
+      sl = Math.round((Math.min(slBase, entry - atr) - 0.3 * atr) * 1e5) / 1e5;
+      // TP: first swing high above entry + 1 ATR (skip minor structure)
+      const minTp = entry + atr;
+      const tpCandidates = swingHighs
+        .filter(s => s.price > minTp)
+        .sort((a, b) => a.price - b.price);
+      if (tpCandidates[0]) tp1 = Math.round(tpCandidates[0].price * 1e5) / 1e5;
+      else if (nearestResistance && nearestResistance > minTp) tp1 = Math.round(nearestResistance * 1e5) / 1e5;
+      if (tpCandidates[1]) tp2 = Math.round(tpCandidates[1].price * 1e5) / 1e5;
+    } else {
+      const slBase = nearestResistance ?? (entry + 2 * atr);
+      sl = Math.round((Math.max(slBase, entry + atr) + 0.3 * atr) * 1e5) / 1e5;
+      const minTp = entry - atr;
+      const tpCandidates = swingLows
+        .filter(s => s.price < minTp)
+        .sort((a, b) => b.price - a.price);
+      if (tpCandidates[0]) tp1 = Math.round(tpCandidates[0].price * 1e5) / 1e5;
+      else if (nearestSupport && nearestSupport < minTp) tp1 = Math.round(nearestSupport * 1e5) / 1e5;
+      if (tpCandidates[1]) tp2 = Math.round(tpCandidates[1].price * 1e5) / 1e5;
+    }
+
+    if (entry !== null && sl !== null && tp1 !== null) {
+      const risk = Math.abs(entry - sl);
+      const reward = Math.abs(tp1 - entry);
+      if (risk > 0) rrRatio = Math.round((reward / risk) * 100) / 100;
+    }
+  }
+
   return {
     pair,
     displaySymbol: pair.replace('_', '/'),
@@ -920,6 +971,11 @@ export function scoutAnalyzeCandles(
     interestLevel,
     timeframe: granularity,
     scannedAt: new Date().toISOString(),
+    entry,
+    sl,
+    tp1,
+    tp2,
+    rrRatio,
   };
 }
 

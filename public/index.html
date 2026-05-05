@@ -1335,6 +1335,25 @@
             <div class="scout-level-value" style="color:var(--green)">${f(r.nearestSupport)}</div>
           </div>
         </div>
+        ${r.entry != null ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin:8px 0;">
+          <div class="scout-level-box" style="border-color:rgba(96,165,250,0.2);border-left:3px solid rgba(96,165,250,0.5);">
+            <div class="scout-level-label" style="color:rgba(96,165,250,0.7);">Entry</div>
+            <div class="scout-level-value" style="color:var(--blue);font-size:12px;">${f(r.entry)}</div>
+          </div>
+          <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
+            <div class="scout-level-label" style="color:rgba(255,59,92,0.7);">SL</div>
+            <div class="scout-level-value" style="color:var(--red);font-size:12px;">${f(r.sl)}</div>
+          </div>
+          <div class="scout-level-box" style="border-color:rgba(0,255,136,0.2);border-left:3px solid rgba(0,255,136,0.5);">
+            <div class="scout-level-label" style="color:rgba(0,255,136,0.7);">TP1</div>
+            <div class="scout-level-value" style="color:var(--green);font-size:12px;">${f(r.tp1)}</div>
+          </div>
+          <div class="scout-level-box">
+            <div class="scout-level-label">R:R</div>
+            <div class="scout-level-value" style="color:${r.rrRatio != null && r.rrRatio >= 1.5 ? 'var(--green)' : 'var(--slate)'};font-size:12px;">${r.rrRatio != null ? r.rrRatio.toFixed(2) + 'R' : '—'}</div>
+          </div>
+        </div>` : ''}
         <div class="scout-structure">
           ${bosHtml}
           ${chochHtml}
