@@ -830,15 +830,16 @@ export function scoutAnalyzeCandles(
   const ema20arr = calcEMA(candles, 20);
   const ema20 = ema20arr[candles.length - 1] ?? price;
 
-  // Bias from swing structure of last 100 candles
-  const recentCandles = candles.slice(-100);
+  // Bias from swing structure of last 50 candles — tighter window reads current structure
+  // not the older rally that may still be inside a 100-bar lookback
+  const recentCandles = candles.slice(-50);
   const swings = findSwings(recentCandles, 3);
   const trend = getTrend(swings);
   const bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' =
     trend === 'LONG' ? 'BULLISH' : trend === 'SHORT' ? 'BEARISH' : 'NEUTRAL';
 
-  // HTF bias
-  const htfSwings = findSwings(htf.slice(-100), 5);
+  // HTF bias — 50 candles as well for consistency
+  const htfSwings = findSwings(htf.slice(-50), 5);
   const htfTrend = getTrend(htfSwings);
   const htfBias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' =
     htfTrend === 'LONG' ? 'BULLISH' : htfTrend === 'SHORT' ? 'BEARISH' : 'NEUTRAL';
