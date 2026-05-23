@@ -674,6 +674,81 @@
   function escapeHtml(v) {
     return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+  function encodeSetupArg(setup) {
+    return encodeURIComponent(JSON.stringify(setup || {})).replace(/'/g, '%27');
+  }
+  function actionKey(prefix, symbol) {
+    return `${prefix}-${String(symbol || 'card').replace(/[^a-z0-9_-]/gi, '-')}`;
+  }
+  function normalizeJournalDirection(value) {
+    const v = String(value || '').toUpperCase();
+    if (v === 'BULLISH' || v === 'BUY' || v === 'LONG') return 'LONG';
+    if (v === 'BEARISH' || v === 'SELL' || v === 'SHORT') return 'SHORT';
+    return 'LONG';
+  }
+  function normalizeActionSetup(setup) {
+    const raw = setup || {};
+    const symbol = raw.symbol || raw.pair || raw.displaySymbol || '';
+    return {
+      id: raw.id || '',
+      symbol,
+      pair: raw.pair || raw.symbol || symbol,
+      displaySymbol: raw.displaySymbol || (symbol ? String(symbol).replace('_', '/') : ''),
+      direction: normalizeJournalDirection(raw.direction || raw.bias || raw.trend),
+      quality: raw.quality || raw.interestLevel || raw.marketState || 'DEVELOPING',
+      pattern: raw.pattern || raw.structureState || raw.reason || 'Manual chart review',
+      timeframe: raw.timeframe || raw.granularity || 'MANUAL',
+      entry: raw.entry ?? raw.entryPrice ?? raw.price ?? '',
+      sl: raw.sl ?? raw.stopLoss ?? raw.stop ?? '',
+      tp1: raw.tp1 ?? raw.target1 ?? raw.takeProfit1 ?? '',
+      tp2: raw.tp2 ?? raw.target2 ?? raw.takeProfit2 ?? '',
+      tp3: raw.tp3 ?? raw.target3 ?? raw.takeProfit3 ?? '',
+      rrRatio: raw.rrRatio ?? raw.rr1 ?? '',
+      confluences: raw.confluences || raw.confluence || raw.whyTrending || [],
+      session: raw.session || getSession(),
+      newsRisk: raw.newsRisk ?? false,
+      notes: raw.notes || '',
+    };
+  }
+  function renderTradeActionBlock(setup, prefix) {
+    const normalized = normalizeActionSetup(setup);
+    const key = actionKey(prefix, normalized.id || normalized.pair || normalized.symbol || normalized.displaySymbol);
+    const encoded = encodeSetupArg(normalized);
+    const dir = normalized.direction;
+    return `<div class="card-actions" style="margin-top:10px;">
+      <button class="send-bot-btn" onclick="sendSetupToCalculator(decodeURIComponent('${encoded}'))">Send to Calculator</button>
+      <button class="push-btn" id="${key}-push" onclick="toggleCardJournal('${key}')">📓 Log Trade</button>
+    </div>
+    <div class="journal-panel" id="${key}-journal" style="display:none;">
+      <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Log trade to journal</div>
+      <div class="outcome-row" style="margin-bottom:8px;">
+        <span class="outcome-label">Direction:</span>
+        <button class="outcome-btn win${dir === 'LONG' ? ' active-outcome' : ''}" id="${key}-dir-long" onclick="setCardJournalDir('${key}','LONG')">LONG</button>
+        <button class="outcome-btn loss${dir === 'SHORT' ? ' active-outcome' : ''}" id="${key}-dir-short" onclick="setCardJournalDir('${key}','SHORT')">SHORT</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
+        <div>
+          <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:3px;">Entry</div>
+          <input type="number" class="pnl-input" id="${key}-entry" value="${escapeHtml(normalized.entry)}" placeholder="Entry" step="0.00001" style="width:100%;" />
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--red);text-transform:uppercase;margin-bottom:3px;">Stop Loss</div>
+          <input type="number" class="pnl-input" id="${key}-sl" value="${escapeHtml(normalized.sl)}" placeholder="SL" step="0.00001" style="width:100%;border-color:rgba(255,59,92,0.3);" />
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--green);text-transform:uppercase;margin-bottom:3px;">TP1</div>
+          <input type="number" class="pnl-input" id="${key}-tp1" value="${escapeHtml(normalized.tp1)}" placeholder="TP1" step="0.00001" style="width:100%;border-color:rgba(0,255,136,0.3);" />
+        </div>
+      </div>
+      <div class="notes-row" style="margin-bottom:8px;">
+        <textarea class="notes-input" id="${key}-notes" placeholder="Notes from your analysis..." style="min-height:48px;">${escapeHtml(normalized.notes)}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="push-btn" id="${key}-save" onclick="saveCardTradeToJournal(decodeURIComponent('${encoded}'),'${key}')">Save to Journal</button>
+        <button class="push-btn" onclick="toggleCardJournal('${key}')" style="border-color:rgba(148,163,184,0.3);background:transparent;color:var(--slate-dim);">Cancel</button>
+      </div>
+    </div>`;
+  }
   function toCalcPairValue(p) { return p.replace('_', ''); }
   function currentScanLabel() {
     return priorityPairsActive
@@ -1114,6 +1189,17 @@
             ${reasons.map(r => `<div class="trend-reason">${r}</div>`).join('') || '<div class="trend-reason">No clean directional movement yet.</div>'}
           </div>
         </details>
+        ${renderTradeActionBlock({
+          ...row,
+          pattern: `Trend review — ${marketState}`,
+          quality: marketState,
+          notes: [
+            row.htfAlignment ? `HTF alignment: ${row.htfAlignment}` : '',
+            row.structureState ? `Structure: ${row.structureState}` : '',
+            ...(row.whyTrending || []),
+            ...(row.warnings || []).map(x => `Warning: ${x}`),
+          ].filter(Boolean).join('\n'),
+        }, `trend-${sectionType || dirClass}`)}
       </div>`;
   }
 
@@ -1589,7 +1675,30 @@
     const cards = priorityWatchlistRows.map(row => {
       const statusClass = row.status.toLowerCase();
       const journalSetup = buildPriorityJournalSetup(row);
-      const disabled = journalSetup ? '' : 'disabled title="Needs Claude bias, entry zone, stop loss, and target 1 to save"';
+      const actionSetup = journalSetup || {
+        id: `priority-${row.pair}`,
+        pair: row.pair,
+        displaySymbol: makePairLabel(row.pair),
+        direction: row.bias,
+        quality: gradeToQuality(row.grade),
+        pattern: 'Claude Priority Watchlist',
+        timeframe: selectedScanTf,
+        entry: extractEntry(row.entryZone) ?? '',
+        sl: extractNumber(row.stopLoss) ?? '',
+        tp1: extractNumber(row.target1) ?? '',
+        tp2: extractNumber(row.target2) ?? '',
+        rrRatio: extractNumber(row.rrEstimate) ?? '',
+        session: getSession(),
+        notes: [
+          row.reason ? `Claude reason: ${row.reason}` : '',
+          row.entryZone ? `Entry zone: ${row.entryZone}` : '',
+          row.stopLoss ? `Stop loss: ${row.stopLoss}` : '',
+          row.target1 ? `Target 1: ${row.target1}` : '',
+          row.target2 ? `Target 2: ${row.target2}` : '',
+          row.invalidation ? `Invalidation: ${row.invalidation}` : '',
+          row.rejectionReason ? `Scanner rejection: ${row.rejectionReason}` : '',
+        ].filter(Boolean).join('\n'),
+      };
       const reason = row.reason ? `<div class="priority-reason"><strong>Claude:</strong> ${escapeHtml(row.reason)}</div>` : '';
       const rejection = row.rejectionReason ? `<div class="priority-reason"><strong>Scanner:</strong> ${escapeHtml(row.rejectionReason)}</div>` : '';
       return `<div class="priority-card ${statusClass}">
@@ -1609,9 +1718,7 @@
         </div>
         ${reason}
         ${rejection}
-        <div class="priority-actions">
-          <button class="push-btn" id="priority-save-${row.pair}" onclick="savePriorityToJournal('${row.pair}')" ${disabled}>📓 Save to Journal</button>
-        </div>
+        ${renderTradeActionBlock(actionSetup, 'priority')}
       </div>`;
     }).join('');
     container.innerHTML = `<div class="priority-watchlist">
@@ -1663,6 +1770,67 @@
     window.scrollTo(0, 0);
   }
 
+  const cardJournalDirMap = {};
+  function toggleCardJournal(key) {
+    const panel = document.getElementById(key + '-journal');
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    if (panel.style.display === 'flex') panel.style.flexDirection = 'column';
+  }
+  function setCardJournalDir(key, dir) {
+    cardJournalDirMap[key] = dir;
+    const longBtn = document.getElementById(key + '-dir-long');
+    const shortBtn = document.getElementById(key + '-dir-short');
+    if (longBtn) longBtn.className = 'outcome-btn win' + (dir === 'LONG' ? ' active-outcome' : '');
+    if (shortBtn) shortBtn.className = 'outcome-btn loss' + (dir === 'SHORT' ? ' active-outcome' : '');
+  }
+  async function saveCardTradeToJournal(setupJson, key) {
+    const setup = normalizeActionSetup(typeof setupJson === 'string' ? JSON.parse(setupJson) : setupJson);
+    const entry = parseFloat(document.getElementById(key + '-entry')?.value);
+    const sl = parseFloat(document.getElementById(key + '-sl')?.value);
+    const tp1 = parseFloat(document.getElementById(key + '-tp1')?.value);
+    const notes = document.getElementById(key + '-notes')?.value || setup.notes || '';
+    if (!entry || !sl || !tp1) { alert('Entry, Stop Loss, and TP1 are required.'); return; }
+    const risk = Math.abs(entry - sl);
+    const rr1 = risk > 0 ? parseFloat((Math.abs(tp1 - entry) / risk).toFixed(1)) : null;
+    const saveBtn = document.getElementById(key + '-save');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+    try {
+      const res = await fetch('/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: setup.symbol || setup.pair,
+          displaySymbol: setup.displaySymbol || makePairLabel(setup.pair || setup.symbol || ''),
+          direction: cardJournalDirMap[key] || setup.direction,
+          quality: setup.quality,
+          pattern: setup.pattern,
+          timeframe: setup.timeframe,
+          entry,
+          stopLoss: sl,
+          tp1,
+          tp2: setup.tp2 || undefined,
+          tp3: setup.tp3 || undefined,
+          rr1,
+          rr2: setup.rr2,
+          rr3: setup.rr3,
+          confluences: setup.confluences,
+          session: setup.session,
+          newsRisk: setup.newsRisk ?? false,
+          notes,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Save failed');
+      const pushBtn = document.getElementById(key + '-push');
+      if (pushBtn) { pushBtn.textContent = '✓ Journaled'; pushBtn.classList.add('pushed'); pushBtn.disabled = true; }
+      toggleCardJournal(key);
+    } catch(e) {
+      alert('Failed to save: ' + e.message);
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save to Journal'; }
+    }
+  }
+
   function fillCalculator(idx) {
     const setup = allSetups[idx];
     sendSetupToCalculator(setup);
@@ -1696,6 +1864,26 @@
       const bosStr    = hasBOS ? `BOS @ ${fmt(d.bosLevel, nm.pair)}` : '';
       const htfStr    = d.htfTrend ? `HTF: ${d.htfTrend}` : '';
       const metaLine  = [bosStr, obStr, rsiStr, htfStr].filter(Boolean).join(' · ');
+      const actionSetup = {
+        id: `${nm.pair}-${nm.granularity}`,
+        pair: nm.pair,
+        displaySymbol: nm.pair.replace('_','/'),
+        direction: d.trend,
+        quality: hardBlocked ? 'BLOCKED' : 'WATCHLIST',
+        pattern: 'Rejected / Watchlist',
+        timeframe: nm.granularity,
+        entry: d.entry ?? '',
+        sl: d.sl ?? d.stopLoss ?? '',
+        tp1: d.tp1 ?? d.target1 ?? '',
+        session: getSession(),
+        notes: [
+          nm.reason ? `Rejected reason: ${nm.reason}` : '',
+          bosStr,
+          obStr,
+          rsiStr,
+          htfStr,
+        ].filter(Boolean).join('\n'),
+      };
       return `<div class="nm-card" style="border-color:${cardBorder}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
           <div>
@@ -1719,6 +1907,7 @@
         </div>
         <div style="font-size:10px;color:rgba(255,59,92,0.75);background:rgba(255,59,92,0.05);border:1px solid rgba(255,59,92,0.15);border-radius:5px;padding:5px 8px;">✗ ${nm.reason}</div>
         ${metaLine ? `<div style="font-size:9px;color:var(--slate-dim);margin-top:6px;line-height:1.6">${metaLine}</div>` : ''}
+        ${renderTradeActionBlock(actionSetup, 'nearmiss')}
       </div>`;
     }).join('');
     container.innerHTML = `<div class="near-miss-section">
@@ -2626,8 +2815,16 @@
       const isLong = s.direction === 'LONG';
       const dc = isLong ? 'var(--green)' : 'var(--red)';
       const qc = s.quality === 'PREMIUM' ? 'var(--gold)' : s.quality === 'STRONG' ? 'var(--blue)' : 'var(--slate)';
+      const actionSetup = {
+        ...s,
+        symbol: s.pair,
+        displaySymbol: s.pair ? s.pair.replace('_','/') : '',
+        stopLoss: s.sl || s.stopLoss,
+        pattern: s.pattern || 'Bot approval',
+      };
       return `
-        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #111820;flex-wrap:wrap;">
+        <div style="padding:12px 14px;border-bottom:1px solid #111820;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <span style="font-weight:700;font-size:13px;min-width:72px;">${s.pair.replace('_','/')}</span>
           <span style="color:${dc};font-size:10px;font-weight:700;min-width:40px;">${s.direction}</span>
           <span style="font-size:9px;padding:2px 7px;border-radius:99px;border:1px solid ${qc};color:${qc};background:transparent;">${s.quality}</span>
@@ -2636,6 +2833,8 @@
             <button onclick="dismissSetup('${s.id}')" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--slate-dim);font-size:10px;font-family:inherit;cursor:pointer;">Dismiss</button>
             <button onclick="executeSetup('${s.id}')" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(0,255,136,0.4);background:rgba(0,255,136,0.1);color:var(--green);font-size:10px;font-family:inherit;cursor:pointer;font-weight:700;">Execute</button>
           </span>
+          </div>
+          ${renderTradeActionBlock(actionSetup, 'approval')}
         </div>`;
     }).join('');
   }
