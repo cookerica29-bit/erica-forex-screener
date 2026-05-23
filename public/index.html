@@ -213,17 +213,6 @@
     .journal-edit-btn { font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--slate-dim); cursor: pointer; font-family: inherit; }
     .journal-edit-btn:hover { color: var(--text); border-color: var(--slate); }
     .journal-edit-panel { margin-top: 10px; padding: 10px; background: var(--inner); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
-    .stock-journal-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; }
-    .stock-journal-card.ready { border-color:rgba(0,255,136,0.3); }
-    .stock-journal-card.building { border-color:rgba(245,166,35,0.3); }
-    .stock-journal-card.no-trade { border-color:rgba(255,59,92,0.24); }
-    .stock-journal-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; }
-    .stock-journal-symbol { font-size:17px; font-weight:900; letter-spacing:.04em; }
-    .stock-journal-meta { display:flex; flex-wrap:wrap; gap:5px; margin-top:4px; }
-    .stock-journal-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:7px; margin:10px 0; }
-    .stock-journal-missing { margin-top:8px; padding:8px 10px; border-radius:8px; border:1px solid rgba(96,165,250,0.18); background:rgba(96,165,250,0.05); color:#c7d2fe; font-size:11px; line-height:1.45; }
-    .stock-journal-note { width:100%; min-height:54px; margin-top:8px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--inner); color:var(--text); font-size:11px; font-family:inherit; resize:vertical; }
-    .stock-journal-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
     @media (max-width: 600px) { .journal-stats { grid-template-columns: repeat(3, 1fr); } .journal-levels { grid-template-columns: repeat(3, 1fr); } }
     .breakdown-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .breakdown-label { font-size: 11px; color: var(--slate); min-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -292,26 +281,6 @@
     .interest-badge.high { color:var(--gold); border-color:rgba(245,166,35,0.5); background:rgba(245,166,35,0.12); }
     .interest-badge.medium { color:var(--blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.1); }
     .interest-badge.low { color:var(--slate-dim); border-color:rgba(148,163,184,0.2); background:transparent; }
-    .aplus-panel { margin: 0 20px 14px; background: linear-gradient(135deg, rgba(13,17,23,0.98), rgba(8,11,16,0.98)); border: 1px solid rgba(245,166,35,0.22); border-radius: 10px; padding: 14px; }
-    .aplus-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-    .aplus-title { font-size:13px; color:var(--text); font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
-    .aplus-status { font-size:11px; font-weight:900; border-radius:99px; border:1px solid rgba(255,59,92,0.45); color:var(--red); background:rgba(255,59,92,0.08); padding:5px 12px; white-space:nowrap; }
-    .aplus-status.ready { color:var(--green); border-color:rgba(0,255,136,0.45); background:rgba(0,255,136,0.09); }
-    .aplus-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:10px; }
-    .aplus-section { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px; }
-    .aplus-section-title { font-size:9px; color:var(--gold); text-transform:uppercase; letter-spacing:.11em; font-weight:800; margin-bottom:8px; }
-    .aplus-check { display:flex; align-items:center; gap:8px; min-height:26px; color:var(--slate); font-size:11px; cursor:pointer; user-select:none; }
-    .aplus-check input { appearance:none; width:14px; height:14px; border-radius:4px; border:1px solid rgba(148,163,184,0.35); background:var(--inner); display:grid; place-items:center; flex-shrink:0; cursor:pointer; }
-    .aplus-check input:checked { border-color:rgba(0,255,136,0.55); background:rgba(0,255,136,0.12); }
-    .aplus-check input:checked::after { content:''; width:6px; height:3px; border-left:2px solid var(--green); border-bottom:2px solid var(--green); transform:rotate(-45deg); margin-top:-1px; }
-    .aplus-check:has(input:checked) { color:var(--text); }
-    .aplus-entry-row { display:flex; flex-wrap:wrap; gap:8px; }
-    .aplus-entry { display:flex; align-items:center; gap:7px; flex:1; min-width:170px; padding:8px 10px; border:1px solid rgba(96,165,250,0.18); border-radius:8px; background:rgba(96,165,250,0.04); color:var(--slate); font-size:11px; cursor:pointer; user-select:none; }
-    .aplus-entry input { accent-color:var(--blue); }
-    .aplus-entry span { color:var(--text); font-weight:700; }
-    .aplus-actions { display:flex; justify-content:flex-end; margin-top:10px; }
-    .aplus-reset { padding:5px 12px; border-radius:6px; border:1px solid rgba(148,163,184,0.22); background:transparent; color:var(--slate-dim); font-size:10px; font-family:inherit; cursor:pointer; }
-    .aplus-reset:hover { color:var(--text); border-color:rgba(148,163,184,0.45); }
     .scout-levels { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:10px 0; }
     .scout-level-box { background:rgba(255,255,255,0.03); border-radius:8px; padding:8px 10px; border:1px solid rgba(255,255,255,0.06); }
     .scout-level-label { font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--slate-dim); margin-bottom:2px; }
@@ -322,51 +291,8 @@
     .scout-indicators { display:flex; gap:14px; margin-top:8px; }
     .scout-ind-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; display:block; margin-bottom:1px; }
     .scout-ind-value { font-size:12px; font-weight:600; color:var(--slate); }
-    .stock-page { padding: 0 0 24px; }
-    .stock-controls { padding: 14px 20px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; border-bottom:1px solid var(--border); }
-    .stock-input { flex:1; min-width:260px; max-width:440px; padding:8px 12px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:12px; font-family:inherit; outline:none; }
-    .stock-input::placeholder { color:var(--slate-dim); }
-    .stock-summary { padding:12px 20px 0; color:var(--slate-dim); font-size:11px; }
-    .stock-grid { padding:16px 24px; display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:16px; }
-    .stock-card { background:linear-gradient(135deg, #0D1117 0%, #0a0f16 100%); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-    .stock-card.a-plus-alert { border-color:rgba(0,255,136,0.85); box-shadow:0 0 0 1px rgba(0,255,136,0.42), 0 0 24px rgba(0,255,136,0.24); animation:stockAPlusPulse 1.4s ease-in-out 3; }
-    .stock-card.a-plus-alert .stock-card-head { background:rgba(0,255,136,0.07); }
-    @keyframes stockAPlusPulse { 0%,100%{box-shadow:0 0 0 1px rgba(0,255,136,0.32),0 0 16px rgba(0,255,136,0.14);} 50%{box-shadow:0 0 0 2px rgba(0,255,136,0.75),0 0 32px rgba(0,255,136,0.34);} }
-    .stock-card.ready { border-color:rgba(0,255,136,0.32); }
-    .stock-card.building { border-color:rgba(245,166,35,0.32); }
-    .stock-card.no-trade { border-color:rgba(255,59,92,0.22); opacity:.88; }
-    .stock-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:14px; border-bottom:1px solid rgba(255,255,255,0.06); }
-    .stock-ticker { font-size:20px; font-weight:900; letter-spacing:.05em; }
-    .stock-price { font-size:12px; color:var(--blue); margin-top:3px; font-weight:700; }
-    .stock-stage { font-size:10px; font-weight:900; text-transform:uppercase; border-radius:99px; border:1px solid; padding:4px 9px; white-space:nowrap; }
-    .stock-stage.ready { color:var(--green); border-color:rgba(0,255,136,0.42); background:rgba(0,255,136,0.09); }
-    .stock-stage.building { color:var(--gold); border-color:rgba(245,166,35,0.42); background:rgba(245,166,35,0.09); }
-    .stock-stage.no-trade { color:var(--red); border-color:rgba(255,59,92,0.36); background:rgba(255,59,92,0.08); }
-    .stock-body { padding:14px; }
-    .stock-metrics { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:7px; margin-bottom:10px; }
-    .stock-metric { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); border-radius:7px; padding:7px 9px; min-width:0; }
-    .stock-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px; }
-    .stock-value { font-size:11px; color:var(--text); line-height:1.35; overflow-wrap:anywhere; }
-    .stock-value.blocked { color:var(--red); }
-    .stock-coach, .stock-missing { border-radius:7px; padding:8px 10px; font-size:11px; line-height:1.45; margin-top:8px; }
-    .stock-coach { border:1px solid rgba(245,166,35,0.22); background:rgba(245,166,35,0.06); color:#fcd34d; }
-    .stock-missing { border:1px solid rgba(96,165,250,0.2); background:rgba(96,165,250,0.06); color:#c7d2fe; }
-    .stock-panel-title { color:var(--text); font-weight:900; text-transform:uppercase; letter-spacing:.08em; font-size:10px; margin-bottom:5px; }
-    .stock-list-item + .stock-list-item { margin-top:4px; }
-    .stock-near-title { padding:4px 24px 0; color:var(--slate-dim); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
-    .stock-card-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 14px 14px; }
-    .stock-sound-status { color:var(--slate-dim); font-size:11px; font-weight:700; }
-    .stock-sound-status.enabled { color:var(--green); }
-    .stock-sound-status.muted { color:var(--slate-dim); }
-    .stock-journal-btn { padding:7px 12px; border-radius:7px; border:1px solid rgba(96,165,250,0.35); background:rgba(96,165,250,0.08); color:var(--blue); font-size:11px; font-weight:800; font-family:inherit; cursor:pointer; }
-    .stock-journal-btn:hover { background:rgba(96,165,250,0.16); border-color:rgba(96,165,250,0.55); }
-    .stock-toast { position:fixed; right:18px; bottom:18px; z-index:1000; border:1px solid rgba(0,255,136,0.45); background:rgba(8,11,16,0.96); color:var(--green); border-radius:8px; box-shadow:0 12px 32px rgba(0,0,0,0.35); font-size:12px; font-weight:800; opacity:0; padding:10px 14px; pointer-events:none; transform:translateY(8px); transition:opacity .18s, transform .18s; }
-    .stock-toast.show { opacity:1; transform:translateY(0); }
     @media (max-width: 768px) {
       .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
-      .stock-grid { grid-template-columns:1fr; padding:12px; }
-      .stock-controls { align-items:stretch; }
-      .stock-input, .stock-controls .scan-btn { width:100%; max-width:none; }
       #bot-challenge > div:first-child { grid-template-columns: 1fr !important; }
       .tbl-wrap { overflow-x: auto; }
       #bot-positions-body td { font-size: 11px; padding: 8px 6px; }
@@ -423,8 +349,6 @@
 <div class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
   <button class="tab-btn" onclick="switchTab('trending')" id="tab-trending">🔥 Trending</button>
-  <button class="tab-btn" onclick="switchTab('stock')" id="tab-stock">📈 Stock Scout</button>
-  <button class="tab-btn" onclick="switchTab('stockjournal')" id="tab-stockjournal">📒 Stock Journal</button>
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
   <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
   <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">🧮 Calculator</button>
@@ -462,58 +386,6 @@
 <div class="filter-row">
   <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
   <span id="resultCount" class="result-count"></span>
-</div>
-
-<div class="aplus-panel" id="aplusPanel">
-  <div class="aplus-head">
-    <div>
-      <div class="aplus-title">A+ Eval Checklist</div>
-      <div style="font-size:10px;color:var(--slate-dim);margin-top:3px;">Manual pre-trade gate</div>
-    </div>
-    <div class="aplus-status" id="aplusStatus">NO TRADE</div>
-  </div>
-  <div class="aplus-grid">
-    <div class="aplus-section">
-      <div class="aplus-section-title">Bias</div>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">HTF aligned</label>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Clear direction</label>
-    </div>
-    <div class="aplus-section">
-      <div class="aplus-section-title">Location</div>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Premium/Discount valid</label>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Fib 61-79 zone</label>
-    </div>
-    <div class="aplus-section">
-      <div class="aplus-section-title">Liquidity</div>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Sweep taken</label>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Stops cleared</label>
-    </div>
-    <div class="aplus-section">
-      <div class="aplus-section-title">Confirmation</div>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Strong displacement</label>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Real BOS, not weak</label>
-    </div>
-    <div class="aplus-section">
-      <div class="aplus-section-title">Risk/Reward</div>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">1:2 minimum</label>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Clean path to TP</label>
-    </div>
-    <div class="aplus-section">
-      <div class="aplus-section-title">Mental State</div>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Not forcing</label>
-      <label class="aplus-check"><input type="checkbox" data-aplus-required onchange="updateAPlusChecklist()">Okay missing trade</label>
-    </div>
-  </div>
-  <div class="aplus-section" style="margin-top:10px;">
-    <div class="aplus-section-title">Entry Type</div>
-    <div class="aplus-entry-row">
-      <label class="aplus-entry"><input type="radio" name="aplusEntryType"><div><span>Continuation:</span> break + retest</div></label>
-      <label class="aplus-entry"><input type="radio" name="aplusEntryType"><div><span>Reversal:</span> sweep + displacement</div></label>
-    </div>
-  </div>
-  <div class="aplus-actions">
-    <button class="aplus-reset" onclick="resetAPlusChecklist()">Reset Checklist</button>
-  </div>
 </div>
 
 <div id="mainContent">
@@ -554,38 +426,6 @@
       <div class="trend-section-title">Pullback Opportunities <span id="trendPullbackCount"></span></div>
       <div class="trend-grid" id="trendPullbackGrid"><div class="trend-empty">Clean trend pullbacks will appear here.</div></div>
     </div>
-  </div>
-</div>
-
-<div id="content-stock" class="tab-content">
-  <div class="stock-page">
-    <div class="stock-controls">
-      <input class="stock-input" type="text" id="stockTickerInput" placeholder="Custom tickers (e.g. TSLA,META,NVDA) — leave blank for full stock watchlist" />
-      <div class="control-group">
-        <span class="control-label">Stage</span>
-        <button class="pill active" onclick="setStockStageFilter('ALL')" id="stock-stage-ALL">All</button>
-        <button class="pill" onclick="setStockStageFilter('A+ READY')" id="stock-stage-A_READY">A+</button>
-        <button class="pill" onclick="setStockStageFilter('BUILDING / WATCHLIST')" id="stock-stage-BUILDING">Building</button>
-        <button class="pill" onclick="setStockStageFilter('RANGE / NO TRADE')" id="stock-stage-NO_TRADE">No Trade</button>
-      </div>
-      <button class="push-btn" onclick="toggleStockSoundAlerts()" id="stockSoundBtn" style="border-color:rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);color:var(--green);">Enable Sound Alerts</button>
-      <span id="stockSoundStatus" class="stock-sound-status muted">Sound alerts muted</span>
-      <button class="scan-btn" onclick="runStockScan()" id="stockScanBtn">
-        <span id="stockScanIcon">↻</span> Scan Stocks
-      </button>
-      <button class="push-btn" onclick="clearStockScout()" style="border-color:rgba(148,163,184,0.25);background:transparent;color:var(--slate);">Clear</button>
-      <span id="stockStatus" style="font-size:11px;color:var(--slate-dim);"></span>
-    </div>
-    <div class="stock-summary" id="stockSummary">Stock Scout uses the existing stock scanner service through STOCK_SCANNER_URL.</div>
-    <div id="stockJournalBuildMarker" style="margin:10px 24px 0;padding:8px 10px;border:1px solid rgba(0,255,136,0.42);border-radius:8px;background:rgba(0,255,136,0.08);color:var(--green);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;">Stock Journal Button Build Active</div>
-    <div id="stockMain">
-      <div class="empty-state">
-        <div style="font-size:48px;opacity:0.35">📈</div>
-        <div>Scan stocks from the existing Stock Scanner service</div>
-        <div id="stockWatchlistHint" style="font-size:11px;opacity:0.65;">Loading watchlist...</div>
-      </div>
-    </div>
-    <div id="stockNearMiss"></div>
   </div>
 </div>
 
@@ -817,52 +657,12 @@
   </div>
 </div>
 
-<div id="content-stockjournal" class="tab-content">
-  <div class="journal-page">
-    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
-      <div>
-        <div style="font-size:14px;font-weight:900;color:var(--text);letter-spacing:.04em;">Stock Journal</div>
-        <div style="font-size:11px;color:var(--slate-dim);margin-top:3px;">Local entries saved from Stock Scout cards.</div>
-      </div>
-      <button onclick="exportStockJournalCSV()" style="margin-left:auto;padding:6px 14px;border-radius:8px;border:1px solid rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);color:var(--green);font-size:11px;font-family:inherit;cursor:pointer;font-weight:600;">Export Stock CSV</button>
-      <button onclick="clearStockJournal()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(255,59,92,0.28);background:rgba(255,59,92,0.06);color:var(--red);font-size:11px;font-family:inherit;cursor:pointer;font-weight:600;">Clear Stock Journal</button>
-    </div>
-    <div class="journal-stats">
-      <div class="stat-box"><div class="stat-value" id="sj-total" style="color:var(--text)">—</div><div class="stat-label">Total</div></div>
-      <div class="stat-box"><div class="stat-value" id="sj-ready" style="color:var(--green)">—</div><div class="stat-label">A+ Ready</div></div>
-      <div class="stat-box"><div class="stat-value" id="sj-building" style="color:var(--gold)">—</div><div class="stat-label">Building</div></div>
-      <div class="stat-box"><div class="stat-value" id="sj-no-trade" style="color:var(--red)">—</div><div class="stat-label">No Trade</div></div>
-      <div class="stat-box"><div class="stat-value" id="sj-avg-rr" style="color:var(--blue)">—</div><div class="stat-label">Avg RR</div></div>
-    </div>
-    <div id="stockJournalList" class="journal-list">
-      <div class="empty-journal">
-        <div style="font-size:32px;opacity:0.3">📒</div>
-        <div>No stock journal entries yet</div>
-        <div style="font-size:11px;">Click Add to Journal on a Stock Scout card.</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="stockToast" class="stock-toast" role="status" aria-live="polite"></div>
-
 <script>
-  const STOCK_JOURNAL_KEY = 'stock_journal';
-  const STOCK_SOUND_ALERTS_KEY = 'stock_sound_alerts_enabled';
   let allSetups = [], allNearMisses = [], interestFilter = 'ALL', biasFilter = 'ALL', scanning = false;
   let autoRefreshTimer = null;
   let nearMissOpen = false;
   let priorityPairsPayload = null;
   let priorityWatchlistRows = [];
-  let stockRows = [];
-  let stockNearMissRows = [];
-  let stockStageFilter = 'ALL';
-  let stockWatchlistLoaded = false;
-  let stockToastTimer = null;
-  let stockSoundAlertsEnabled = localStorage.getItem(STOCK_SOUND_ALERTS_KEY) === 'true';
-  let stockAudioContext = null;
-  let previousStockTradeStages = new Map();
-  let stockAPlusAlertTickers = new Set();
 
   const FULL_SCAN_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','AUD_USD','NZD_USD','EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY','EUR_GBP','EUR_AUD','XAU_USD','XAG_USD'];
   // Pair list — overwritten on load from /api/priority-pairs; falls back to full 16 pairs
@@ -1950,18 +1750,6 @@
     ['ALL','BULLISH','BEARISH','NEUTRAL'].forEach(x => { const el = document.getElementById('bias-'+x); if(el) { el.className = 'pill' + (x === v ? ' active' : ''); } });
     renderSetups();
   }
-  function updateAPlusChecklist() {
-    const boxes = Array.from(document.querySelectorAll('[data-aplus-required]'));
-    const ready = boxes.length > 0 && boxes.every(box => box.checked);
-    const status = document.getElementById('aplusStatus');
-    if (!status) return;
-    status.textContent = ready ? 'A+ READY' : 'NO TRADE';
-    status.className = 'aplus-status' + (ready ? ' ready' : '');
-  }
-  function resetAPlusChecklist() {
-    document.querySelectorAll('#aplusPanel input').forEach(input => { input.checked = false; });
-    updateAPlusChecklist();
-  }
   // legacy stubs — controls removed but may still be referenced
   function setRR(v){renderSetups();}
   function setDir(v){renderSetups();}
@@ -1969,437 +1757,11 @@
   function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...':' Scan';}
   function showLoading(){const modeLabel=currentScanLabel();document.getElementById('mainContent').innerHTML=`<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCOUTING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · ${modeLabel}</div></div></div>`;document.getElementById('resultCount').textContent='';['s-total','s-high','s-bullish','s-bearish','s-neutral','s-choch'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='—';});}
 
-  function stockStageClass(stage) {
-    if (stage === 'A+ READY') return 'ready';
-    if (stage === 'BUILDING / WATCHLIST') return 'building';
-    return 'no-trade';
-  }
-
-  function stockStageButtonId(stage) {
-    if (stage === 'A+ READY') return 'A_READY';
-    if (stage === 'BUILDING / WATCHLIST') return 'BUILDING';
-    if (stage === 'RANGE / NO TRADE') return 'NO_TRADE';
-    return 'ALL';
-  }
-
-  function setStockStageFilter(stage) {
-    stockStageFilter = stage;
-    ['ALL','A_READY','BUILDING','NO_TRADE'].forEach(id => {
-      const el = document.getElementById('stock-stage-' + id);
-      if (el) el.className = 'pill' + (stockStageButtonId(stage) === id ? ' active' : '');
-    });
-    renderStockScout();
-  }
-
-  async function loadStockWatchlist() {
-    if (stockWatchlistLoaded) return;
-    const hint = document.getElementById('stockWatchlistHint');
-    try {
-      const res = await fetch('/api/stock/watchlist');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Stock watchlist failed: ${res.status}`);
-      const list = data.watchlist || [];
-      stockWatchlistLoaded = true;
-      if (hint) hint.textContent = list.length ? `Default watchlist: ${list.slice(0, 10).join(', ')}${list.length > 10 ? ` +${list.length - 10} more` : ''}` : 'Default stock watchlist ready';
-    } catch (e) {
-      if (hint) hint.textContent = e.message || 'Stock scanner URL not configured';
-    }
-  }
-
-  function setStockScanLoading(loading) {
-    const btn = document.getElementById('stockScanBtn');
-    const icon = document.getElementById('stockScanIcon');
-    if (btn) btn.disabled = loading;
-    if (icon) icon.className = loading ? 'spin' : '';
-  }
-
-  function getStockStage(row) {
-    return row?.trade_eval?.trade_stage || 'RANGE / NO TRADE';
-  }
-
-  function getStockStageKey(row) {
-    return String(row?.ticker || '').trim().toUpperCase();
-  }
-
-  function detectStockAPlusTransitions(setups) {
-    const nextStages = new Map();
-    const alerts = [];
-    setups.forEach(setup => {
-      const ticker = getStockStageKey(setup);
-      if (!ticker) return;
-      const currentStage = getStockStage(setup);
-      const previousStage = previousStockTradeStages.get(ticker);
-      nextStages.set(ticker, currentStage);
-      if (previousStage !== undefined && previousStage !== 'A+ READY' && currentStage === 'A+ READY') {
-        alerts.push({ ticker, setup, previousStage, currentStage });
-      }
-    });
-    previousStockTradeStages = nextStages;
-    return alerts;
-  }
-
-  function updateStockSoundUi() {
-    const btn = document.getElementById('stockSoundBtn');
-    const status = document.getElementById('stockSoundStatus');
-    if (btn) btn.textContent = stockSoundAlertsEnabled ? 'Disable Sound Alerts' : 'Enable Sound Alerts';
-    if (status) {
-      status.textContent = stockSoundAlertsEnabled ? 'Sound alerts enabled' : 'Sound alerts muted';
-      status.className = `stock-sound-status ${stockSoundAlertsEnabled ? 'enabled' : 'muted'}`;
-    }
-  }
-
-  function ensureStockAudioContext() {
-    const AudioCtor = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtor) return null;
-    if (!stockAudioContext) stockAudioContext = new AudioCtor();
-    if (stockAudioContext.state === 'suspended') stockAudioContext.resume().catch(() => {});
-    return stockAudioContext;
-  }
-
-  function playStockAPlusPing() {
-    if (!stockSoundAlertsEnabled) return;
-    const ctx = ensureStockAudioContext();
-    if (!ctx) return;
-    const start = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, start);
-    osc.frequency.setValueAtTime(1175, start + 0.08);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.18, start + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(start);
-    osc.stop(start + 0.24);
-  }
-
-  function maybeSendStockAPlusNotification(alert) {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const price = alert.setup?.price != null ? formatStockMoney(alert.setup.price) : 'price unavailable';
-    const direction = alert.setup?.direction || alert.setup?.trend || 'direction unavailable';
-    new Notification(`${alert.ticker} A+ READY`, {
-      body: `${alert.previousStage} → ${alert.currentStage} · ${direction} · ${price}`,
-      tag: `stock-a-plus-ready-${alert.ticker}`,
-      renotify: true,
-    });
-  }
-
-  function handleStockAPlusAlert(alert) {
-    console.log(`[STOCK A+ READY] ${alert.ticker} changed from ${alert.previousStage} to ${alert.currentStage}`, alert.setup);
-    playStockAPlusPing();
-    maybeSendStockAPlusNotification(alert);
-  }
-
-  async function toggleStockSoundAlerts() {
-    stockSoundAlertsEnabled = !stockSoundAlertsEnabled;
-    localStorage.setItem(STOCK_SOUND_ALERTS_KEY, stockSoundAlertsEnabled ? 'true' : 'false');
-    if (stockSoundAlertsEnabled) {
-      ensureStockAudioContext();
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {});
-      }
-      playStockAPlusPing();
-      showStockToast('Sound alerts enabled');
-    } else {
-      showStockToast('Sound alerts muted');
-    }
-    updateStockSoundUi();
-  }
-
-  async function runStockScan() {
-    const input = document.getElementById('stockTickerInput')?.value?.trim() || '';
-    const status = document.getElementById('stockStatus');
-    setStockScanLoading(true);
-    if (status) status.textContent = 'Scanning...';
-    document.getElementById('stockMain').innerHTML = '<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCOUTING STOCK WATCHLIST...</div><div class="loading-sub">Proxying existing stock scanner service</div></div></div>';
-    document.getElementById('stockNearMiss').innerHTML = '';
-    try {
-      const url = input ? `/api/stock/scan?tickers=${encodeURIComponent(input)}` : '/api/stock/scan';
-      const res = await fetch(url);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Stock scan failed: ${res.status}`);
-      const nextRows = data.rows || [];
-      const nextNearMissRows = data.near_miss || [];
-      const aPlusAlerts = detectStockAPlusTransitions([...nextRows, ...nextNearMissRows]);
-      stockAPlusAlertTickers = new Set(aPlusAlerts.map(a => a.ticker));
-      aPlusAlerts.forEach(handleStockAPlusAlert);
-      stockRows = nextRows;
-      stockNearMissRows = nextNearMissRows;
-      if (status) status.textContent = `Done · ${new Date().toLocaleTimeString()}`;
-      renderStockScout();
-    } catch (e) {
-      stockRows = [];
-      stockNearMissRows = [];
-      stockAPlusAlertTickers = new Set();
-      if (status) status.textContent = `Error: ${e.message}`;
-      document.getElementById('stockMain').innerHTML = `<div class="empty-state"><div style="font-size:32px;opacity:0.3">⚠</div><div>${escapeHtml(e.message || 'Stock scan failed')}</div><div style="font-size:11px;opacity:0.65;">Check STOCK_SCANNER_URL and the stock scanner service.</div></div>`;
-    } finally {
-      setStockScanLoading(false);
-    }
-  }
-
-  function clearStockScout() {
-    stockRows = [];
-    stockNearMissRows = [];
-    previousStockTradeStages = new Map();
-    stockAPlusAlertTickers = new Set();
-    document.getElementById('stockStatus').textContent = '';
-    document.getElementById('stockSummary').textContent = 'Stock Scout uses the existing stock scanner service through STOCK_SCANNER_URL.';
-    document.getElementById('stockMain').innerHTML = '<div class="empty-state"><div style="font-size:48px;opacity:0.35">📈</div><div>Scan stocks from the existing Stock Scanner service</div><div style="font-size:11px;opacity:0.65;">Forex logic and scheduled scans remain separate.</div></div>';
-    document.getElementById('stockNearMiss').innerHTML = '';
-  }
-
-  function stockPassesStage(row) {
-    if (stockStageFilter === 'ALL') return true;
-    return (row.trade_eval?.trade_stage || 'RANGE / NO TRADE') === stockStageFilter;
-  }
-
-  function renderStockScout() {
-    const rows = stockRows.filter(stockPassesStage);
-    const near = stockNearMissRows.filter(stockPassesStage);
-    const total = stockRows.length + stockNearMissRows.length;
-    const visible = rows.length + near.length;
-    const ready = [...stockRows, ...stockNearMissRows].filter(s => s.trade_eval?.trade_stage === 'A+ READY').length;
-    const building = [...stockRows, ...stockNearMissRows].filter(s => s.trade_eval?.trade_stage === 'BUILDING / WATCHLIST').length;
-    const noTrade = total - ready - building;
-    document.getElementById('stockSummary').textContent = `${visible} of ${total} stock scout card${total !== 1 ? 's' : ''} shown · ${ready} A+ Ready · ${building} Building · ${noTrade} No Trade`;
-    document.getElementById('stockMain').innerHTML = rows.length
-      ? `<div class="stock-grid">${rows.map(renderStockCard).join('')}</div>`
-      : '<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔎</div><div>No qualified stock setups match this filter</div></div>';
-    document.getElementById('stockNearMiss').innerHTML = near.length
-      ? `<div class="stock-near-title">Scout Cards — Developing / No Trade (${near.length})</div><div class="stock-grid">${near.map(renderStockCard).join('')}</div>`
-      : '';
-  }
-
-  function formatStockMoney(v) {
-    return v == null || Number.isNaN(Number(v)) ? '—' : `$${Number(v).toFixed(2)}`;
-  }
-
-  function loadStockJournal() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STOCK_JOURNAL_KEY) || '[]');
-      return Array.isArray(saved) ? saved : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function buildStockJournalEntry(setup) {
-    const ev = setup?.trade_eval || {};
-    const room = ev.room_to_target || {};
-    const tradeStage = ev.trade_stage || 'RANGE / NO TRADE';
-    return {
-      timestamp: new Date().toISOString(),
-      ticker: setup?.ticker || '',
-      direction: setup?.direction || setup?.trend || '',
-      trade_stage: tradeStage,
-      setup_type: ev.setup_type || '',
-      structure: setup?.structureLabel || ev.structure_quality || setup?.structure || setup?.trend || '',
-      price: setup?.price == null ? null : Number(setup.price),
-      rr: room.estimated_rr == null ? null : Number(room.estimated_rr),
-      a_plus_ready: tradeStage === 'A+ READY',
-      missing_for_a_plus: Array.isArray(ev.missing_for_a_plus) ? ev.missing_for_a_plus : [],
-      notes: '',
-      outcome: null,
-    };
-  }
-
-  function addStockSetupToJournal(setupJson) {
-    const setup = typeof setupJson === 'string' ? JSON.parse(setupJson) : setupJson;
-    const entries = loadStockJournal();
-    entries.push(buildStockJournalEntry(setup));
-    localStorage.setItem(STOCK_JOURNAL_KEY, JSON.stringify(entries));
-    renderStockJournal();
-    showStockToast('Saved to Stock Journal.');
-  }
-
-  function showStockToast(message) {
-    const toast = document.getElementById('stockToast');
-    if (!toast) return;
-    toast.textContent = message;
-    toast.classList.add('show');
-    clearTimeout(stockToastTimer);
-    stockToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
-  }
-
-  function stockJournalStageClass(stage) {
-    if (stage === 'A+ READY') return 'ready';
-    if (stage === 'BUILDING / WATCHLIST') return 'building';
-    return 'no-trade';
-  }
-
-  function renderStockJournal() {
-    const entries = loadStockJournal();
-    const total = entries.length;
-    const ready = entries.filter(e => e.a_plus_ready || e.trade_stage === 'A+ READY').length;
-    const building = entries.filter(e => e.trade_stage === 'BUILDING / WATCHLIST').length;
-    const noTrade = total - ready - building;
-    const rrValues = entries.map(e => Number(e.rr)).filter(Number.isFinite);
-    const avgRr = rrValues.length ? (rrValues.reduce((a, b) => a + b, 0) / rrValues.length).toFixed(2) : '—';
-
-    const statMap = {
-      'sj-total': total,
-      'sj-ready': ready,
-      'sj-building': building,
-      'sj-no-trade': noTrade,
-      'sj-avg-rr': avgRr,
-    };
-    Object.entries(statMap).forEach(([id, value]) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = value;
-    });
-
-    const list = document.getElementById('stockJournalList');
-    if (!list) return;
-    if (!entries.length) {
-      list.innerHTML = '<div class="empty-journal"><div style="font-size:32px;opacity:0.3">📒</div><div>No stock journal entries yet</div><div style="font-size:11px;">Click Add to Journal on a Stock Scout card.</div></div>';
-      return;
-    }
-
-    list.innerHTML = entries.slice().reverse().map((entry, reverseIdx) => {
-      const idx = entries.length - 1 - reverseIdx;
-      const stage = entry.trade_stage || 'RANGE / NO TRADE';
-      const cls = stockJournalStageClass(stage);
-      const missing = Array.isArray(entry.missing_for_a_plus) ? entry.missing_for_a_plus : [];
-      const date = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : 'No timestamp';
-      const rr = entry.rr == null || Number.isNaN(Number(entry.rr)) ? '—' : `${Number(entry.rr).toFixed(2)}R`;
-      return `<div class="stock-journal-card ${cls}">
-        <div class="stock-journal-top">
-          <div>
-            <div class="stock-journal-symbol">${escapeHtml(entry.ticker || '—')}</div>
-            <div class="stock-journal-meta">
-              <span class="stock-stage ${cls}">${escapeHtml(stage)}</span>
-              <span class="badge ${entry.direction === 'LONG' || entry.direction === 'BULLISH' ? 'long' : entry.direction === 'SHORT' || entry.direction === 'BEARISH' ? 'short' : 'neutral'}">${escapeHtml(entry.direction || '—')}</span>
-              <span class="badge neutral">STOCK</span>
-            </div>
-          </div>
-          <div style="text-align:right;">
-            <div class="journal-rr ${Number(entry.rr) >= 2 ? 'positive' : ''}">${rr}</div>
-            <div style="font-size:10px;color:var(--slate-dim);">${escapeHtml(date)}</div>
-          </div>
-        </div>
-        <div class="stock-journal-grid">
-          <div class="stock-metric"><div class="stock-label">Price</div><div class="stock-value">${formatStockMoney(entry.price)}</div></div>
-          <div class="stock-metric"><div class="stock-label">Setup Type</div><div class="stock-value">${escapeHtml(entry.setup_type || '—')}</div></div>
-          <div class="stock-metric"><div class="stock-label">Structure</div><div class="stock-value">${escapeHtml(entry.structure || '—')}</div></div>
-          <div class="stock-metric"><div class="stock-label">A+ Ready</div><div class="stock-value">${entry.a_plus_ready ? 'Yes' : 'No'}</div></div>
-        </div>
-        ${missing.length ? `<div class="stock-journal-missing"><div class="stock-panel-title">Missing for A+</div>${missing.map(x => `<div class="stock-list-item">${escapeHtml(x)}</div>`).join('')}</div>` : ''}
-        <textarea class="stock-journal-note" placeholder="Notes..." oninput="updateStockJournalNote(${idx}, this.value)">${escapeHtml(entry.notes || '')}</textarea>
-        <div class="stock-journal-actions">
-          <button class="journal-edit-btn" onclick="setStockJournalOutcome(${idx}, null)">Pending</button>
-          <button class="journal-edit-btn" onclick="setStockJournalOutcome(${idx}, 'WIN')">Win</button>
-          <button class="journal-edit-btn" onclick="setStockJournalOutcome(${idx}, 'LOSS')">Loss</button>
-          <button class="journal-edit-btn" onclick="deleteStockJournalEntry(${idx})">Delete</button>
-          <span style="font-size:10px;color:var(--slate-dim);">Outcome: ${escapeHtml(entry.outcome || 'Pending')}</span>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  function updateStockJournalNote(idx, notes) {
-    const entries = loadStockJournal();
-    if (!entries[idx]) return;
-    entries[idx].notes = notes;
-    localStorage.setItem(STOCK_JOURNAL_KEY, JSON.stringify(entries));
-  }
-
-  function setStockJournalOutcome(idx, outcome) {
-    const entries = loadStockJournal();
-    if (!entries[idx]) return;
-    entries[idx].outcome = outcome;
-    localStorage.setItem(STOCK_JOURNAL_KEY, JSON.stringify(entries));
-    renderStockJournal();
-  }
-
-  function deleteStockJournalEntry(idx) {
-    const entries = loadStockJournal();
-    if (!entries[idx]) return;
-    entries.splice(idx, 1);
-    localStorage.setItem(STOCK_JOURNAL_KEY, JSON.stringify(entries));
-    renderStockJournal();
-  }
-
-  function clearStockJournal() {
-    if (!confirm('Clear all local stock journal entries?')) return;
-    localStorage.removeItem(STOCK_JOURNAL_KEY);
-    renderStockJournal();
-  }
-
-  function exportStockJournalCSV() {
-    const entries = loadStockJournal();
-    if (!entries.length) { alert('No stock journal entries to export.'); return; }
-    const headers = ['timestamp','ticker','direction','trade_stage','setup_type','structure','price','rr','a_plus_ready','missing_for_a_plus','notes','outcome'];
-    const rows = entries.map(e => headers.map(h => {
-      const value = Array.isArray(e[h]) ? e[h].join('; ') : e[h] ?? '';
-      return `"${String(value).replace(/"/g, '""')}"`;
-    }).join(','));
-    const a = document.createElement('a');
-    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent([headers.join(','), ...rows].join('\n'));
-    a.download = `stock_journal_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-  }
-
-  function renderStockList(title, items, cls) {
-    const list = (items || []).filter(Boolean);
-    if (!list.length) return '';
-    return `<div class="${cls}"><div class="stock-panel-title">${title}</div>${list.map(x => `<div class="stock-list-item">${escapeHtml(x)}</div>`).join('')}</div>`;
-  }
-
-  function renderStockCard(s) {
-    const ev = s.trade_eval || {};
-    const q = s.quality || {};
-    const room = ev.room_to_target || {};
-    const stage = ev.trade_stage || 'RANGE / NO TRADE';
-    const stageCls = stockStageClass(stage);
-    const roomTarget = room.target != null ? formatStockMoney(room.target) : '—';
-    const roomPct = room.percent_to_target != null ? `${room.percent_to_target}%` : '—';
-    const rr = room.estimated_rr != null ? `${Number(room.estimated_rr).toFixed(2)}R` : '—';
-    const dir = s.direction || s.trend || 'NEUTRAL';
-    const dirCls = dir === 'LONG' || dir === 'BULLISH' ? 'long' : dir === 'SHORT' || dir === 'BEARISH' ? 'short' : 'neutral';
-    const encoded = encodeURIComponent(JSON.stringify(s)).replace(/'/g, '%27');
-    const isAPlusAlert = stockAPlusAlertTickers.has(getStockStageKey(s));
-    return `<div class="stock-card ${stageCls}${isAPlusAlert ? ' a-plus-alert' : ''}">
-      <div class="stock-card-head">
-        <div>
-          <div class="stock-ticker">${escapeHtml(s.ticker || '—')}</div>
-          <div class="stock-price">${formatStockMoney(s.price)} · RSI ${s.rsi ?? '—'} · ATR ${formatStockMoney(s.atr)}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
-          <div class="stock-stage ${stageCls}">${escapeHtml(ev.stage_badge || stage)}</div>
-          <div class="badges" style="justify-content:flex-end;">
-            ${q.grade ? `<span class="badge ${q.grade?.startsWith('A') ? 'bullish' : q.grade?.startsWith('B') ? 'strong' : 'neutral'}">Grade ${escapeHtml(q.grade)}</span>` : ''}
-            <span class="badge ${dirCls}">${escapeHtml(dir)}</span>
-          </div>
-        </div>
-      </div>
-      <div class="stock-body">
-        <div class="stock-metrics">
-          <div class="stock-metric"><div class="stock-label">Location</div><div class="stock-value">${escapeHtml(ev.location || q.location || '—')}${ev.location_percentile != null ? ` · ${ev.location_percentile}%` : ''}</div></div>
-          <div class="stock-metric"><div class="stock-label">Structure Quality</div><div class="stock-value">${escapeHtml(ev.structure_quality || '—')}</div></div>
-          <div class="stock-metric"><div class="stock-label">Displacement</div><div class="stock-value">${escapeHtml(ev.displacement || '—')}${ev.displacement_score ? ` · ${ev.displacement_score} ATR` : ''}</div></div>
-          <div class="stock-metric"><div class="stock-label">Setup Type</div><div class="stock-value">${escapeHtml(ev.setup_type || 'NONE')}</div></div>
-          <div class="stock-metric"><div class="stock-label">BOS / OB</div><div class="stock-value">BOS ${formatStockMoney(s.bos_level)} · OB ${formatStockMoney(s.ob_low)}-${formatStockMoney(s.ob_high)}</div></div>
-          <div class="stock-metric"><div class="stock-label">Room to Target</div><div class="stock-value ${room.blocked ? 'blocked' : ''}">${roomPct} to ${roomTarget} · RR ${rr}${room.blocked ? ' · BLOCKED' : room.clear ? ' · CLEAR' : ''}</div></div>
-        </div>
-        ${renderStockList('Missing for A+', ev.missing_for_a_plus, 'stock-missing')}
-        ${renderStockList('What would make this tradeable?', ev.coaching, 'stock-coach')}
-      </div>
-      <div class="stock-card-actions">
-        <button class="stock-journal-btn" onclick="addStockSetupToJournal(decodeURIComponent('${encoded}'))">Add to Journal</button>
-      </div>
-    </div>`;
-  }
-
   const journalMap = {};
   let journalEntries = [];
   let _journalEntries = [];
   let jFilter = 'ALL';
   let journalView = 'active';
-
-  updateStockSoundUi();
 
   async function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -2407,7 +1769,6 @@
     document.getElementById('tab-' + tab).classList.add('active');
     document.getElementById('content-' + tab).classList.add('active');
     if (tab === 'journal') await loadJournal();
-    if (tab === 'stockjournal') renderStockJournal();
     if (tab === 'analytics') await loadAnalytics();
     if (tab === 'calculator') { document.getElementById('calc-account').value = '25308'; calcPosition(); }
     if (tab === 'trending') await loadTrending();
@@ -2416,10 +1777,6 @@
       await loadPriorityPairs();
       fetchLatestSetups();
       autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
-    }
-    if (tab === 'stock') {
-      updateStockSoundUi();
-      await loadStockWatchlist();
     }
   }
 
