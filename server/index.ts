@@ -7,7 +7,7 @@ import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats, getSetting, setSetting, deleteSetting, getSettingsStorageInfo } from './db.js';
-import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS, runScoutScan, ScoutReport } from './scanner.js';
+import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS, runScoutScan, ScoutReport, runTrendScan, TrendScanResult } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -20,6 +20,8 @@ app.use(express.text({ type: 'text/plain' }));
 
 let latestSetups: Setup[] = [];
 let latestScoutResults: ScoutReport[] = [];
+let latestTrendResults: TrendScanResult | null = null;
+let lastTrendScanTime: string | null = null;
 let latestRejected: Array<{ pair: string; reason: string; detail: any; granularity: string }> = [];
 let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
@@ -325,6 +327,24 @@ app.post('/api/scout', async (req, res) => {
     latestScoutResults = await runScoutScan(tf);
     lastScanTime = new Date().toISOString();
     res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Trending API ──────────────────────────────────────────────────────────────
+app.get('/api/trending', (_req, res) => {
+  res.json({
+    ...(latestTrendResults ?? { strongBullish: [], strongBearish: [], pullbackOpportunities: [], all: [] }),
+    lastScanTime: lastTrendScanTime,
+  });
+});
+
+app.post('/api/trending', async (_req, res) => {
+  try {
+    latestTrendResults = await runTrendScan();
+    lastTrendScanTime = new Date().toISOString();
+    res.json({ ...latestTrendResults, lastScanTime: lastTrendScanTime });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

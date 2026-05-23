@@ -19,10 +19,19 @@ export const PAIRS = [
   'XAU_USD','XAG_USD',
 ];
 
+export const TRENDING_ASSETS = [
+  ...PAIRS,
+  'US30_USD',
+  'NAS100_USD',
+];
+
 const HTF_MAP: Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };
 
 interface Candle { t:string; o:number; h:number; l:number; c:number; v:number; }
 interface Swing  { index:number; price:number; type:'high'|'low'; }
+
+type TrendDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+type MarketState = 'TRENDING' | 'PULLBACK' | 'EXPANDING' | 'EXHAUSTED' | 'CHOPPY';
 
 export interface SetupChecklist {
   trend: boolean;           // Gate 1: EMA stack (price > EMA50 > EMA200) + EMA20 slope + HTF alignment
@@ -822,6 +831,259 @@ export interface ScoutReport {
   tp1: number | null;
   tp2: number | null;
   rrRatio: number | null;
+}
+
+export interface TrendReport {
+  pair: string;
+  displaySymbol: string;
+  direction: TrendDirection;
+  trendScore: number;
+  structureState: string;
+  marketState: MarketState;
+  session: string;
+  cleanlinessScore: number;
+  htfAlignment: string;
+  whyTrending: string[];
+  warnings: string[];
+  timeframe: string;
+  scannedAt: string;
+}
+
+export interface TrendScanResult {
+  strongBullish: TrendReport[];
+  strongBearish: TrendReport[];
+  pullbackOpportunities: TrendReport[];
+  all: TrendReport[];
+}
+
+function signedDirection(direction: TrendDirection): number {
+  return direction === 'BULLISH' ? 1 : direction === 'BEARISH' ? -1 : 0;
+}
+
+function getEmaTrend(candles: Candle[]): TrendDirection {
+  if (candles.length < 55) return 'NEUTRAL';
+  const ema20 = calcEMA(candles, 20);
+  const ema50 = calcEMA(candles, 50);
+  const lastIdx = candles.length - 1;
+  const price = candles[lastIdx].c;
+  const e20 = ema20[lastIdx];
+  const e50 = ema50[lastIdx];
+  const e20Prev = ema20[lastIdx - 5];
+  if (!e20 || !e50 || !e20Prev) return 'NEUTRAL';
+  if (price > e20 && e20 > e50 && e20 > e20Prev) return 'BULLISH';
+  if (price < e20 && e20 < e50 && e20 < e20Prev) return 'BEARISH';
+  return 'NEUTRAL';
+}
+
+function getStructureState(candles: Candle[]): { direction: TrendDirection; label: string } {
+  const swings = findSwings(candles.slice(-120), 4);
+  const highs = swings.filter(s => s.type === 'high');
+  const lows = swings.filter(s => s.type === 'low');
+  const trend = getTrend(swings);
+  if (trend === 'LONG') return { direction: 'BULLISH', label: 'Clean HH/HL' };
+  if (trend === 'SHORT') return { direction: 'BEARISH', label: 'Clean LH/LL' };
+  if (highs.length >= 2 && lows.length >= 2) return { direction: 'NEUTRAL', label: 'Mixed swings' };
+  return { direction: 'NEUTRAL', label: 'Limited structure' };
+}
+
+function countRecentStructureEvents(candles: Candle[], direction: TrendDirection) {
+  const structures = computeStructures(candles.slice(-140), 4);
+  const wanted = direction === 'BULLISH' ? 'bullish' : direction === 'BEARISH' ? 'bearish' : null;
+  const opposing = direction === 'BULLISH' ? 'bearish' : direction === 'BEARISH' ? 'bullish' : null;
+  const recentBos = wanted ? structures.bosEvents.filter(e => e.type === wanted).slice(-3).length : 0;
+  const recentChoch = opposing ? structures.chochEvents.filter(e => e.type === opposing).slice(-3).length : structures.chochEvents.slice(-3).length;
+  return { recentBos, recentChoch };
+}
+
+function getDisplacementStats(candles: Candle[], direction: TrendDirection, atr: number) {
+  const sign = signedDirection(direction);
+  if (!sign || atr <= 0) return { strong: false, persistence: 0, opposingWickRatio: 0 };
+  const recent = candles.slice(-12);
+  let aligned = 0;
+  let strongBodies = 0;
+  let opposingWickTotal = 0;
+  for (const c of recent) {
+    const body = Math.abs(c.c - c.o);
+    const dirOk = sign > 0 ? c.c > c.o : c.c < c.o;
+    if (dirOk) aligned++;
+    if (dirOk && body >= 0.65 * atr) strongBodies++;
+    const upper = c.h - Math.max(c.c, c.o);
+    const lower = Math.min(c.c, c.o) - c.l;
+    opposingWickTotal += sign > 0 ? upper : lower;
+  }
+  return {
+    strong: strongBodies >= 2 || recent.some(c => Math.abs(c.c - c.o) >= 1.1 * atr),
+    persistence: aligned / Math.max(1, recent.length),
+    opposingWickRatio: opposingWickTotal / Math.max(atr, 0.00001) / Math.max(1, recent.length),
+  };
+}
+
+function getChopStats(candles: Candle[], atr: number) {
+  const recent = candles.slice(-18);
+  const bodies = recent.map(c => Math.abs(c.c - c.o));
+  const ranges = recent.map(c => c.h - c.l).filter(v => v > 0);
+  const avgBody = bodies.reduce((a, b) => a + b, 0) / Math.max(1, bodies.length);
+  const avgRange = ranges.reduce((a, b) => a + b, 0) / Math.max(1, ranges.length);
+  let overlaps = 0;
+  for (let i = 1; i < recent.length; i++) {
+    const overlap = Math.max(0, Math.min(recent[i].h, recent[i - 1].h) - Math.max(recent[i].l, recent[i - 1].l));
+    const prevRange = Math.max(recent[i - 1].h - recent[i - 1].l, 0.00001);
+    if (overlap / prevRange > 0.55) overlaps++;
+  }
+  const overlapRatio = overlaps / Math.max(1, recent.length - 1);
+  const bodyRatio = avgRange > 0 ? avgBody / avgRange : 0;
+  const recentRange = Math.max(...recent.map(c => c.h)) - Math.min(...recent.map(c => c.l));
+  const compression = atr > 0 ? recentRange / atr : 0;
+  return {
+    overlapRatio,
+    bodyRatio,
+    compression,
+    choppy: overlapRatio > 0.55 || bodyRatio < 0.38 || compression < 4.5,
+  };
+}
+
+function isCleanPullback(candles: Candle[], direction: TrendDirection, atr: number): boolean {
+  if (direction === 'NEUTRAL' || candles.length < 55) return false;
+  const ema20 = calcEMA(candles, 20);
+  const ema50 = calcEMA(candles, 50);
+  const recent = candles.slice(-8);
+  const lastIdx = candles.length - 1;
+  const e20 = ema20[lastIdx];
+  const e50 = ema50[lastIdx];
+  if (!e20 || !e50 || atr <= 0) return false;
+  if (direction === 'BULLISH') {
+    return recent.some(c => c.l <= e20 + 0.65 * atr && c.c >= e50) && candles[lastIdx].c >= e20;
+  }
+  return recent.some(c => c.h >= e20 - 0.65 * atr && c.c <= e50) && candles[lastIdx].c <= e20;
+}
+
+function nearHtfZone(candles: Candle[], direction: TrendDirection, price: number, atr: number): boolean {
+  if (direction === 'NEUTRAL') return false;
+  const structures = computeStructures(candles.slice(-180), 5);
+  const zones = direction === 'BULLISH' ? structures.supplyZones : structures.demandZones;
+  return zones.slice(-3).some(z => price <= z.obHigh + atr && price >= z.obLow - atr);
+}
+
+export function analyzeTrendMarket(pair: string, h1: Candle[], h4: Candle[], daily: Candle[]): TrendReport | null {
+  if (h1.length < 80 || h4.length < 80 || daily.length < 80) return null;
+  const price = h1[h1.length - 1].c;
+  const h1Atr = calcATR(h1.slice(-50));
+  const h1BaselineAtr = calcATR(h1.slice(-100, -40));
+  const atrExpansion = h1BaselineAtr > 0 ? h1Atr / h1BaselineAtr : 1;
+  const dailyDir = getEmaTrend(daily);
+  const h4Dir = getEmaTrend(h4);
+  const h1Dir = getEmaTrend(h1);
+  const structure = getStructureState(h4);
+  const directionVotes = [dailyDir, h4Dir, h1Dir, structure.direction].filter(d => d !== 'NEUTRAL');
+  const bullishVotes = directionVotes.filter(d => d === 'BULLISH').length;
+  const bearishVotes = directionVotes.filter(d => d === 'BEARISH').length;
+  const direction: TrendDirection = bullishVotes >= 3 ? 'BULLISH' : bearishVotes >= 3 ? 'BEARISH' : 'NEUTRAL';
+  const htfAligned = direction !== 'NEUTRAL' && dailyDir === direction && h4Dir === direction && h1Dir === direction;
+  const { recentBos, recentChoch } = countRecentStructureEvents(h4, direction);
+  const displacement = getDisplacementStats(h1, direction, h1Atr);
+  const chop = getChopStats(h1, h1Atr);
+  const cleanPullback = isCleanPullback(h1, direction, h1Atr);
+  const nearZone = nearHtfZone(h4, direction, price, h1Atr);
+  const emaAligned = direction !== 'NEUTRAL' && h1Dir === direction && h4Dir === direction;
+  const overextended = direction !== 'NEUTRAL' && h1Atr > 0 && Math.abs(price - (calcEMA(h1, 20)[h1.length - 1] ?? price)) / h1Atr > 3.2;
+  const silverNoiseMultiplier = pair === 'XAG_USD' ? 1.45 : 1;
+
+  let score = 0;
+  if (htfAligned) score += 2.0;
+  else if (direction !== 'NEUTRAL' && dailyDir === direction && h4Dir === direction) score += 1.2;
+  if (recentBos >= 2) score += 1.4;
+  else if (recentBos === 1) score += 0.7;
+  if (displacement.strong) score += 1.3;
+  if (emaAligned) score += 1.1;
+  if (structure.direction === direction) score += 1.2;
+  if (displacement.persistence >= 0.62) score += 0.9;
+  if (atrExpansion >= 1.08) score += 0.8;
+  if (!chop.choppy) score += 1.3;
+  if (cleanPullback) score += 0.6;
+
+  score -= chop.overlapRatio > 0.5 ? 1.2 * silverNoiseMultiplier : 0;
+  score -= chop.bodyRatio < 0.35 ? 1.0 * silverNoiseMultiplier : 0;
+  score -= chop.compression < 4.2 ? 1.1 * silverNoiseMultiplier : 0;
+  score -= recentChoch * 0.8;
+  score -= displacement.opposingWickRatio > 0.55 ? 0.8 * silverNoiseMultiplier : 0;
+  score -= nearZone ? 0.8 : 0;
+  score -= overextended ? 1.0 : 0;
+  if (direction === 'NEUTRAL') score = Math.min(score, 4.0);
+
+  const trendScore = Math.max(0, Math.min(10, Math.round(score * 10) / 10));
+  const cleanlinessRaw = 10
+    - (chop.overlapRatio * 4.0 * silverNoiseMultiplier)
+    - ((1 - Math.min(chop.bodyRatio, 0.7)) * 2.0 * silverNoiseMultiplier)
+    - Math.max(0, 4.5 - chop.compression) * 0.45 * silverNoiseMultiplier
+    - (recentChoch * 0.7)
+    - (displacement.opposingWickRatio > 0.55 ? 1.0 * silverNoiseMultiplier : 0);
+  const cleanlinessScore = Math.max(0, Math.min(10, Math.round(cleanlinessRaw * 10) / 10));
+
+  let marketState: MarketState = 'TRENDING';
+  if (direction === 'NEUTRAL' || trendScore < 4.5 || cleanlinessScore < 4.5) marketState = 'CHOPPY';
+  else if (overextended) marketState = 'EXHAUSTED';
+  else if (atrExpansion >= 1.25 && displacement.strong) marketState = 'EXPANDING';
+  else if (cleanPullback) marketState = 'PULLBACK';
+
+  const whyTrending: string[] = [];
+  const warnings: string[] = [];
+  if (htfAligned) whyTrending.push(`Daily + H4 + H1 ${direction.toLowerCase()} alignment`);
+  else warnings.push(`HTF mixed: D ${dailyDir}, H4 ${h4Dir}, H1 ${h1Dir}`);
+  if (displacement.strong) whyTrending.push(`Strong ${direction.toLowerCase()} displacement`);
+  if (recentBos >= 2) whyTrending.push('Consecutive BOS in trend direction');
+  else if (recentBos === 1) whyTrending.push('Recent BOS in trend direction');
+  if (structure.direction === direction) whyTrending.push(structure.label);
+  if (cleanPullback) whyTrending.push('Clean pullback into EMA20/EMA50 trend');
+  if (atrExpansion >= 1.08) whyTrending.push('ATR expansion / volatility expansion');
+  if (chop.choppy) warnings.push(pair === 'XAG_USD' ? 'Silver chop/compression penalty active' : 'Choppy overlap or compression');
+  if (recentChoch) warnings.push('Opposing CHOCH detected');
+  if (nearZone) warnings.push(`Near H4 ${direction === 'BULLISH' ? 'supply' : 'demand'}`);
+  if (overextended) warnings.push('Structure extended away from EMA20');
+  if (!whyTrending.length) whyTrending.push('No clean directional trend yet');
+
+  return {
+    pair,
+    displaySymbol: pair.replace('_', '/'),
+    direction,
+    trendScore,
+    structureState: structure.label,
+    marketState,
+    session: getSessionLabel(pair),
+    cleanlinessScore,
+    htfAlignment: `D ${dailyDir} / H4 ${h4Dir} / H1 ${h1Dir}`,
+    whyTrending,
+    warnings,
+    timeframe: 'D/H4/H1',
+    scannedAt: new Date().toISOString(),
+  };
+}
+
+export async function runTrendScan(): Promise<TrendScanResult> {
+  const all: TrendReport[] = [];
+  for (const pair of TRENDING_ASSETS) {
+    try {
+      const [h1, h4, daily] = await Promise.all([
+        fetchCandles(pair, 'H1', 250),
+        fetchCandles(pair, 'H4', 220),
+        fetchCandles(pair, 'D', 220),
+      ]);
+      const report = analyzeTrendMarket(pair, h1, h4, daily);
+      if (report) all.push(report);
+    } catch (e: any) {
+      console.error(`Trend skip ${pair}:`, e.message);
+    }
+  }
+  all.sort((a, b) => b.trendScore - a.trendScore || b.cleanlinessScore - a.cleanlinessScore);
+  const strongBullish = all
+    .filter(r => r.direction === 'BULLISH' && ['TRENDING', 'EXPANDING'].includes(r.marketState) && r.trendScore >= 6)
+    .slice(0, 10);
+  const strongBearish = all
+    .filter(r => r.direction === 'BEARISH' && ['TRENDING', 'EXPANDING'].includes(r.marketState) && r.trendScore >= 6)
+    .slice(0, 10);
+  const pullbackOpportunities = all
+    .filter(r => r.direction !== 'NEUTRAL' && r.marketState === 'PULLBACK' && r.trendScore >= 5.5)
+    .slice(0, 10);
+  return { strongBullish, strongBearish, pullbackOpportunities, all };
 }
 
 export function scoutAnalyzeCandles(

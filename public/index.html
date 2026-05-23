@@ -129,9 +129,45 @@
     .search-box::placeholder { color: var(--slate-dim); }
     .result-count { font-size: 11px; color: var(--slate-dim); }
     .result-count span { color: var(--text); }
+    .trending-page { padding: 18px 24px 28px; }
+    .trend-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:16px; }
+    .trend-heading { font-size:18px; font-weight:900; letter-spacing:.02em; color:var(--text); }
+    .trend-sub { font-size:11px; color:var(--slate-dim); margin-top:5px; max-width:760px; line-height:1.5; }
+    .trend-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .trend-section { margin-top:18px; }
+    .trend-section-title { font-size:12px; font-weight:900; color:var(--text); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+    .trend-section-title span { color:var(--slate-dim); font-weight:600; text-transform:none; letter-spacing:0; }
+    .trend-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:12px; }
+    .trend-card { background:linear-gradient(135deg,#0D1117 0%,#090d14 100%); border:1px solid var(--border); border-radius:12px; padding:14px; }
+    .trend-card.bullish { border-color:rgba(0,255,136,0.22); }
+    .trend-card.bearish { border-color:rgba(255,59,92,0.22); }
+    .trend-card.pullback { border-color:rgba(245,166,35,0.24); }
+    .trend-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+    .trend-pair { font-size:18px; font-weight:900; color:var(--text); }
+    .trend-score { font-size:26px; font-weight:900; line-height:1; text-align:right; }
+    .trend-score.bullish { color:var(--green); }
+    .trend-score.bearish { color:var(--red); }
+    .trend-score.neutral { color:var(--slate); }
+    .trend-score-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; text-align:right; margin-top:3px; }
+    .trend-meta { display:grid; grid-template-columns:repeat(2,1fr); gap:7px; margin-bottom:10px; }
+    .trend-metric { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:8px; }
+    .trend-metric-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; margin-bottom:3px; }
+    .trend-metric-value { font-size:12px; color:var(--text); font-weight:700; }
+    .market-state { display:inline-flex; align-items:center; border-radius:99px; border:1px solid; padding:2px 8px; font-size:9px; font-weight:900; letter-spacing:.06em; }
+    .market-state.trending { color:var(--green); border-color:rgba(0,255,136,.35); background:rgba(0,255,136,.07); }
+    .market-state.pullback { color:var(--gold); border-color:rgba(245,166,35,.35); background:rgba(245,166,35,.08); }
+    .market-state.expanding { color:var(--blue); border-color:rgba(96,165,250,.35); background:rgba(96,165,250,.08); }
+    .market-state.exhausted { color:#f97316; border-color:rgba(249,115,22,.35); background:rgba(249,115,22,.08); }
+    .market-state.choppy { color:var(--red); border-color:rgba(255,59,92,.35); background:rgba(255,59,92,.08); }
+    details.trend-why { margin-top:8px; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px; }
+    details.trend-why summary { cursor:pointer; color:var(--blue); font-size:11px; font-weight:800; }
+    .trend-reasons { margin-top:8px; display:flex; flex-direction:column; gap:5px; }
+    .trend-reason { font-size:11px; color:var(--slate); line-height:1.35; }
+    .trend-empty { color:var(--slate-dim); border:1px dashed rgba(148,163,184,.18); border-radius:10px; padding:24px; text-align:center; font-size:12px; }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
       .setup-grid { grid-template-columns: 1fr; padding: 10px; }
+      .trend-grid { grid-template-columns:1fr; }
     }
     .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
     .tab-btn { padding: 14px 20px; font-size: 12px; font-family: inherit; border: none; background: transparent; color: var(--slate-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; font-weight: 500; letter-spacing: 0.3px; }
@@ -386,6 +422,7 @@
 
 <div class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
+  <button class="tab-btn" onclick="switchTab('trending')" id="tab-trending">🔥 Trending</button>
   <button class="tab-btn" onclick="switchTab('stock')" id="tab-stock">📈 Stock Scout</button>
   <button class="tab-btn" onclick="switchTab('stockjournal')" id="tab-stockjournal">📒 Stock Journal</button>
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
@@ -491,6 +528,33 @@
 
 <div id="nearMissContent"></div>
 
+</div>
+
+<div id="content-trending" class="tab-content">
+  <div class="trending-page">
+    <div class="trend-hero">
+      <div>
+        <div class="trend-heading">🔥 Trending Markets</div>
+        <div class="trend-sub">Ranks forex, metals, US30, and NAS100 by trend quality and cleanliness only. This tab does not generate entries or trade signals; it answers which markets are moving cleanly right now.</div>
+      </div>
+      <div class="trend-actions">
+        <span id="trendLastScan" style="font-size:11px;color:var(--slate-dim);">Not scanned yet</span>
+        <button class="scan-btn" onclick="runTrendingScan()" id="trendScanBtn"><span id="trendScanIcon">↻</span> Scan Trends</button>
+      </div>
+    </div>
+    <div class="trend-section">
+      <div class="trend-section-title">Strong Bullish Trends <span id="trendBullishCount"></span></div>
+      <div class="trend-grid" id="trendBullishGrid"><div class="trend-empty">Run a trend scan to rank bullish markets.</div></div>
+    </div>
+    <div class="trend-section">
+      <div class="trend-section-title">Strong Bearish Trends <span id="trendBearishCount"></span></div>
+      <div class="trend-grid" id="trendBearishGrid"><div class="trend-empty">Run a trend scan to rank bearish markets.</div></div>
+    </div>
+    <div class="trend-section">
+      <div class="trend-section-title">Pullback Opportunities <span id="trendPullbackCount"></span></div>
+      <div class="trend-grid" id="trendPullbackGrid"><div class="trend-empty">Clean trend pullbacks will appear here.</div></div>
+    </div>
+  </div>
 </div>
 
 <div id="content-stock" class="tab-content">
@@ -1199,6 +1263,116 @@
       renderSetups();
     } catch(e) {
       console.warn('Could not fetch latest scout:', e.message);
+    }
+  }
+
+  let trendingLoaded = false;
+
+  function trendDirectionClass(direction) {
+    if (direction === 'BULLISH') return 'bullish';
+    if (direction === 'BEARISH') return 'bearish';
+    return 'neutral';
+  }
+
+  function trendMarketStateClass(state) {
+    return String(state || 'CHOPPY').toLowerCase();
+  }
+
+  function renderTrendCard(row, sectionType) {
+    const dirClass = trendDirectionClass(row.direction);
+    const marketState = row.marketState || 'CHOPPY';
+    const reasons = [
+      ...(row.whyTrending || []).map(x => `✅ ${escapeHtml(x)}`),
+      ...(row.warnings || []).map(x => `⚠ ${escapeHtml(x)}`),
+    ];
+    return `
+      <div class="trend-card ${sectionType || dirClass}">
+        <div class="trend-top">
+          <div>
+            <div class="trend-pair">${escapeHtml(row.displaySymbol || row.pair)}</div>
+            <div class="badges">
+              <span class="badge ${dirClass === 'bullish' ? 'long' : dirClass === 'bearish' ? 'short' : 'tf'}">${escapeHtml(row.direction || 'NEUTRAL')}</span>
+              <span class="badge tf">${escapeHtml(row.timeframe || 'D/H4/H1')}</span>
+              <span class="badge session">${escapeHtml(row.session || '—')}</span>
+            </div>
+          </div>
+          <div>
+            <div class="trend-score ${dirClass}">${Number(row.trendScore || 0).toFixed(1)}</div>
+            <div class="trend-score-label">Trend Score</div>
+          </div>
+        </div>
+        <div class="trend-meta">
+          <div class="trend-metric"><div class="trend-metric-label">Structure State</div><div class="trend-metric-value">${escapeHtml(row.structureState || '—')}</div></div>
+          <div class="trend-metric"><div class="trend-metric-label">Market State</div><div class="trend-metric-value"><span class="market-state ${trendMarketStateClass(marketState)}">${escapeHtml(marketState)}</span></div></div>
+          <div class="trend-metric"><div class="trend-metric-label">Session</div><div class="trend-metric-value">${escapeHtml(row.session || '—')}</div></div>
+          <div class="trend-metric"><div class="trend-metric-label">Cleanliness</div><div class="trend-metric-value">${Number(row.cleanlinessScore || 0).toFixed(1)} / 10</div></div>
+        </div>
+        <div class="trend-metric"><div class="trend-metric-label">HTF Alignment</div><div class="trend-metric-value">${escapeHtml(row.htfAlignment || '—')}</div></div>
+        <details class="trend-why">
+          <summary>Why Trending</summary>
+          <div class="trend-reasons">
+            ${reasons.map(r => `<div class="trend-reason">${r}</div>`).join('') || '<div class="trend-reason">No clean directional movement yet.</div>'}
+          </div>
+        </details>
+      </div>`;
+  }
+
+  function renderTrendSection(id, rows, emptyText, sectionType) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!rows || !rows.length) {
+      el.innerHTML = `<div class="trend-empty">${escapeHtml(emptyText)}</div>`;
+      return;
+    }
+    el.innerHTML = rows.slice(0, 10).map(r => renderTrendCard(r, sectionType)).join('');
+  }
+
+  function renderTrending(data) {
+    const bullish = data?.strongBullish || [];
+    const bearish = data?.strongBearish || [];
+    const pullbacks = data?.pullbackOpportunities || [];
+    document.getElementById('trendBullishCount').textContent = `Top ${bullish.length}`;
+    document.getElementById('trendBearishCount').textContent = `Top ${bearish.length}`;
+    document.getElementById('trendPullbackCount').textContent = `Top ${pullbacks.length}`;
+    renderTrendSection('trendBullishGrid', bullish, 'No strong bullish trends met the quality threshold.', 'bullish');
+    renderTrendSection('trendBearishGrid', bearish, 'No strong bearish trends met the quality threshold.', 'bearish');
+    renderTrendSection('trendPullbackGrid', pullbacks, 'No clean pullback opportunities met the trend-quality threshold.', 'pullback');
+    if (data?.lastScanTime) {
+      document.getElementById('trendLastScan').textContent = `Last trend scan: ${new Date(data.lastScanTime).toLocaleString()}`;
+    }
+  }
+
+  async function loadTrending() {
+    try {
+      const res = await fetch('/api/trending');
+      if (!res.ok) return;
+      const data = await res.json();
+      if ((data.all || []).length || data.lastScanTime) {
+        trendingLoaded = true;
+        renderTrending(data);
+      }
+    } catch(e) {
+      console.warn('Could not load trend scan:', e.message);
+    }
+  }
+
+  async function runTrendingScan() {
+    const btn = document.getElementById('trendScanBtn');
+    const icon = document.getElementById('trendScanIcon');
+    btn.disabled = true;
+    icon.classList.add('spin');
+    document.getElementById('trendLastScan').textContent = 'Scanning D/H4/H1 trend quality...';
+    try {
+      const res = await fetch('/api/trending', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Trend scan failed');
+      trendingLoaded = true;
+      renderTrending(data);
+    } catch(e) {
+      document.getElementById('trendLastScan').textContent = `Trend scan failed: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+      icon.classList.remove('spin');
     }
   }
 
@@ -2236,6 +2410,7 @@
     if (tab === 'stockjournal') renderStockJournal();
     if (tab === 'analytics') await loadAnalytics();
     if (tab === 'calculator') { document.getElementById('calc-account').value = '25308'; calcPosition(); }
+    if (tab === 'trending') await loadTrending();
     clearInterval(autoRefreshTimer);
     if (tab === 'scanner') {
       await loadPriorityPairs();
