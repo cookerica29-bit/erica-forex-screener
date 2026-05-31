@@ -7,7 +7,7 @@ import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats, getSetting, setSetting, deleteSetting, getSettingsStorageInfo } from './db.js';
-import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS, runScoutScan, ScoutReport, runTrendScan, TrendScanResult } from './scanner.js';
+import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS, runScoutScan, ScoutReport, runTrendScan, TrendReport, TrendScanResult } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -22,6 +22,9 @@ let latestSetups: Setup[] = [];
 let latestScoutResults: ScoutReport[] = [];
 let latestTrendResults: TrendScanResult | null = null;
 let lastTrendScanTime: string | null = null;
+let trendScanInFlight: Promise<TrendScanResult> | null = null;
+let trendingMembershipInitialized = false;
+let previousTrendingPairs = new Set<string>();
 let latestRejected: Array<{ pair: string; reason: string; detail: any; granularity: string }> = [];
 let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
@@ -135,6 +138,76 @@ async function sendTelegram(text: string, parseMode?: 'Markdown') {
   const data = await response.json() as any;
   if (!data.ok) console.error('[Telegram] API error:', JSON.stringify(data));
   return data;
+}
+
+function getSurfacedTrends(results: TrendScanResult) {
+  const surfaced = new Map<string, { report: TrendReport; section: string }>();
+  const add = (reports: TrendReport[], section: string) => {
+    for (const report of reports) {
+      if (!surfaced.has(report.pair)) surfaced.set(report.pair, { report, section });
+    }
+  };
+  add(results.strongBullish, 'Strong Bullish Trends');
+  add(results.strongBearish, 'Strong Bearish Trends');
+  add(results.pullbackOpportunities, 'Pullback Opportunities');
+  return surfaced;
+}
+
+async function notifyNewTrendingPairs(results: TrendScanResult) {
+  const surfaced = getSurfacedTrends(results);
+  const currentPairs = new Set(surfaced.keys());
+  const analyzedPairs = new Set(results.all.map(report => report.pair));
+  if (!trendingMembershipInitialized) {
+    if (!analyzedPairs.size) {
+      console.warn('[Trending] Baseline deferred: no markets were analyzed successfully');
+      return;
+    }
+    previousTrendingPairs = currentPairs;
+    trendingMembershipInitialized = true;
+    console.log(`[Trending] Baseline initialized with ${currentPairs.size} surfaced market${currentPairs.size === 1 ? '' : 's'}`);
+    return;
+  }
+
+  const added = [...surfaced.values()].filter(({ report }) => !previousTrendingPairs.has(report.pair));
+  // Preserve membership for assets that failed market-data analysis this cycle.
+  // A transient provider failure must not turn recovered markets into false "new" alerts.
+  previousTrendingPairs = new Set([
+    ...currentPairs,
+    ...[...previousTrendingPairs].filter(pair => !analyzedPairs.has(pair)),
+  ]);
+  for (const { report, section } of added) {
+    const direction = report.direction === 'BULLISH' ? '🟢 BULLISH' : report.direction === 'BEARISH' ? '🔴 BEARISH' : '⚪ NEUTRAL';
+    const text = `🔥 *NEW TRENDING MARKET — ${report.displaySymbol}*\n${direction} | ${section}\nTrend score: ${report.trendScore.toFixed(1)}/10 | Cleanliness: ${report.cleanlinessScore.toFixed(1)}/10\nState: ${report.marketState} | ${report.htfAlignment}\nSession: ${report.session}\n→ https://erica-forex-screener-production.up.railway.app`;
+    sendTelegram(text, 'Markdown').then((data: any) => {
+      if (data.ok) console.log(`[Trending] Telegram alert sent for new market ${report.pair}`);
+    }).catch((e: any) => console.error(`[Trending] Telegram alert failed for ${report.pair}:`, e.message));
+  }
+  if (added.length) console.log(`[Trending] ${added.length} newly surfaced market${added.length === 1 ? '' : 's'} detected`);
+}
+
+async function refreshTrendingMarkets() {
+  if (trendScanInFlight) return trendScanInFlight;
+  trendScanInFlight = (async () => {
+    console.log(`[Trending] Running scan at ${new Date().toISOString()}`);
+    const results = await runTrendScan();
+    latestTrendResults = results;
+    lastTrendScanTime = new Date().toISOString();
+    await notifyNewTrendingPairs(results);
+    return results;
+  })();
+  try {
+    return await trendScanInFlight;
+  } finally {
+    trendScanInFlight = null;
+  }
+}
+
+async function scheduledTrendScan() {
+  try {
+    await refreshTrendingMarkets();
+  } catch (e: any) {
+    console.error('[Trending] Scan failed:', e.message);
+  }
 }
 
 function toNumber(value: unknown): number | undefined {
@@ -258,7 +331,9 @@ async function init() {
     console.warn('[Priority] Could not load from storage on startup:', e);
   }
   scheduledScan();
+  scheduledTrendScan();
   setInterval(scheduledScan, 15 * 60 * 1000);
+  setInterval(scheduledTrendScan, 15 * 60 * 1000);
 }
 init();
 
@@ -303,9 +378,8 @@ app.get('/api/trending', (_req, res) => {
 
 app.post('/api/trending', async (_req, res) => {
   try {
-    latestTrendResults = await runTrendScan();
-    lastTrendScanTime = new Date().toISOString();
-    res.json({ ...latestTrendResults, lastScanTime: lastTrendScanTime });
+    const results = await refreshTrendingMarkets();
+    res.json({ ...results, lastScanTime: lastTrendScanTime });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

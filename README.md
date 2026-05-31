@@ -60,3 +60,13 @@ TradingView alert message:
 ```
 
 Use `"action": "sell"` for short alerts. The endpoint requires `symbol`, `action`, `entry`, `sl`, and `tp` so every paper alert has measurable risk/reward.
+
+## Trending Telegram alerts
+
+The server refreshes the Trending list every 15 minutes and sends a Telegram message when a market newly enters one of the surfaced Trending sections:
+
+- Strong Bullish Trends
+- Strong Bearish Trends
+- Pullback Opportunities
+
+The first successful trend scan after a restart establishes a baseline without sending alerts. This uses the same `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` variables as the existing scanner alerts.
