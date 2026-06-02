@@ -127,6 +127,8 @@
     .filter-row { padding: 0 20px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .search-box { flex: 1; min-width: 160px; max-width: 240px; padding: 6px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; font-family: inherit; outline: none; }
     .search-box::placeholder { color: var(--slate-dim); }
+    .filter-select { height: 31px; padding: 0 9px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--slate); font-size: 11px; font-family: inherit; outline: none; }
+    .filter-select:focus { border-color: rgba(96,165,250,0.55); color: var(--text); }
     .result-count { font-size: 11px; color: var(--slate-dim); }
     .result-count span { color: var(--text); }
     .trending-page { padding: 18px 24px 28px; }
@@ -385,6 +387,18 @@
 
 <div class="filter-row">
   <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
+  <select class="filter-select" id="locationFilter" onchange="renderSetups()" aria-label="Location filter">
+    <option value="HIDE_MID">Location: Hide MID</option>
+    <option value="ALL">Location: All locations</option>
+    <option value="PREMIUM">Location: Premium only</option>
+    <option value="DISCOUNT">Location: Discount only</option>
+    <option value="MID">Location: MID only</option>
+  </select>
+  <select class="filter-select" id="htfAlignmentFilter" onchange="renderSetups()" aria-label="HTF alignment filter">
+    <option value="ALIGNED">HTF: Aligned only</option>
+    <option value="ALL">HTF: All bias states</option>
+    <option value="MIXED">HTF: Mixed only</option>
+  </select>
   <span id="resultCount" class="result-count"></span>
 </div>
 
@@ -1307,12 +1321,39 @@
 
   function getFiltered() {
     const s = document.getElementById('searchBox').value.toLowerCase();
+    const location = document.getElementById('locationFilter')?.value || 'HIDE_MID';
+    const htfAlignment = document.getElementById('htfAlignmentFilter')?.value || 'ALIGNED';
     return allSetups.filter(x => {
       if (interestFilter !== 'ALL' && x.interestLevel !== interestFilter) return false;
       if (biasFilter !== 'ALL' && x.bias !== biasFilter) return false;
+      if (!matchesLocationFilter(x.zone, location)) return false;
+      if (!matchesHtfAlignmentFilter(x.htfBias, x.bias, htfAlignment)) return false;
       if (s && !x.displaySymbol.toLowerCase().includes(s)) return false;
       return true;
     });
+  }
+
+  function matchesLocationFilter(zone, filter) {
+    const normalized = String(zone || '').toUpperCase();
+    const isMid = normalized === 'FAIR VALUE' || normalized === 'MID' || normalized === 'EQUILIBRIUM';
+    if (filter === 'ALL') return true;
+    if (filter === 'PREMIUM') return normalized === 'PREMIUM';
+    if (filter === 'DISCOUNT') return normalized === 'DISCOUNT';
+    if (filter === 'MID') return isMid;
+    return !isMid;
+  }
+
+  function matchesHtfAlignmentFilter(htfBias, setupDirection, filter) {
+    if (filter === 'ALL') return true;
+    const htf = String(htfBias || '').toUpperCase();
+    const direction = String(setupDirection || '').toUpperCase();
+    const aligned =
+      (htf === 'BULLISH' && (direction === 'BULLISH' || direction === 'LONG')) ||
+      (htf === 'BEARISH' && (direction === 'BEARISH' || direction === 'SHORT'));
+    const mixed =
+      (htf === 'BULLISH' && (direction === 'BEARISH' || direction === 'SHORT')) ||
+      (htf === 'BEARISH' && (direction === 'BULLISH' || direction === 'LONG'));
+    return filter === 'MIXED' ? mixed : aligned;
   }
 
   function renderSetups() {
@@ -1330,7 +1371,7 @@
       document.getElementById('resultCount').textContent = '';
       return;
     }
-    document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of ${all.length} pair${all.length !== 1 ? 's' : ''}`;
+    document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of ${all.length} setups`;
     if (!filtered.length) { main.innerHTML = '<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No pairs match your filters</div></div>'; return; }
     main.innerHTML = '<div class="setup-grid">' + filtered.map(r => renderScoutCard(r)).join('') + '</div>';
   }
