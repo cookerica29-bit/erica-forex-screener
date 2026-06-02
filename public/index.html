@@ -399,6 +399,11 @@
     <option value="ALL">HTF: All bias states</option>
     <option value="MIXED">HTF: Mixed only</option>
   </select>
+  <select class="filter-select" id="qualityFilter" onchange="renderSetups()" aria-label="Quality filter">
+    <option value="ALL">Quality: All</option>
+    <option value="BIAS_ALIGNED">Quality: Bias aligned</option>
+    <option value="BIAS_LOCATION_ALIGNED">Quality: Bias + Location aligned</option>
+  </select>
   <span id="resultCount" class="result-count"></span>
 </div>
 
@@ -1323,11 +1328,13 @@
     const s = document.getElementById('searchBox').value.toLowerCase();
     const location = document.getElementById('locationFilter')?.value || 'HIDE_MID';
     const htfAlignment = document.getElementById('htfAlignmentFilter')?.value || 'ALIGNED';
+    const quality = document.getElementById('qualityFilter')?.value || 'ALL';
     return allSetups.filter(x => {
       if (interestFilter !== 'ALL' && x.interestLevel !== interestFilter) return false;
       if (biasFilter !== 'ALL' && x.bias !== biasFilter) return false;
       if (!matchesLocationFilter(x.zone, location)) return false;
       if (!matchesHtfAlignmentFilter(x.htfBias, x.bias, htfAlignment)) return false;
+      if (!matchesQualityFilter(x.htfBias, x.bias, x.zone, quality)) return false;
       if (s && !x.displaySymbol.toLowerCase().includes(s)) return false;
       return true;
     });
@@ -1354,6 +1361,18 @@
       (htf === 'BULLISH' && (direction === 'BEARISH' || direction === 'SHORT')) ||
       (htf === 'BEARISH' && (direction === 'BULLISH' || direction === 'LONG'));
     return filter === 'MIXED' ? mixed : aligned;
+  }
+
+  function matchesQualityFilter(htfBias, setupDirection, zone, filter) {
+    if (filter === 'ALL') return true;
+    const aligned = matchesHtfAlignmentFilter(htfBias, setupDirection, 'ALIGNED');
+    if (filter === 'BIAS_ALIGNED') return aligned;
+    const direction = String(setupDirection || '').toUpperCase();
+    const location = String(zone || '').toUpperCase();
+    return aligned && (
+      ((direction === 'BULLISH' || direction === 'LONG') && location === 'DISCOUNT') ||
+      ((direction === 'BEARISH' || direction === 'SHORT') && location === 'PREMIUM')
+    );
   }
 
   function renderSetups() {
