@@ -541,6 +541,10 @@ app.post('/api/journal', async (req, res) => {
       session:       b.session,
       newsRisk:      b.newsRisk ?? b.news_risk ?? false,
       notes:         b.notes,
+      result:        b.result,
+      directionCorrect: b.direction_correct ?? b.directionCorrect,
+      entryQuality:  b.entry_quality ?? b.entryQuality,
+      reviewNotes:   b.review_notes ?? b.reviewNotes,
     };
     const id = await createJournalEntry(normalized);
     return res.json({ success: true, id });
@@ -558,6 +562,10 @@ app.patch('/api/journal/:id', async (req, res) => {
       pnl: b.pnl,
       notes: b.notes,
       tradeType: b.trade_type ?? b.tradeType,
+      result: b.result,
+      directionCorrect: b.direction_correct ?? b.directionCorrect,
+      entryQuality: b.entry_quality ?? b.entryQuality,
+      reviewNotes: b.review_notes ?? b.reviewNotes,
     });
     return res.json({ success: true });
   } catch (err) {

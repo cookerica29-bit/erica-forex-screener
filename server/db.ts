@@ -9,6 +9,10 @@ let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: mysql.Pool | null = null;
 
 type SettingsRecord = Record<string, string>;
+export type JournalResult = 'RUNNING' | 'WINNER' | 'STOPPED' | 'FAILED' | 'BREAKEVEN' | 'PENDING';
+export type DirectionCorrect = 'YES' | 'NO' | 'PENDING' | 'N/A';
+export type EntryQuality = 'GOOD' | 'EARLY' | 'LATE' | 'N/A' | 'PENDING';
+type LegacyOutcome = 'WIN' | 'LOSS' | 'BREAKEVEN' | 'PENDING';
 type SettingsStorageInfo = {
   backend: 'mysql' | 'file' | 'unavailable';
   durable: boolean;
@@ -123,8 +127,12 @@ async function initSchema(pool: mysql.Pool) {
       rr2 DECIMAL(4,1),
       rr3 DECIMAL(4,1),
       outcome ENUM('WIN','LOSS','BREAKEVEN','PENDING') DEFAULT 'PENDING',
+      result ENUM('RUNNING','WINNER','STOPPED','FAILED','BREAKEVEN','PENDING') DEFAULT 'PENDING',
+      direction_correct ENUM('YES','NO','PENDING','N/A') DEFAULT 'PENDING',
+      entry_quality ENUM('GOOD','EARLY','LATE','N/A','PENDING') DEFAULT 'PENDING',
       pnl DECIMAL(10,2),
       notes TEXT,
+      review_notes TEXT,
       confluences TEXT,
       session VARCHAR(30),
       pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -158,7 +166,57 @@ async function initSchema(pool: mysql.Pool) {
     await pool.execute(`ALTER TABLE journal_entries ADD COLUMN trade_type VARCHAR(10) DEFAULT NULL`);
     console.log('[Database] Added trade_type column');
   }
+  // Entry-quality review columns. Keep the legacy outcome column for existing analytics.
+  const [reviewRows] = await pool.execute(`
+    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'journal_entries'
+      AND COLUMN_NAME IN ('result', 'direction_correct', 'entry_quality', 'review_notes')
+  `) as any[];
+  const reviewColumns = new Set(reviewRows.map((row: any) => row.COLUMN_NAME));
+  if (!reviewColumns.has('result')) {
+    await pool.execute(`
+      ALTER TABLE journal_entries
+      ADD COLUMN result ENUM('RUNNING','WINNER','STOPPED','FAILED','BREAKEVEN','PENDING') DEFAULT 'PENDING'
+    `);
+    await pool.execute(`
+      UPDATE journal_entries
+      SET result = CASE outcome
+        WHEN 'WIN' THEN 'WINNER'
+        WHEN 'LOSS' THEN 'STOPPED'
+        WHEN 'BREAKEVEN' THEN 'BREAKEVEN'
+        ELSE 'PENDING'
+      END
+    `);
+    console.log('[Database] Added result column');
+  }
+  if (!reviewColumns.has('direction_correct')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN direction_correct ENUM('YES','NO','PENDING','N/A') DEFAULT 'PENDING'`);
+    console.log('[Database] Added direction_correct column');
+  }
+  if (!reviewColumns.has('entry_quality')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN entry_quality ENUM('GOOD','EARLY','LATE','N/A','PENDING') DEFAULT 'PENDING'`);
+    console.log('[Database] Added entry_quality column');
+  }
+  if (!reviewColumns.has('review_notes')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN review_notes TEXT`);
+    console.log('[Database] Added review_notes column');
+  }
   console.log('[Database] Schema ready');
+}
+
+function resultToOutcome(result: JournalResult): LegacyOutcome {
+  if (result === 'WINNER') return 'WIN';
+  if (result === 'STOPPED' || result === 'FAILED') return 'LOSS';
+  if (result === 'BREAKEVEN') return 'BREAKEVEN';
+  return 'PENDING';
+}
+
+function outcomeToResult(outcome: LegacyOutcome): JournalResult {
+  if (outcome === 'WIN') return 'WINNER';
+  if (outcome === 'LOSS') return 'STOPPED';
+  if (outcome === 'BREAKEVEN') return 'BREAKEVEN';
+  return 'PENDING';
 }
 
 export async function getJournalEntries() {
@@ -187,6 +245,10 @@ export async function createJournalEntry(data: {
   newsRisk?: boolean;
   notes?: string;
   tradeType?: string;
+  result?: JournalResult;
+  directionCorrect?: DirectionCorrect;
+  entryQuality?: EntryQuality;
+  reviewNotes?: string;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
@@ -210,24 +272,38 @@ export async function createJournalEntry(data: {
     newsRisk: data.newsRisk ?? false,
     notes: data.notes ?? null,
     tradeType: data.tradeType ?? null,
-    outcome: 'PENDING',
+    result: data.result ?? 'PENDING',
+    directionCorrect: data.directionCorrect ?? 'PENDING',
+    entryQuality: data.entryQuality ?? 'PENDING',
+    reviewNotes: data.reviewNotes ?? null,
+    outcome: resultToOutcome(data.result ?? 'PENDING'),
   }).$returningId();
   return result[0].id;
 }
 
 export async function updateJournalEntry(id: number, data: {
-  outcome?: 'WIN' | 'LOSS' | 'BREAKEVEN' | 'PENDING';
+  outcome?: LegacyOutcome;
   pnl?: number;
   notes?: string;
   tradeType?: string;
+  result?: JournalResult;
+  directionCorrect?: DirectionCorrect;
+  entryQuality?: EntryQuality;
+  reviewNotes?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
+  const result = data.result ?? (data.outcome ? outcomeToResult(data.outcome) : undefined);
+  const outcome = data.result ? resultToOutcome(data.result) : data.outcome;
   await db.update(journalEntries).set({
-    ...(data.outcome && { outcome: data.outcome }),
+    ...(outcome && { outcome }),
+    ...(result && { result }),
     ...(data.pnl !== undefined && { pnl: String(data.pnl) }),
     ...(data.notes !== undefined && { notes: data.notes }),
     ...(data.tradeType !== undefined && { tradeType: data.tradeType }),
+    ...(data.directionCorrect !== undefined && { directionCorrect: data.directionCorrect }),
+    ...(data.entryQuality !== undefined && { entryQuality: data.entryQuality }),
+    ...(data.reviewNotes !== undefined && { reviewNotes: data.reviewNotes }),
   }).where(eq(journalEntries.id, id));
 }
 
