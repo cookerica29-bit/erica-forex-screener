@@ -31,6 +31,7 @@ let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
 const journalCandidateAlerts = new Map<string, number>();
 const JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+const AUTO_JOURNAL_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 
 // Priority pairs — pushed by Claude after each forex scan via POST /api/priority-pairs
 // When set, the scanner and frontend only scan these pairs instead of the full 16-pair list.
@@ -161,6 +162,66 @@ function journalCandidateAlertKey(report: ScoutReport) {
 function formatScoutLevel(value: number | null) {
   if (value === null) return 'N/A';
   return value >= 100 ? value.toFixed(3) : value.toFixed(5);
+}
+
+async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) {
+  const aligned = reports.filter(isBiasLocationAligned);
+  if (!aligned.length) return;
+
+  let existing: any[];
+  try {
+    existing = await getJournalEntries();
+  } catch (e: any) {
+    console.error('[Journal] Auto-journal lookup failed:', e.message);
+    return;
+  }
+  const now = Date.now();
+  for (const report of aligned) {
+    if (report.entry === null || report.sl === null || report.tp1 === null) {
+      console.warn(`[Journal] Auto-journal skipped for ${report.pair}: missing entry, SL, or TP`);
+      continue;
+    }
+
+    const direction = report.bias === 'BULLISH' ? 'LONG' : 'SHORT';
+    const duplicate = existing.some((entry: any) => {
+      const pushedAt = new Date(entry.pushedAt || 0).getTime();
+      return entry.symbol === report.pair &&
+        entry.direction === direction &&
+        entry.timeframe === report.timeframe &&
+        entry.session === report.session &&
+        Math.abs(Number(entry.entry) - report.entry!) < (report.pair.includes('JPY') ? 0.1 : 0.001) &&
+        now - pushedAt < AUTO_JOURNAL_COOLDOWN_MS;
+    });
+    if (duplicate) {
+      console.log(`[Journal] Auto-journal duplicate suppressed for ${report.pair} ${report.timeframe}`);
+      continue;
+    }
+
+    try {
+      await createJournalEntry({
+        symbol: report.pair,
+        displaySymbol: report.displaySymbol,
+        direction,
+        quality: 'DEVELOPING',
+        pattern: 'Bias + Location Aligned',
+        timeframe: report.timeframe,
+        entry: report.entry,
+        stopLoss: report.sl,
+        tp1: report.tp1,
+        tp2: report.tp2 ?? undefined,
+        rr1: report.rrRatio ?? undefined,
+        session: report.session,
+        notes: `Auto-journal candidate: ${report.bias} bias + ${report.htfBias} HTF bias + ${report.zone} location`,
+        result: 'PENDING',
+        directionCorrect: 'PENDING',
+        entryQuality: 'PENDING',
+        reviewNotes: '',
+      });
+      console.log(`[Journal] Auto-journaled bias + location candidate ${report.pair} ${report.timeframe}`);
+    } catch (e: any) {
+      console.error(`[Journal] Auto-journal insert failed for ${report.pair}:`, e.message);
+    }
+  }
 }
 
 async function notifyBiasLocationAlignedCandidates(reports: ScoutReport[]) {
@@ -363,6 +424,7 @@ async function scheduledScan(forceTf?: string) {
     try {
       latestScoutResults = await runScoutScan(forceTf || 'H4');
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
+      await autoJournalBiasLocationAlignedCandidates(latestScoutResults);
       await notifyBiasLocationAlignedCandidates(latestScoutResults);
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
@@ -413,6 +475,7 @@ app.post('/api/scout', async (req, res) => {
       console.log(`[Scout] Priority mode active for setup queue, ignored for scout card coverage (${priorityPairsData.pairs.length} priority pairs)`);
     }
     latestScoutResults = await runScoutScan(tf);
+    await autoJournalBiasLocationAlignedCandidates(latestScoutResults);
     await notifyBiasLocationAlignedCandidates(latestScoutResults);
     lastScanTime = new Date().toISOString();
     res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
