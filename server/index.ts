@@ -29,6 +29,8 @@ let latestRejected: Array<{ pair: string; reason: string; detail: any; granulari
 let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
+const journalCandidateAlerts = new Map<string, number>();
+const JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 
 // Priority pairs — pushed by Claude after each forex scan via POST /api/priority-pairs
 // When set, the scanner and frontend only scan these pairs instead of the full 16-pair list.
@@ -138,6 +140,55 @@ async function sendTelegram(text: string, parseMode?: 'Markdown') {
   const data = await response.json() as any;
   if (!data.ok) console.error('[Telegram] API error:', JSON.stringify(data));
   return data;
+}
+
+function isBiasLocationAligned(report: ScoutReport) {
+  return (
+    report.bias === 'BULLISH' &&
+    report.htfBias === 'BULLISH' &&
+    report.zone === 'DISCOUNT'
+  ) || (
+    report.bias === 'BEARISH' &&
+    report.htfBias === 'BEARISH' &&
+    report.zone === 'PREMIUM'
+  );
+}
+
+function journalCandidateAlertKey(report: ScoutReport) {
+  return [report.pair, report.timeframe, report.bias, report.htfBias, report.zone].join('|');
+}
+
+function formatScoutLevel(value: number | null) {
+  if (value === null) return 'N/A';
+  return value >= 100 ? value.toFixed(3) : value.toFixed(5);
+}
+
+async function notifyBiasLocationAlignedCandidates(reports: ScoutReport[]) {
+  const now = Date.now();
+  for (const [key, alertedAt] of journalCandidateAlerts) {
+    if (now - alertedAt >= JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS) journalCandidateAlerts.delete(key);
+  }
+
+  for (const report of reports.filter(isBiasLocationAligned)) {
+    const key = journalCandidateAlertKey(report);
+    const alertedAt = journalCandidateAlerts.get(key);
+    if (alertedAt && now - alertedAt < JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS) {
+      console.log(`[Telegram] Journal candidate suppressed by cooldown for ${report.pair} ${report.timeframe}`);
+      continue;
+    }
+
+    const direction = report.bias === 'BULLISH' ? 'LONG' : 'SHORT';
+    const text = `🧪 *JOURNAL CANDIDATE — Bias + Location Aligned*\nPair: ${report.displaySymbol}\nDirection: ${direction}\nHTF Bias: ${report.htfBias}\nLocation: ${report.zone}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nTimeframe: ${report.timeframe}\nReason: Bias + Location aligned for review\n→ https://erica-forex-screener-production.up.railway.app`;
+    try {
+      const data = await sendTelegram(text, 'Markdown');
+      if (data.ok) {
+        journalCandidateAlerts.set(key, now);
+        console.log(`[Telegram] Journal candidate alert sent for ${report.pair} ${report.timeframe}`);
+      }
+    } catch (e: any) {
+      console.error(`[Telegram] Journal candidate alert failed for ${report.pair}:`, e.message);
+    }
+  }
 }
 
 function getSurfacedTrends(results: TrendScanResult) {
@@ -312,6 +363,7 @@ async function scheduledScan(forceTf?: string) {
     try {
       latestScoutResults = await runScoutScan(forceTf || 'H4');
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
+      await notifyBiasLocationAlignedCandidates(latestScoutResults);
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
     }
@@ -361,6 +413,7 @@ app.post('/api/scout', async (req, res) => {
       console.log(`[Scout] Priority mode active for setup queue, ignored for scout card coverage (${priorityPairsData.pairs.length} priority pairs)`);
     }
     latestScoutResults = await runScoutScan(tf);
+    await notifyBiasLocationAlignedCandidates(latestScoutResults);
     lastScanTime = new Date().toISOString();
     res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
   } catch (e: any) {
