@@ -164,6 +164,28 @@ function formatScoutLevel(value: number | null) {
   return value >= 100 ? value.toFixed(3) : value.toFixed(5);
 }
 
+function isOpenJournalIdea(entry: any) {
+  const result = String(entry.result || 'PENDING').toUpperCase();
+  const outcome = String(entry.outcome || 'PENDING').toUpperCase();
+  return result === 'PENDING' || result === 'RUNNING' || outcome === 'PENDING';
+}
+
+function isMateriallySameJournalIdea(entry: any, report: ScoutReport, direction: 'LONG' | 'SHORT', now: number) {
+  if (entry.symbol !== report.pair || entry.direction !== direction || entry.timeframe !== report.timeframe) {
+    return false;
+  }
+
+  if (isOpenJournalIdea(entry)) {
+    return true;
+  }
+
+  const pushedAt = new Date(entry.pushedAt || 0).getTime();
+  const entryTolerance = report.pair.includes('JPY') ? 0.1 : 0.001;
+  return Number.isFinite(pushedAt) &&
+    now - pushedAt < AUTO_JOURNAL_COOLDOWN_MS &&
+    Math.abs(Number(entry.entry) - report.entry!) < entryTolerance;
+}
+
 async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) {
   const aligned = reports.filter(isBiasLocationAligned);
   if (!aligned.length) return;
@@ -183,22 +205,14 @@ async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) 
     }
 
     const direction = report.bias === 'BULLISH' ? 'LONG' : 'SHORT';
-    const duplicate = existing.some((entry: any) => {
-      const pushedAt = new Date(entry.pushedAt || 0).getTime();
-      return entry.symbol === report.pair &&
-        entry.direction === direction &&
-        entry.timeframe === report.timeframe &&
-        entry.session === report.session &&
-        Math.abs(Number(entry.entry) - report.entry!) < (report.pair.includes('JPY') ? 0.1 : 0.001) &&
-        now - pushedAt < AUTO_JOURNAL_COOLDOWN_MS;
-    });
+    const duplicate = existing.some((entry: any) => isMateriallySameJournalIdea(entry, report, direction, now));
     if (duplicate) {
-      console.log(`[Journal] Auto-journal duplicate suppressed for ${report.pair} ${report.timeframe}`);
+      console.log(`[Journal] Auto-journal existing idea reused for ${report.pair} ${report.timeframe} ${direction}`);
       continue;
     }
 
     try {
-      await createJournalEntry({
+      const id = await createJournalEntry({
         symbol: report.pair,
         displaySymbol: report.displaySymbol,
         direction,
@@ -216,6 +230,16 @@ async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) 
         directionCorrect: 'PENDING',
         entryQuality: 'PENDING',
         reviewNotes: '',
+      });
+      existing.unshift({
+        id,
+        symbol: report.pair,
+        direction,
+        timeframe: report.timeframe,
+        entry: String(report.entry),
+        outcome: 'PENDING',
+        result: 'PENDING',
+        pushedAt: new Date().toISOString(),
       });
       console.log(`[Journal] Auto-journaled bias + location candidate ${report.pair} ${report.timeframe}`);
     } catch (e: any) {
