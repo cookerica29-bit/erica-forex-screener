@@ -32,6 +32,7 @@ let pendingApprovals: (Setup & { id: string })[] = [];
 const journalCandidateAlerts = new Map<string, number>();
 const JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const AUTO_JOURNAL_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+const journalCandidateCandleTimes = new Map<string, string>();
 
 // Priority pairs — pushed by Claude after each forex scan via POST /api/priority-pairs
 // When set, the scanner and frontend only scan these pairs instead of the full 16-pair list.
@@ -157,6 +158,72 @@ function isBiasLocationAligned(report: ScoutReport) {
 
 function journalCandidateAlertKey(report: ScoutReport) {
   return [report.pair, report.timeframe, report.bias, report.htfBias, report.zone].join('|');
+}
+
+function journalCandidateDataKey(report: ScoutReport) {
+  return [report.pair, report.timeframe].join('|');
+}
+
+function getNewYorkMarketParts(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+  return {
+    weekday: get('weekday'),
+    hour: Number(get('hour')),
+    minute: Number(get('minute')),
+  };
+}
+
+function isForexMarketOpen(now = new Date()) {
+  const { weekday, hour, minute } = getNewYorkMarketParts(now);
+  const minutes = hour * 60 + minute;
+  if (weekday === 'Sat') return false;
+  if (weekday === 'Sun') return minutes >= 17 * 60;
+  if (weekday === 'Fri') return minutes < 17 * 60;
+  return true;
+}
+
+function getFreshJournalCandidateReports(reports: ScoutReport[], source: string) {
+  const aligned = reports.filter(isBiasLocationAligned);
+  if (!aligned.length) return [];
+
+  if (!isForexMarketOpen()) {
+    console.log(`[Journal] ${source}: market closed; skipped ${aligned.length} journal candidate${aligned.length === 1 ? '' : 's'}`);
+    return [];
+  }
+
+  const fresh: ScoutReport[] = [];
+  for (const report of aligned) {
+    const candleTime = report.candleTime;
+    if (!candleTime) {
+      console.warn(`[Journal] ${source}: skipped ${report.pair} ${report.timeframe}; missing candle timestamp`);
+      continue;
+    }
+
+    const key = journalCandidateDataKey(report);
+    const previousCandleTime = journalCandidateCandleTimes.get(key);
+    journalCandidateCandleTimes.set(key, candleTime);
+
+    if (!previousCandleTime) {
+      console.log(`[Journal] ${source}: baseline candle recorded for ${report.pair} ${report.timeframe} @ ${candleTime}`);
+      continue;
+    }
+
+    if (previousCandleTime === candleTime) {
+      console.log(`[Journal] ${source}: stale candle skipped for ${report.pair} ${report.timeframe} @ ${candleTime}`);
+      continue;
+    }
+
+    fresh.push(report);
+  }
+
+  return fresh;
 }
 
 function formatScoutLevel(value: number | null) {
@@ -448,8 +515,9 @@ async function scheduledScan(forceTf?: string) {
     try {
       latestScoutResults = await runScoutScan(forceTf || 'H4');
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
-      await autoJournalBiasLocationAlignedCandidates(latestScoutResults);
-      await notifyBiasLocationAlignedCandidates(latestScoutResults);
+      const freshJournalCandidates = getFreshJournalCandidateReports(latestScoutResults, 'scheduled scout scan');
+      await autoJournalBiasLocationAlignedCandidates(freshJournalCandidates);
+      await notifyBiasLocationAlignedCandidates(freshJournalCandidates);
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
     }
@@ -499,8 +567,9 @@ app.post('/api/scout', async (req, res) => {
       console.log(`[Scout] Priority mode active for setup queue, ignored for scout card coverage (${priorityPairsData.pairs.length} priority pairs)`);
     }
     latestScoutResults = await runScoutScan(tf);
-    await autoJournalBiasLocationAlignedCandidates(latestScoutResults);
-    await notifyBiasLocationAlignedCandidates(latestScoutResults);
+    const freshJournalCandidates = getFreshJournalCandidateReports(latestScoutResults, 'manual scout scan');
+    await autoJournalBiasLocationAlignedCandidates(freshJournalCandidates);
+    await notifyBiasLocationAlignedCandidates(freshJournalCandidates);
     lastScanTime = new Date().toISOString();
     res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
   } catch (e: any) {

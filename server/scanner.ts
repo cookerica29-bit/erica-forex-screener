@@ -824,6 +824,7 @@ export interface ScoutReport {
   interestLevel: 'HIGH' | 'MEDIUM' | 'LOW';
   timeframe: string;
   scannedAt: string;
+  candleTime: string;
   newsRisk?: boolean;
   // Trade levels — derived from EMA20 + ATR + nearest structural target
   entry: number | null;
@@ -1244,6 +1245,7 @@ export function scoutAnalyzeCandles(
     interestLevel,
     timeframe: granularity,
     scannedAt: new Date().toISOString(),
+    candleTime: candles[candles.length - 1].t,
     entry,
     sl,
     tp1,
