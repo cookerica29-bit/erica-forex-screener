@@ -299,6 +299,13 @@
     .scout-indicators { display:flex; gap:14px; margin-top:8px; }
     .scout-ind-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; display:block; margin-bottom:1px; }
     .scout-ind-value { font-size:12px; font-weight:600; color:var(--slate); }
+    .momentum-box { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-top:8px; padding:8px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.1); background:rgba(148,163,184,0.04); }
+    .momentum-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+    .momentum-value { font-size:12px; font-weight:800; color:var(--slate); }
+    .momentum-state { font-size:9px; padding:3px 8px; border-radius:99px; border:1px solid rgba(148,163,184,0.22); color:var(--slate); white-space:nowrap; }
+    .momentum-state.aligned { color:var(--green); border-color:rgba(0,255,136,0.35); background:rgba(0,255,136,0.07); }
+    .momentum-state.conflict { color:var(--red); border-color:rgba(255,59,92,0.35); background:rgba(255,59,92,0.07); }
+    .momentum-state.mixed { color:var(--gold); border-color:rgba(245,166,35,0.35); background:rgba(245,166,35,0.07); }
     @media (max-width: 768px) {
       .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
       #bot-challenge > div:first-child { grid-template-columns: 1fr !important; }
@@ -1426,6 +1433,11 @@
       ? `<div class="scout-struct-row"><span class="scout-struct-label">CHoCH</span><span style="font-size:11px;color:${r.recentChoCH.type === 'bullish' ? 'var(--blue)' : 'var(--gold)'};">⚠ ${r.recentChoCH.type} @ ${f(r.recentChoCH.level)}</span></div>`
       : `<div class="scout-struct-row"><span class="scout-struct-label">CHoCH</span><span style="font-size:11px;color:#334155;">—</span></div>`;
     const rsiColor = r.rsi > 70 ? 'var(--red)' : r.rsi < 30 ? 'var(--green)' : 'var(--slate)';
+    const momentumScore = Number.isFinite(Number(r.momentumScore)) ? Number(r.momentumScore) : 0;
+    const momentumSigned = momentumScore > 0 ? `+${momentumScore}` : `${momentumScore}`;
+    const momentumState = r.momentumConflict ? 'Conflict' : r.momentumAlignedWithBias ? 'Aligned' : 'Pullback / Mixed';
+    const momentumStateCls = r.momentumConflict ? 'conflict' : r.momentumAlignedWithBias ? 'aligned' : 'mixed';
+    const momentumColor = momentumScore >= 3 ? 'var(--green)' : momentumScore <= -3 ? 'var(--red)' : 'var(--slate)';
 
     return `<div class="setup-card ${intCls}" style="position:relative;">
       <div class="card-body">
@@ -1484,6 +1496,13 @@
         <div class="scout-structure">
           ${bosHtml}
           ${chochHtml}
+        </div>
+        <div class="momentum-box">
+          <div>
+            <div class="momentum-label">Momentum</div>
+            <div class="momentum-value" style="color:${momentumColor};">${escapeHtml(r.momentumLabel || 'Neutral / Mixed')} (${momentumSigned})</div>
+          </div>
+          <span class="momentum-state ${momentumStateCls}">${momentumState}</span>
         </div>
         <div class="scout-indicators">
           <div><span class="scout-ind-label">RSI</span><span class="scout-ind-value" style="color:${rsiColor}">${r.rsi ?? '—'}</span></div>

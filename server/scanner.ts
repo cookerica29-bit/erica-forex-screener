@@ -32,6 +32,7 @@ interface Swing  { index:number; price:number; type:'high'|'low'; }
 
 type TrendDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 type MarketState = 'TRENDING' | 'PULLBACK' | 'EXPANDING' | 'EXHAUSTED' | 'CHOPPY';
+type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 
 export interface SetupChecklist {
   trend: boolean;           // Gate 1: EMA stack (price > EMA50 > EMA200) + EMA20 slope + HTF alignment
@@ -66,6 +67,10 @@ export interface Setup {
   approved?: boolean;
   approvedAt?: string;
   checklist?: SetupChecklist;
+  momentumScore: number;
+  momentumLabel: MomentumLabel;
+  momentumAlignedWithBias: boolean;
+  momentumConflict: boolean;
 }
 
 export type JournalStats = Record<string, { wins: number; losses: number }>;
@@ -528,6 +533,16 @@ export function analyzeCandles(
   const liquiditySweep = direction === 'LONG'
     ? sweepWindow.some(c => c.l < ema20 && c.c > ema20)
     : sweepWindow.some(c => c.h > ema20 && c.c < ema20);
+  const momentumStructures = computeStructures(candles.slice(-120), 4);
+  const latestBos = momentumStructures.bosEvents.at(-1);
+  const latestChoch = momentumStructures.chochEvents.at(-1);
+  const currentMomentum = scoreCurrentMomentum(
+    candles,
+    atr,
+    direction,
+    latestBos ? { type: latestBos.type, level: latestBos.brokenLevel } : null,
+    latestChoch ? { type: latestChoch.type, level: latestChoch.brokenLevel } : null
+  );
 
   const tpPathSwings = direction === 'LONG'
     ? swingHighs.filter(s => s.price > price && s.price < tp1)
@@ -637,6 +652,7 @@ export function analyzeCandles(
     timeframe: granularity,
     session,
     checklist,
+    ...currentMomentum,
   };
 
   return { setup, reason: 'OK', detail };
@@ -826,12 +842,83 @@ export interface ScoutReport {
   scannedAt: string;
   candleTime: string;
   newsRisk?: boolean;
+  momentumScore: number;
+  momentumLabel: MomentumLabel;
+  momentumAlignedWithBias: boolean;
+  momentumConflict: boolean;
   // Trade levels — derived from EMA20 + ATR + nearest structural target
   entry: number | null;
   sl: number | null;
   tp1: number | null;
   tp2: number | null;
   rrRatio: number | null;
+}
+
+function momentumLabel(score: number): MomentumLabel {
+  if (score >= 7) return 'Strong Bullish';
+  if (score >= 3) return 'Bullish';
+  if (score <= -7) return 'Strong Bearish';
+  if (score <= -3) return 'Bearish';
+  return 'Neutral / Mixed';
+}
+
+function momentumAlignment(
+  score: number,
+  bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'LONG' | 'SHORT'
+) {
+  const normalizedBias = bias === 'LONG' ? 'BULLISH' : bias === 'SHORT' ? 'BEARISH' : bias;
+  const aligned = (normalizedBias === 'BULLISH' && score >= 3) || (normalizedBias === 'BEARISH' && score <= -3);
+  const conflict = (normalizedBias === 'BULLISH' && score <= -3) || (normalizedBias === 'BEARISH' && score >= 3);
+  return {
+    momentumAlignedWithBias: aligned,
+    momentumConflict: conflict,
+  };
+}
+
+function scoreCurrentMomentum(
+  candles: Candle[],
+  atr: number,
+  bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'LONG' | 'SHORT',
+  recentBOS: { type: 'bullish' | 'bearish'; level: number } | null = null,
+  recentChoCH: { type: 'bullish' | 'bearish'; level: number } | null = null
+) {
+  const recent = candles.slice(-8);
+  const atrSafe = atr > 0 ? atr : 0.00001;
+  let raw = 0;
+  let weightTotal = 0;
+
+  recent.forEach((c, idx) => {
+    const range = Math.max(c.h - c.l, 0.00001);
+    const body = Math.abs(c.c - c.o);
+    const direction = c.c > c.o ? 1 : c.c < c.o ? -1 : 0;
+    const bodyStrength = Math.min(1.25, body / atrSafe);
+    const closePressure = ((c.c - c.l) / range - 0.5) * 2;
+    const weight = 0.75 + (idx / Math.max(1, recent.length - 1)) * 0.5;
+    raw += ((direction * bodyStrength * 1.15) + (closePressure * 0.55)) * weight;
+    weightTotal += weight;
+  });
+
+  const displacementCandles = recent.slice(-3);
+  displacementCandles.forEach(c => {
+    const range = Math.max(c.h - c.l, 0.00001);
+    const body = Math.abs(c.c - c.o);
+    const closePosition = (c.c - c.l) / range;
+    if (body >= 0.75 * atrSafe && closePosition >= 0.72) raw += 1.35;
+    if (body >= 0.75 * atrSafe && closePosition <= 0.28) raw -= 1.35;
+  });
+
+  if (recentBOS?.type === 'bullish') raw += 1.4;
+  if (recentBOS?.type === 'bearish') raw -= 1.4;
+  if (recentChoCH?.type === 'bullish') raw += 1.1;
+  if (recentChoCH?.type === 'bearish') raw -= 1.1;
+
+  const normalized = weightTotal > 0 ? raw / (weightTotal * 1.7) : 0;
+  const momentumScore = Math.max(-10, Math.min(10, Math.round(normalized * 10)));
+  return {
+    momentumScore,
+    momentumLabel: momentumLabel(momentumScore),
+    ...momentumAlignment(momentumScore, bias),
+  };
 }
 
 export interface TrendReport {
@@ -1160,6 +1247,7 @@ export function scoutAnalyzeCandles(
   let finalBias = bias;
   if (recentChoCH?.type === 'bearish') finalBias = 'BEARISH';
   else if (recentChoCH?.type === 'bullish') finalBias = 'BULLISH';
+  const currentMomentum = scoreCurrentMomentum(candles, atr, finalBias, recentBOS, recentChoCH);
 
   // Interest level: how many bullish factors align
   let interestScore = 0;
@@ -1246,6 +1334,7 @@ export function scoutAnalyzeCandles(
     timeframe: granularity,
     scannedAt: new Date().toISOString(),
     candleTime: candles[candles.length - 1].t,
+    ...currentMomentum,
     entry,
     sl,
     tp1,
