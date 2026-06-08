@@ -39,6 +39,12 @@ type PullbackStatus =
   | 'Stabilizing'
   | 'Reversal forming'
   | 'Pullback completed';
+type ConfirmationStatus =
+  | 'No confirmation'
+  | 'Early confirmation'
+  | 'Building confirmation'
+  | 'Strong confirmation'
+  | 'Confirmed trend resumption';
 
 export interface SetupChecklist {
   trend: boolean;           // Gate 1: EMA stack (price > EMA50 > EMA200) + EMA20 slope + HTF alignment
@@ -81,6 +87,10 @@ export interface Setup {
   pullbackStatus: PullbackStatus;
   pullbackCompleted: boolean;
   pullbackReason: string;
+  confirmationScore: number;
+  confirmationStatus: ConfirmationStatus;
+  confirmationConfirmed: boolean;
+  confirmationReason: string;
 }
 
 export type JournalStats = Record<string, { wins: number; losses: number }>;
@@ -564,6 +574,13 @@ export function analyzeCandles(
     setupNearestSupport,
     setupNearestResistance
   );
+  const trendConfirmation = scoreTrendConfirmation(
+    candles,
+    atr,
+    direction,
+    latestBos ? { type: latestBos.type, level: latestBos.brokenLevel } : null,
+    latestChoch ? { type: latestChoch.type, level: latestChoch.brokenLevel } : null
+  );
 
   const tpPathSwings = direction === 'LONG'
     ? swingHighs.filter(s => s.price > price && s.price < tp1)
@@ -675,6 +692,7 @@ export function analyzeCandles(
     checklist,
     ...currentMomentum,
     ...pullbackCompletion,
+    ...trendConfirmation,
   };
 
   return { setup, reason: 'OK', detail };
@@ -872,6 +890,10 @@ export interface ScoutReport {
   pullbackStatus: PullbackStatus;
   pullbackCompleted: boolean;
   pullbackReason: string;
+  confirmationScore: number;
+  confirmationStatus: ConfirmationStatus;
+  confirmationConfirmed: boolean;
+  confirmationReason: string;
   // Trade levels — derived from EMA20 + ATR + nearest structural target
   entry: number | null;
   sl: number | null;
@@ -1090,6 +1112,154 @@ function scorePullbackCompletion(
     pullbackStatus: pullbackStatus(pullbackScore),
     pullbackCompleted: pullbackScore >= 9,
     pullbackReason: reasons[0] || 'Mixed pullback evidence; no clear completion signal yet.',
+  };
+}
+
+function confirmationStatus(score: number): ConfirmationStatus {
+  if (score <= 2) return 'No confirmation';
+  if (score <= 4) return 'Early confirmation';
+  if (score <= 6) return 'Building confirmation';
+  if (score <= 8) return 'Strong confirmation';
+  return 'Confirmed trend resumption';
+}
+
+function scoreTrendConfirmation(
+  candles: Candle[],
+  atr: number,
+  bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'LONG' | 'SHORT',
+  recentBOS: { type: 'bullish' | 'bearish'; level: number } | null = null,
+  recentChoCH: { type: 'bullish' | 'bearish'; level: number } | null = null
+) {
+  const direction = bias === 'LONG' ? 'BULLISH' : bias === 'SHORT' ? 'BEARISH' : bias;
+  if (direction === 'NEUTRAL') {
+    return {
+      confirmationScore: 1,
+      confirmationStatus: confirmationStatus(1),
+      confirmationConfirmed: false,
+      confirmationReason: 'Neutral bias; trend resumption is not confirmed.',
+    };
+  }
+
+  const recent = candles.slice(-10);
+  const atrSafe = atr > 0 ? atr : 0.00001;
+  let score = 2;
+  const reasons: string[] = [];
+  const isBullish = direction === 'BULLISH';
+  const favorableStructure = isBullish ? 'bullish' : 'bearish';
+  const opposingStructure = isBullish ? 'bearish' : 'bullish';
+  const body = (c: Candle) => Math.abs(c.c - c.o);
+  const range = (c: Candle) => Math.max(c.h - c.l, 0.00001);
+  const closePos = (c: Candle) => (c.c - c.l) / range(c);
+  const favorableBody = (c: Candle) => isBullish ? Math.max(0, c.c - c.o) : Math.max(0, c.o - c.c);
+  const opposingBody = (c: Candle) => isBullish ? Math.max(0, c.o - c.c) : Math.max(0, c.c - c.o);
+
+  if (recentChoCH?.type === favorableStructure) {
+    score += 2;
+    reasons.push(`${favorableStructure} CHoCH printed after pullback`);
+  } else if (recentChoCH?.type === opposingStructure) {
+    score -= 2;
+    reasons.push(`${opposingStructure} CHoCH is still active`);
+  }
+
+  if (recentBOS?.type === favorableStructure) {
+    score += 2;
+    reasons.push(`${favorableStructure} BOS confirms trend resumption`);
+  } else if (recentBOS?.type === opposingStructure) {
+    score -= 1.5;
+    reasons.push(`${opposingStructure} BOS argues against resumption`);
+  }
+
+  const lastFour = recent.slice(-4);
+  const favorableDisplacement = lastFour.some(c => (
+    favorableBody(c) >= 0.75 * atrSafe &&
+    (isBullish ? closePos(c) >= 0.72 : closePos(c) <= 0.28)
+  ));
+  if (favorableDisplacement) {
+    score += 2;
+    reasons.push(isBullish ? 'bullish displacement candle printed' : 'bearish displacement candle printed');
+  }
+
+  const opposingDisplacement = lastFour.some(c => (
+    opposingBody(c) >= 0.75 * atrSafe &&
+    (isBullish ? closePos(c) <= 0.28 : closePos(c) >= 0.72)
+  ));
+  if (opposingDisplacement) {
+    score -= 2;
+    reasons.push(isBullish ? 'bearish displacement is still active' : 'bullish displacement is still active');
+  }
+
+  const last = recent[recent.length - 1];
+  const prior = recent.slice(0, -1);
+  if (last && prior.length) {
+    if (isBullish) {
+      const recentSwingHigh = Math.max(...prior.slice(-8).map(c => c.h));
+      if (last.c > recentSwingHigh + 0.05 * atrSafe) {
+        score += 1.5;
+        reasons.push('strong close above recent swing high');
+      }
+      const priorLow = Math.min(...prior.map(c => c.l));
+      if (last.l < priorLow - 0.05 * atrSafe) {
+        score -= 2;
+        reasons.push('fresh swing low printed');
+      }
+    } else {
+      const recentSwingLow = Math.min(...prior.slice(-8).map(c => c.l));
+      if (last.c < recentSwingLow - 0.05 * atrSafe) {
+        score += 1.5;
+        reasons.push('strong close below recent swing low');
+      }
+      const priorHigh = Math.max(...prior.map(c => c.h));
+      if (last.h > priorHigh + 0.05 * atrSafe) {
+        score -= 2;
+        reasons.push('fresh swing high printed');
+      }
+    }
+  }
+
+  const lastThree = recent.slice(-3);
+  const favorableCloses = lastThree.filter(c => favorableBody(c) > 0).length;
+  if (favorableCloses >= 2) {
+    score += 1.25;
+    reasons.push(isBullish ? 'consecutive bullish closes' : 'consecutive bearish closes');
+  }
+
+  const weakFavorableCloses = lastThree.filter(c => (
+    favorableBody(c) > 0 &&
+    (isBullish ? closePos(c) < 0.58 : closePos(c) > 0.42)
+  )).length;
+  if (weakFavorableCloses >= 2) {
+    score -= 1;
+    reasons.push('recent closes are weak');
+  }
+
+  const ema20 = calcEMA(candles, 20).at(-1);
+  if (last && ema20 !== undefined) {
+    if ((isBullish && last.c > ema20) || (!isBullish && last.c < ema20)) {
+      score += 1.25;
+      reasons.push('EMA20 reclaimed in setup direction');
+    } else {
+      score -= 1.25;
+      reasons.push('EMA20 has not been reclaimed');
+    }
+  }
+
+  const swings = findSwings(recent, 2);
+  const lows = swings.filter(s => s.type === 'low').slice(-2);
+  const highs = swings.filter(s => s.type === 'high').slice(-2);
+  if (isBullish && lows.length === 2 && lows[1].price > lows[0].price) {
+    score += 1.25;
+    reasons.push('higher low formed after pullback');
+  } else if (!isBullish && highs.length === 2 && highs[1].price < highs[0].price) {
+    score += 1.25;
+    reasons.push('lower high formed after pullback');
+  }
+
+  const confirmationScore = Math.max(0, Math.min(10, Math.round(score)));
+  return {
+    confirmationScore,
+    confirmationStatus: confirmationStatus(confirmationScore),
+    confirmationConfirmed: confirmationScore >= 9,
+    confirmationReason: reasons[0] || 'No clear resumption signal yet.',
   };
 }
 
@@ -1429,6 +1599,7 @@ export function scoutAnalyzeCandles(
     nearestSupport,
     nearestResistance
   );
+  const trendConfirmation = scoreTrendConfirmation(candles, atr, finalBias, recentBOS, recentChoCH);
 
   // Interest level: how many bullish factors align
   let interestScore = 0;
@@ -1517,6 +1688,7 @@ export function scoutAnalyzeCandles(
     candleTime: candles[candles.length - 1].t,
     ...currentMomentum,
     ...pullbackCompletion,
+    ...trendConfirmation,
     entry,
     sl,
     tp1,
