@@ -33,6 +33,12 @@ interface Swing  { index:number; price:number; type:'high'|'low'; }
 type TrendDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 type MarketState = 'TRENDING' | 'PULLBACK' | 'EXPANDING' | 'EXHAUSTED' | 'CHOPPY';
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
+type PullbackStatus =
+  | 'Aggressive pullback / Not ready'
+  | 'Pullback still active'
+  | 'Stabilizing'
+  | 'Reversal forming'
+  | 'Pullback completed';
 
 export interface SetupChecklist {
   trend: boolean;           // Gate 1: EMA stack (price > EMA50 > EMA200) + EMA20 slope + HTF alignment
@@ -71,6 +77,10 @@ export interface Setup {
   momentumLabel: MomentumLabel;
   momentumAlignedWithBias: boolean;
   momentumConflict: boolean;
+  pullbackScore: number;
+  pullbackStatus: PullbackStatus;
+  pullbackCompleted: boolean;
+  pullbackReason: string;
 }
 
 export type JournalStats = Record<string, { wins: number; losses: number }>;
@@ -536,12 +546,23 @@ export function analyzeCandles(
   const momentumStructures = computeStructures(candles.slice(-120), 4);
   const latestBos = momentumStructures.bosEvents.at(-1);
   const latestChoch = momentumStructures.chochEvents.at(-1);
+  const setupNearestResistance = swingHighs.filter(s => s.price > price).sort((a, b) => a.price - b.price)[0]?.price ?? null;
+  const setupNearestSupport = swingLows.filter(s => s.price < price).sort((a, b) => b.price - a.price)[0]?.price ?? null;
   const currentMomentum = scoreCurrentMomentum(
     candles,
     atr,
     direction,
     latestBos ? { type: latestBos.type, level: latestBos.brokenLevel } : null,
     latestChoch ? { type: latestChoch.type, level: latestChoch.brokenLevel } : null
+  );
+  const pullbackCompletion = scorePullbackCompletion(
+    candles,
+    atr,
+    direction,
+    latestBos ? { type: latestBos.type, level: latestBos.brokenLevel } : null,
+    latestChoch ? { type: latestChoch.type, level: latestChoch.brokenLevel } : null,
+    setupNearestSupport,
+    setupNearestResistance
   );
 
   const tpPathSwings = direction === 'LONG'
@@ -653,6 +674,7 @@ export function analyzeCandles(
     session,
     checklist,
     ...currentMomentum,
+    ...pullbackCompletion,
   };
 
   return { setup, reason: 'OK', detail };
@@ -846,6 +868,10 @@ export interface ScoutReport {
   momentumLabel: MomentumLabel;
   momentumAlignedWithBias: boolean;
   momentumConflict: boolean;
+  pullbackScore: number;
+  pullbackStatus: PullbackStatus;
+  pullbackCompleted: boolean;
+  pullbackReason: string;
   // Trade levels — derived from EMA20 + ATR + nearest structural target
   entry: number | null;
   sl: number | null;
@@ -918,6 +944,152 @@ function scoreCurrentMomentum(
     momentumScore,
     momentumLabel: momentumLabel(momentumScore),
     ...momentumAlignment(momentumScore, bias),
+  };
+}
+
+function pullbackStatus(score: number): PullbackStatus {
+  if (score <= 2) return 'Aggressive pullback / Not ready';
+  if (score <= 4) return 'Pullback still active';
+  if (score <= 6) return 'Stabilizing';
+  if (score <= 8) return 'Reversal forming';
+  return 'Pullback completed';
+}
+
+function scorePullbackCompletion(
+  candles: Candle[],
+  atr: number,
+  bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'LONG' | 'SHORT',
+  recentBOS: { type: 'bullish' | 'bearish'; level: number } | null = null,
+  recentChoCH: { type: 'bullish' | 'bearish'; level: number } | null = null,
+  support: number | null = null,
+  resistance: number | null = null
+) {
+  const direction = bias === 'LONG' ? 'BULLISH' : bias === 'SHORT' ? 'BEARISH' : bias;
+  if (direction === 'NEUTRAL') {
+    return {
+      pullbackScore: 3,
+      pullbackStatus: pullbackStatus(3),
+      pullbackCompleted: false,
+      pullbackReason: 'Neutral bias; pullback completion cannot be confirmed.',
+    };
+  }
+
+  const recent = candles.slice(-10);
+  const atrSafe = atr > 0 ? atr : 0.00001;
+  let score = 5;
+  const reasons: string[] = [];
+  const isBullish = direction === 'BULLISH';
+  const favorableStructure = isBullish ? 'bullish' : 'bearish';
+  const opposingStructure = isBullish ? 'bearish' : 'bullish';
+  const body = (c: Candle) => Math.abs(c.c - c.o);
+  const range = (c: Candle) => Math.max(c.h - c.l, 0.00001);
+  const closePos = (c: Candle) => (c.c - c.l) / range(c);
+  const opposingBody = (c: Candle) => isBullish ? Math.max(0, c.o - c.c) : Math.max(0, c.c - c.o);
+  const favorableBody = (c: Candle) => isBullish ? Math.max(0, c.c - c.o) : Math.max(0, c.o - c.c);
+  const avg = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+
+  const earlyOpposing = avg(recent.slice(0, 5).map(opposingBody));
+  const lateOpposing = avg(recent.slice(-5).map(opposingBody));
+  if (lateOpposing < earlyOpposing * 0.7 && earlyOpposing > 0.12 * atrSafe) {
+    score += 1.5;
+    reasons.push('opposing candle bodies are shrinking');
+  } else if (lateOpposing > Math.max(earlyOpposing * 1.15, 0.18 * atrSafe)) {
+    score -= 1.5;
+    reasons.push('opposing candle bodies are still expanding');
+  }
+
+  const last = recent[recent.length - 1];
+  const prior = recent.slice(0, -1);
+  if (last && prior.length) {
+    if (isBullish) {
+      const priorLow = Math.min(...prior.map(c => c.l));
+      if (last.l < priorLow - 0.05 * atrSafe) {
+        score -= 2;
+        reasons.push('price is making fresh pullback lows');
+      }
+    } else {
+      const priorHigh = Math.max(...prior.map(c => c.h));
+      if (last.h > priorHigh + 0.05 * atrSafe) {
+        score -= 2;
+        reasons.push('price is making fresh pullback highs');
+      }
+    }
+  }
+
+  const lastThree = recent.slice(-3);
+  const hasRejection = lastThree.some(c => {
+    const lowerWick = Math.min(c.o, c.c) - c.l;
+    const upperWick = c.h - Math.max(c.o, c.c);
+    const b = body(c);
+    return isBullish
+      ? lowerWick >= Math.max(0.25 * atrSafe, b * 1.2) && closePos(c) >= 0.58
+      : upperWick >= Math.max(0.25 * atrSafe, b * 1.2) && closePos(c) <= 0.42;
+  });
+  if (hasRejection) {
+    score += 1.5;
+    reasons.push(isBullish ? 'bullish rejection printed' : 'bearish rejection printed');
+  }
+
+  const hasStrongFavorableClose = lastThree.some(c => (
+    favorableBody(c) >= 0.35 * atrSafe &&
+    (isBullish ? closePos(c) >= 0.68 : closePos(c) <= 0.32)
+  ));
+  if (hasStrongFavorableClose) {
+    score += 1.5;
+    reasons.push(isBullish ? 'buyers are closing candles strong' : 'sellers are closing candles strong');
+  }
+
+  const hasActiveOpposingDisplacement = lastThree.some(c => (
+    opposingBody(c) >= 0.65 * atrSafe &&
+    (isBullish ? closePos(c) <= 0.3 : closePos(c) >= 0.7)
+  ));
+  if (hasActiveOpposingDisplacement) {
+    score -= 2.5;
+    reasons.push(isBullish ? 'strong bearish displacement remains active' : 'strong bullish displacement remains active');
+  }
+
+  if (recentBOS?.type === favorableStructure) {
+    score += 1.5;
+    reasons.push(`${favorableStructure} BOS appeared after the pullback`);
+  } else if (recentBOS?.type === opposingStructure) {
+    score -= 1;
+    reasons.push(`${opposingStructure} BOS still favors the pullback`);
+  }
+
+  if (recentChoCH?.type === favorableStructure) {
+    score += 1.5;
+    reasons.push(`${favorableStructure} CHoCH confirms reaction`);
+  } else if (recentChoCH?.type === opposingStructure) {
+    score -= 1;
+    reasons.push(`${opposingStructure} CHoCH warns pullback is not finished`);
+  }
+
+  if (last) {
+    if (isBullish && support !== null) {
+      if (last.l >= support - 0.5 * atrSafe && last.c > support + 0.1 * atrSafe) {
+        score += 1;
+        reasons.push('price is holding support/demand');
+      } else if (last.c < support - 0.2 * atrSafe) {
+        score -= 1.5;
+        reasons.push('price closed below support/demand');
+      }
+    } else if (!isBullish && resistance !== null) {
+      if (last.h <= resistance + 0.5 * atrSafe && last.c < resistance - 0.1 * atrSafe) {
+        score += 1;
+        reasons.push('price is holding resistance/supply');
+      } else if (last.c > resistance + 0.2 * atrSafe) {
+        score -= 1.5;
+        reasons.push('price closed above resistance/supply');
+      }
+    }
+  }
+
+  const pullbackScore = Math.max(0, Math.min(10, Math.round(score)));
+  return {
+    pullbackScore,
+    pullbackStatus: pullbackStatus(pullbackScore),
+    pullbackCompleted: pullbackScore >= 9,
+    pullbackReason: reasons[0] || 'Mixed pullback evidence; no clear completion signal yet.',
   };
 }
 
@@ -1248,6 +1420,15 @@ export function scoutAnalyzeCandles(
   if (recentChoCH?.type === 'bearish') finalBias = 'BEARISH';
   else if (recentChoCH?.type === 'bullish') finalBias = 'BULLISH';
   const currentMomentum = scoreCurrentMomentum(candles, atr, finalBias, recentBOS, recentChoCH);
+  const pullbackCompletion = scorePullbackCompletion(
+    candles,
+    atr,
+    finalBias,
+    recentBOS,
+    recentChoCH,
+    nearestSupport,
+    nearestResistance
+  );
 
   // Interest level: how many bullish factors align
   let interestScore = 0;
@@ -1335,6 +1516,7 @@ export function scoutAnalyzeCandles(
     scannedAt: new Date().toISOString(),
     candleTime: candles[candles.length - 1].t,
     ...currentMomentum,
+    ...pullbackCompletion,
     entry,
     sl,
     tp1,
