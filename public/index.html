@@ -324,6 +324,12 @@
     .confirmation-state.building { color:var(--gold); border-color:rgba(245,166,35,0.35); background:rgba(245,166,35,0.07); }
     .confirmation-state.strong { color:var(--blue); border-color:rgba(96,165,250,0.35); background:rgba(96,165,250,0.08); }
     .confirmation-state.confirmed { color:var(--green); border-color:rgba(0,255,136,0.35); background:rgba(0,255,136,0.07); }
+    .market-context { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin:10px 0; }
+    .context-cell { background:rgba(255,255,255,0.03); border:1px solid rgba(148,163,184,0.09); border-radius:8px; padding:8px 9px; min-height:54px; }
+    .context-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.07em; margin-bottom:3px; }
+    .context-value { font-size:12px; font-weight:800; color:var(--slate); line-height:1.25; }
+    .context-reason { grid-column:1 / -1; font-size:10px; color:var(--slate-dim); line-height:1.35; padding:7px 9px; background:rgba(148,163,184,0.035); border:1px solid rgba(148,163,184,0.08); border-radius:8px; }
+    @media (max-width: 720px) { .market-context { grid-template-columns:1fr; } .context-reason { grid-column:auto; } }
     @media (max-width: 768px) {
       .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
       #bot-challenge > div:first-child { grid-template-columns: 1fr !important; }
@@ -1466,6 +1472,10 @@
     const confirmationState = confirmationScore >= 9 ? 'Confirmed' : confirmationScore >= 7 ? 'Strong' : confirmationScore >= 3 ? 'Building' : 'No Confirmation';
     const confirmationStateCls = confirmationScore >= 9 ? 'confirmed' : confirmationScore >= 7 ? 'strong' : confirmationScore >= 3 ? 'building' : 'none';
     const confirmationColor = confirmationScore >= 9 ? 'var(--green)' : confirmationScore >= 7 ? 'var(--blue)' : confirmationScore >= 3 ? 'var(--gold)' : 'var(--red)';
+    const contextColor = dir => dir === 'Bullish' ? 'var(--green)' : dir === 'Bearish' ? 'var(--red)' : 'var(--slate)';
+    const trendDirection = r.trendDirection || 'Neutral';
+    const setupTfDirection = r.setupTimeframeDirection || 'Neutral';
+    const marketPhase = r.marketPhase || 'Mixed / Transition';
 
     return `<div class="setup-card ${intCls}" style="position:relative;">
       <div class="card-body">
@@ -1492,6 +1502,21 @@
           </div>
         </div>
         <div style="font-size:13px;color:var(--blue);font-weight:700;letter-spacing:.5px;margin-bottom:10px;">Price: <span>${f(r.price)}</span></div>
+        <div class="market-context">
+          <div class="context-cell">
+            <div class="context-label">Trend</div>
+            <div class="context-value" style="color:${contextColor(trendDirection)}">${escapeHtml(trendDirection)} · ${Number(r.trendScore || 0)}/10</div>
+          </div>
+          <div class="context-cell">
+            <div class="context-label">Setup TF</div>
+            <div class="context-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)} · ${Number(r.setupTimeframeScore || 0)}/10</div>
+          </div>
+          <div class="context-cell">
+            <div class="context-label">Market Phase</div>
+            <div class="context-value">${escapeHtml(marketPhase)}</div>
+          </div>
+          <div class="context-reason">${escapeHtml(r.marketPhaseReason || 'Trend/setup phase context is mixed.')}</div>
+        </div>
         <div class="scout-levels">
           <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
             <div class="scout-level-label">Resistance</div>

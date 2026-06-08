@@ -32,6 +32,7 @@ interface Swing  { index:number; price:number; type:'high'|'low'; }
 
 type TrendDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 type MarketState = 'TRENDING' | 'PULLBACK' | 'EXPANDING' | 'EXHAUSTED' | 'CHOPPY';
+type DirectionLabel = 'Bullish' | 'Bearish' | 'Neutral';
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 type PullbackStatus =
   | 'Aggressive pullback / Not ready'
@@ -91,6 +92,16 @@ export interface Setup {
   confirmationStatus: ConfirmationStatus;
   confirmationConfirmed: boolean;
   confirmationReason: string;
+  trendDirection: DirectionLabel;
+  trendScore: number;
+  trendReason: string;
+  setupTimeframeDirection: DirectionLabel;
+  setupTimeframeScore: number;
+  setupTimeframeReason: string;
+  marketPhase: string;
+  marketPhaseReason: string;
+  trendSetupAligned: boolean;
+  isPullbackAgainstTrend: boolean;
 }
 
 export type JournalStats = Record<string, { wins: number; losses: number }>;
@@ -581,6 +592,16 @@ export function analyzeCandles(
     latestBos ? { type: latestBos.type, level: latestBos.brokenLevel } : null,
     latestChoch ? { type: latestChoch.type, level: latestChoch.brokenLevel } : null
   );
+  const trendSetupPhase = buildTrendSetupPhase(
+    candles,
+    htf,
+    candles,
+    granularity,
+    HTF_MAP[granularity] || 'HTF',
+    granularity,
+    currentMomentum.momentumScore,
+    trendConfirmation.confirmationScore
+  );
 
   const tpPathSwings = direction === 'LONG'
     ? swingHighs.filter(s => s.price > price && s.price < tp1)
@@ -693,6 +714,7 @@ export function analyzeCandles(
     ...currentMomentum,
     ...pullbackCompletion,
     ...trendConfirmation,
+    ...trendSetupPhase,
   };
 
   return { setup, reason: 'OK', detail };
@@ -894,6 +916,16 @@ export interface ScoutReport {
   confirmationStatus: ConfirmationStatus;
   confirmationConfirmed: boolean;
   confirmationReason: string;
+  trendDirection: DirectionLabel;
+  trendScore: number;
+  trendReason: string;
+  setupTimeframeDirection: DirectionLabel;
+  setupTimeframeScore: number;
+  setupTimeframeReason: string;
+  marketPhase: string;
+  marketPhaseReason: string;
+  trendSetupAligned: boolean;
+  isPullbackAgainstTrend: boolean;
   // Trade levels — derived from EMA20 + ATR + nearest structural target
   entry: number | null;
   sl: number | null;
@@ -1263,6 +1295,164 @@ function scoreTrendConfirmation(
   };
 }
 
+function directionFromSignedScore(score: number): DirectionLabel {
+  if (score >= 2) return 'Bullish';
+  if (score <= -2) return 'Bearish';
+  return 'Neutral';
+}
+
+function analyzeDirectionalFrame(candles: Candle[], label: string) {
+  if (candles.length < 55) {
+    return {
+      direction: 'Neutral' as DirectionLabel,
+      score: 0,
+      signedScore: 0,
+      reason: `${label}: not enough candles for directional read.`,
+    };
+  }
+
+  const swings = findSwings(candles.slice(-120), 4);
+  const highs = swings.filter(s => s.type === 'high');
+  const lows = swings.filter(s => s.type === 'low');
+  const structures = computeStructures(candles.slice(-160), 4);
+  const ema20 = calcEMA(candles, 20).at(-1);
+  const ema50 = calcEMA(candles, 50).at(-1);
+  const last = candles[candles.length - 1];
+  let signedScore = 0;
+  const reasons: string[] = [];
+
+  if (highs.length >= 2 && lows.length >= 2) {
+    const higherHigh = highs[highs.length - 1].price > highs[highs.length - 2].price;
+    const higherLow = lows[lows.length - 1].price > lows[lows.length - 2].price;
+    const lowerHigh = highs[highs.length - 1].price < highs[highs.length - 2].price;
+    const lowerLow = lows[lows.length - 1].price < lows[lows.length - 2].price;
+    if (higherHigh && higherLow) {
+      signedScore += 2.5;
+      reasons.push(`${label}: higher highs / higher lows`);
+    } else if (lowerHigh && lowerLow) {
+      signedScore -= 2.5;
+      reasons.push(`${label}: lower highs / lower lows`);
+    } else if (higherLow) {
+      signedScore += 1;
+      reasons.push(`${label}: higher low forming`);
+    } else if (lowerHigh) {
+      signedScore -= 1;
+      reasons.push(`${label}: lower high forming`);
+    }
+  }
+
+  const lastBreak = [...structures.bosEvents, ...structures.chochEvents].sort((a, b) => a.time - b.time).at(-1);
+  if (lastBreak?.type === 'bullish') {
+    signedScore += 2;
+    reasons.push(`${label}: last major break bullish`);
+  } else if (lastBreak?.type === 'bearish') {
+    signedScore -= 2;
+    reasons.push(`${label}: last major break bearish`);
+  }
+
+  const latestBos = structures.bosEvents.at(-1);
+  if (latestBos?.type === 'bullish') {
+    signedScore += 1.5;
+    reasons.push(`${label}: bullish BOS present`);
+  } else if (latestBos?.type === 'bearish') {
+    signedScore -= 1.5;
+    reasons.push(`${label}: bearish BOS present`);
+  }
+
+  const latestChoch = structures.chochEvents.at(-1);
+  if (latestChoch?.type === 'bullish') {
+    signedScore += 1.25;
+    reasons.push(`${label}: bullish CHoCH present`);
+  } else if (latestChoch?.type === 'bearish') {
+    signedScore -= 1.25;
+    reasons.push(`${label}: bearish CHoCH present`);
+  }
+
+  if (ema20 !== undefined && ema50 !== undefined) {
+    if (last.c > ema20 && last.c > ema50 && ema20 >= ema50) {
+      signedScore += 2;
+      reasons.push(`${label}: price above EMA20/EMA50`);
+    } else if (last.c < ema20 && last.c < ema50 && ema20 <= ema50) {
+      signedScore -= 2;
+      reasons.push(`${label}: price below EMA20/EMA50`);
+    } else if (last.c > ema20 && last.c > ema50) {
+      signedScore += 1;
+      reasons.push(`${label}: price above key EMAs`);
+    } else if (last.c < ema20 && last.c < ema50) {
+      signedScore -= 1;
+      reasons.push(`${label}: price below key EMAs`);
+    }
+  }
+
+  const score = Math.max(0, Math.min(10, Math.round(Math.abs(signedScore))));
+  return {
+    direction: directionFromSignedScore(signedScore),
+    score,
+    signedScore,
+    reason: reasons[0] || `${label}: mixed structure and EMA conditions.`,
+  };
+}
+
+function buildTrendSetupPhase(
+  setupCandles: Candle[],
+  trendCandlesA: Candle[],
+  trendCandlesB: Candle[],
+  setupLabel: string,
+  trendLabelA = 'Daily',
+  trendLabelB = 'H4',
+  momentumScore = 0,
+  confirmationScore = 0
+) {
+  const primaryTrend = analyzeDirectionalFrame(trendCandlesA, trendLabelA);
+  const secondaryTrend = analyzeDirectionalFrame(trendCandlesB, trendLabelB);
+  const trendSignedScore = (primaryTrend.signedScore * 0.6) + (secondaryTrend.signedScore * 0.4);
+  const trendDirection = directionFromSignedScore(trendSignedScore);
+  const trendScore = Math.max(0, Math.min(10, Math.round(Math.abs(trendSignedScore))));
+  const setupFrame = analyzeDirectionalFrame(setupCandles, setupLabel);
+  const setupTimeframeDirection = setupFrame.direction;
+  const setupTimeframeScore = setupFrame.score;
+  const trendSetupAligned =
+    trendDirection !== 'Neutral' &&
+    setupTimeframeDirection !== 'Neutral' &&
+    trendDirection === setupTimeframeDirection;
+  const isPullbackAgainstTrend =
+    trendDirection !== 'Neutral' &&
+    setupTimeframeDirection !== 'Neutral' &&
+    trendDirection !== setupTimeframeDirection;
+
+  let marketPhase = 'Mixed / Transition';
+  if (trendDirection === 'Bullish' && setupTimeframeDirection === 'Bullish') marketPhase = 'Bullish Continuation';
+  else if (trendDirection === 'Bullish' && setupTimeframeDirection === 'Bearish') marketPhase = 'Bullish Pullback';
+  else if (trendDirection === 'Bearish' && setupTimeframeDirection === 'Bearish') marketPhase = 'Bearish Continuation';
+  else if (trendDirection === 'Bearish' && setupTimeframeDirection === 'Bullish') marketPhase = 'Bearish Pullback';
+
+  const setupStronglyOpposesTrend =
+    isPullbackAgainstTrend &&
+    setupTimeframeScore >= 7 &&
+    Math.abs(momentumScore) >= 7 &&
+    confirmationScore >= 7;
+  if (setupStronglyOpposesTrend) marketPhase = 'Potential Reversal';
+
+  return {
+    trendDirection,
+    trendScore,
+    trendReason: `${primaryTrend.reason}; ${secondaryTrend.reason}`,
+    setupTimeframeDirection,
+    setupTimeframeScore,
+    setupTimeframeReason: setupFrame.reason,
+    marketPhase,
+    marketPhaseReason: setupStronglyOpposesTrend
+      ? 'Setup timeframe strongly opposes HTF trend with momentum and confirmation; watching as possible reversal only.'
+      : isPullbackAgainstTrend
+      ? `${setupTimeframeDirection} setup timeframe is moving against ${trendDirection} higher-timeframe trend.`
+      : trendSetupAligned
+      ? `${setupTimeframeDirection} setup timeframe agrees with ${trendDirection} higher-timeframe trend.`
+      : 'Trend or setup timeframe is neutral/mixed.',
+    trendSetupAligned,
+    isPullbackAgainstTrend,
+  };
+}
+
 export interface TrendReport {
   pair: string;
   displaySymbol: string;
@@ -1517,7 +1707,7 @@ export async function runTrendScan(): Promise<TrendScanResult> {
 }
 
 export function scoutAnalyzeCandles(
-  candles: Candle[], htf: Candle[], pair: string, granularity = 'H1'
+  candles: Candle[], htf: Candle[], pair: string, granularity = 'H1', dailyCandles?: Candle[], h4Candles?: Candle[]
 ): ScoutReport | null {
   // v2 — 2R minimum TP filter
   if (candles.length < 60) return null;
@@ -1600,6 +1790,16 @@ export function scoutAnalyzeCandles(
     nearestResistance
   );
   const trendConfirmation = scoreTrendConfirmation(candles, atr, finalBias, recentBOS, recentChoCH);
+  const trendSetupPhase = buildTrendSetupPhase(
+    candles,
+    dailyCandles?.length ? dailyCandles : htf,
+    h4Candles?.length ? h4Candles : candles,
+    granularity,
+    'Daily',
+    'H4',
+    currentMomentum.momentumScore,
+    trendConfirmation.confirmationScore
+  );
 
   // Interest level: how many bullish factors align
   let interestScore = 0;
@@ -1689,6 +1889,7 @@ export function scoutAnalyzeCandles(
     ...currentMomentum,
     ...pullbackCompletion,
     ...trendConfirmation,
+    ...trendSetupPhase,
     entry,
     sl,
     tp1,
@@ -1703,11 +1904,13 @@ export async function runScoutScan(granularity = 'H1', pairsOverride?: string[])
   const results: ScoutReport[] = [];
   for (const pair of pairsToScan) {
     try {
-      const [candles, htf] = await Promise.all([
+      const [candles, htf, dailyCandles, h4Candles] = await Promise.all([
         fetchCandles(pair, granularity, 150),
         fetchCandles(pair, htfGran, 100),
+        fetchCandles(pair, 'D', 120),
+        fetchCandles(pair, 'H4', 150),
       ]);
-      const report = scoutAnalyzeCandles(candles, htf, pair, granularity);
+      const report = scoutAnalyzeCandles(candles, htf, pair, granularity, dailyCandles, h4Candles);
       if (report) {
         report.newsRisk = await checkNewsRisk(pair);
         results.push(report);
