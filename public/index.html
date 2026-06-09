@@ -1514,7 +1514,7 @@
       setupStatusCls = 'early';
       setupStatusReason = r.confirmationReason || 'Early confirmation is appearing after the pullback.';
     } else if (r.pullbackCompleted || pullbackStatus === 'Pullback completed' || pullbackScore >= 9) {
-      setupStatus = 'Pullback Completed';
+      setupStatus = 'Pullback Complete';
       setupStatusCls = 'completed';
       setupStatusReason = r.pullbackReason || 'Pullback has completed; waiting for confirmation.';
     }
@@ -1525,9 +1525,17 @@
       if (value.includes('HTF Pullback') || value === 'Mixed / Transition') return 'var(--gold)';
       return 'var(--slate)';
     };
-    const trendDirection = r.trendDirection || 'Neutral';
+    const rawTrendDirection = r.trendDirection || 'Mixed / Transition';
+    const displayTrend = rawTrendDirection === 'Bullish' ? 'Bullish' : rawTrendDirection === 'Bearish' ? 'Bearish' : 'Mixed';
     const setupTfDirection = r.setupTimeframeDirection || 'Neutral';
-    const marketPhase = r.marketPhase || 'Mixed / Transition';
+    const rawMarketPhase = r.marketPhase || 'Mixed / Transition';
+    const displayPhase = rawMarketPhase.includes('Continuation')
+      ? 'Trend Move'
+      : rawMarketPhase.includes('Pullback')
+      ? 'Pullback'
+      : rawMarketPhase.includes('Recovery') || rawMarketPhase.includes('Rejection')
+      ? 'Recovery'
+      : 'Transition';
     const dailyTrendDirection = r.dailyTrendDirection || 'Neutral';
     const h4TrendDirection = r.h4TrendDirection || 'Neutral';
     const entryStatus = r.entryStatus || 'Waiting';
@@ -1563,7 +1571,7 @@
         <div class="market-context">
           <div class="context-cell">
             <div class="context-label">Trend</div>
-            <div class="context-value" style="color:${contextColor(trendDirection)}">${escapeHtml(trendDirection)}</div>
+            <div class="context-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
           </div>
           <div class="context-cell">
             <div class="context-label">Setup TF</div>
@@ -1571,7 +1579,7 @@
           </div>
           <div class="context-cell">
             <div class="context-label">Phase</div>
-            <div class="context-value">${escapeHtml(marketPhase)}</div>
+            <div class="context-value">${escapeHtml(displayPhase)}</div>
           </div>
           <div class="context-cell">
             <div class="context-label">Location</div>
