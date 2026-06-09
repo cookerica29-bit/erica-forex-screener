@@ -1525,21 +1525,20 @@
       if (value.includes('HTF Pullback') || value === 'Mixed / Transition') return 'var(--gold)';
       return 'var(--slate)';
     };
-    const rawTrendDirection = r.trendDirection || 'Mixed / Transition';
-    const displayTrend = rawTrendDirection === 'Bullish' ? 'Bullish' : rawTrendDirection === 'Bearish' ? 'Bearish' : 'Mixed';
     const setupTfDirection = r.setupTimeframeDirection || 'Neutral';
-    const rawMarketPhase = r.marketPhase || 'Mixed / Transition';
-    const displayPhase = rawMarketPhase.includes('Continuation')
-      ? 'Trend Move'
-      : rawMarketPhase.includes('Pullback')
-      ? 'Pullback'
-      : rawMarketPhase.includes('Recovery') || rawMarketPhase.includes('Rejection')
-      ? 'Recovery'
-      : 'Transition';
     const dailyTrendDirection = r.dailyTrendDirection || 'Neutral';
     const h4TrendDirection = r.h4TrendDirection || 'Neutral';
     const dailyTrendDisplay = dailyTrendDirection === 'Neutral' ? 'Mixed' : dailyTrendDirection;
     const h4TrendDisplay = h4TrendDirection === 'Neutral' ? 'Mixed' : h4TrendDirection;
+    const displayTrend = dailyTrendDisplay === 'Bullish' ? 'Bullish' : dailyTrendDisplay === 'Bearish' ? 'Bearish' : 'Mixed';
+    const displayPhase =
+      (displayTrend === 'Bullish' && h4TrendDisplay === 'Bullish') ||
+      (displayTrend === 'Bearish' && h4TrendDisplay === 'Bearish')
+        ? 'Trend Move'
+        : (displayTrend === 'Bullish' && h4TrendDisplay === 'Bearish') ||
+          (displayTrend === 'Bearish' && h4TrendDisplay === 'Bullish')
+        ? 'Pullback'
+        : 'Transition';
     const dailySwingStructure = r.dailySwingStructure || 'Mixed';
     const dailyBosDirection = r.dailyBosDirection === 'Neutral' ? 'None' : (r.dailyBosDirection || 'None');
     const dailyChochDirection = r.dailyChochDirection === 'Neutral' ? 'None' : (r.dailyChochDirection || 'None');
