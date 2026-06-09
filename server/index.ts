@@ -144,20 +144,20 @@ async function sendTelegram(text: string, parseMode?: 'Markdown') {
   return data;
 }
 
-function isBiasLocationAligned(report: ScoutReport) {
+function isBotSignalEligible(report: ScoutReport) {
   return (
-    report.bias === 'BULLISH' &&
-    report.htfBias === 'BULLISH' &&
+    report.trendDirection === 'Bullish' &&
+    report.setupTimeframeDirection === 'Bullish' &&
     report.zone === 'DISCOUNT'
   ) || (
-    report.bias === 'BEARISH' &&
-    report.htfBias === 'BEARISH' &&
+    report.trendDirection === 'Bearish' &&
+    report.setupTimeframeDirection === 'Bearish' &&
     report.zone === 'PREMIUM'
   );
 }
 
 function journalCandidateAlertKey(report: ScoutReport) {
-  return [report.pair, report.timeframe, report.bias, report.htfBias, report.zone].join('|');
+  return [report.pair, report.timeframe, report.trendDirection, report.setupTimeframeDirection, report.zone].join('|');
 }
 
 function journalCandidateDataKey(report: ScoutReport) {
@@ -190,7 +190,7 @@ function isForexMarketOpen(now = new Date()) {
 }
 
 function getFreshJournalCandidateReports(reports: ScoutReport[], source: string) {
-  const aligned = reports.filter(isBiasLocationAligned);
+  const aligned = reports.filter(isBotSignalEligible);
   if (!aligned.length) return [];
 
   if (!isForexMarketOpen()) {
@@ -254,7 +254,7 @@ function isMateriallySameJournalIdea(entry: any, report: ScoutReport, direction:
 }
 
 async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) {
-  const aligned = reports.filter(isBiasLocationAligned);
+  const aligned = reports.filter(isBotSignalEligible);
   if (!aligned.length) return;
 
   let existing: any[];
@@ -271,7 +271,7 @@ async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) 
       continue;
     }
 
-    const direction = report.bias === 'BULLISH' ? 'LONG' : 'SHORT';
+    const direction = report.trendDirection === 'Bullish' ? 'LONG' : 'SHORT';
     const duplicate = existing.some((entry: any) => isMateriallySameJournalIdea(entry, report, direction, now));
     if (duplicate) {
       console.log(`[Journal] Auto-journal existing idea reused for ${report.pair} ${report.timeframe} ${direction}`);
@@ -284,7 +284,7 @@ async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) 
         displaySymbol: report.displaySymbol,
         direction,
         quality: 'DEVELOPING',
-        pattern: 'Bias + Location Aligned',
+        pattern: 'Trend + Setup + Location Aligned',
         timeframe: report.timeframe,
         entry: report.entry,
         stopLoss: report.sl,
@@ -292,7 +292,7 @@ async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) 
         tp2: report.tp2 ?? undefined,
         rr1: report.rrRatio ?? undefined,
         session: report.session,
-        notes: `Auto-journal candidate: ${report.bias} bias + ${report.htfBias} HTF bias + ${report.zone} location`,
+        notes: `Auto-journal candidate: ${report.trendDirection} trend + ${report.setupTimeframeDirection} setup TF + ${report.zone} location`,
         result: 'PENDING',
         directionCorrect: 'PENDING',
         entryQuality: 'PENDING',
@@ -308,7 +308,7 @@ async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) 
         result: 'PENDING',
         pushedAt: new Date().toISOString(),
       });
-      console.log(`[Journal] Auto-journaled bias + location candidate ${report.pair} ${report.timeframe}`);
+      console.log(`[Journal] Auto-journaled trend + setup + location candidate ${report.pair} ${report.timeframe}`);
     } catch (e: any) {
       console.error(`[Journal] Auto-journal insert failed for ${report.pair}:`, e.message);
     }
@@ -321,7 +321,7 @@ async function notifyBiasLocationAlignedCandidates(reports: ScoutReport[]) {
     if (now - alertedAt >= JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS) journalCandidateAlerts.delete(key);
   }
 
-  for (const report of reports.filter(isBiasLocationAligned)) {
+  for (const report of reports.filter(isBotSignalEligible)) {
     const key = journalCandidateAlertKey(report);
     const alertedAt = journalCandidateAlerts.get(key);
     if (alertedAt && now - alertedAt < JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS) {
@@ -329,8 +329,8 @@ async function notifyBiasLocationAlignedCandidates(reports: ScoutReport[]) {
       continue;
     }
 
-    const direction = report.bias === 'BULLISH' ? 'LONG' : 'SHORT';
-    const text = `🧪 *JOURNAL CANDIDATE — Bias + Location Aligned*\nPair: ${report.displaySymbol}\nDirection: ${direction}\nHTF Bias: ${report.htfBias}\nLocation: ${report.zone}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nTimeframe: ${report.timeframe}\nReason: Bias + Location aligned for review\n→ https://erica-forex-screener-production.up.railway.app`;
+    const direction = report.trendDirection === 'Bullish' ? 'LONG' : 'SHORT';
+    const text = `🧪 *JOURNAL CANDIDATE — Trend + Setup + Location Aligned*\nPair: ${report.displaySymbol}\nDirection: ${direction}\nTrend: ${report.trendDirection}\nSetup TF: ${report.setupTimeframeDirection}\nLocation: ${report.zone}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nTimeframe: ${report.timeframe}\nReason: Trend, setup timeframe, and location aligned for review\n→ https://erica-forex-screener-production.up.railway.app`;
     try {
       const data = await sendTelegram(text, 'Markdown');
       if (data.ok) {

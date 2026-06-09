@@ -33,7 +33,7 @@ interface Swing  { index:number; price:number; type:'high'|'low'; }
 type TrendDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 type MarketState = 'TRENDING' | 'PULLBACK' | 'EXPANDING' | 'EXHAUSTED' | 'CHOPPY';
 type DirectionLabel = 'Bullish' | 'Bearish' | 'Neutral';
-type TrendLabel = DirectionLabel | 'HTF Conflict';
+type TrendLabel = 'Bullish' | 'Bearish' | 'Bullish HTF Pullback' | 'Bearish HTF Pullback' | 'Mixed / Transition';
 type EntryStatus = 'Waiting' | 'Near Entry' | 'Tradeable' | 'Too Far';
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 type PullbackStatus =
@@ -1436,33 +1436,34 @@ function buildTrendSetupPhase(
   const trendSignedScore = (primaryTrend.signedScore * 0.6) + (secondaryTrend.signedScore * 0.4);
   const dailyTrendDirection = dominantFrameDirection(primaryTrend);
   const h4TrendDirection = dominantFrameDirection(secondaryTrend);
-  let trendDirection: TrendLabel = 'Neutral';
-  if (dailyTrendDirection !== 'Neutral' && h4TrendDirection !== 'Neutral') {
-    trendDirection = dailyTrendDirection === h4TrendDirection ? dailyTrendDirection : 'HTF Conflict';
-  } else {
-    trendDirection = directionFromSignedScore(trendSignedScore);
-  }
+  let trendDirection: TrendLabel = 'Mixed / Transition';
+  if (dailyTrendDirection === 'Bullish' && h4TrendDirection === 'Bullish') trendDirection = 'Bullish';
+  else if (dailyTrendDirection === 'Bearish' && h4TrendDirection === 'Bearish') trendDirection = 'Bearish';
+  else if (dailyTrendDirection === 'Bullish' && h4TrendDirection === 'Bearish') trendDirection = 'Bullish HTF Pullback';
+  else if (dailyTrendDirection === 'Bearish' && h4TrendDirection === 'Bullish') trendDirection = 'Bearish HTF Pullback';
   const trendScore = Math.max(0, Math.min(10, Math.round(Math.abs(trendSignedScore))));
   const setupFrame = analyzeDirectionalFrame(setupCandles, setupLabel);
   const setupTimeframeDirection = setupFrame.direction;
   const setupTimeframeScore = setupFrame.score;
   const trendSetupAligned =
-    trendDirection !== 'HTF Conflict' &&
-    trendDirection !== 'Neutral' &&
     setupTimeframeDirection !== 'Neutral' &&
     trendDirection === setupTimeframeDirection;
   const isPullbackAgainstTrend =
-    trendDirection !== 'HTF Conflict' &&
-    trendDirection !== 'Neutral' &&
     setupTimeframeDirection !== 'Neutral' &&
-    trendDirection !== setupTimeframeDirection;
+    ((trendDirection === 'Bullish' && setupTimeframeDirection === 'Bearish') ||
+      (trendDirection === 'Bearish' && setupTimeframeDirection === 'Bullish') ||
+      (trendDirection === 'Bullish HTF Pullback' && setupTimeframeDirection === 'Bearish') ||
+      (trendDirection === 'Bearish HTF Pullback' && setupTimeframeDirection === 'Bullish'));
 
   let marketPhase = 'Mixed / Transition';
-  if (trendDirection === 'HTF Conflict') marketPhase = 'HTF Conflict';
-  else if (trendDirection === 'Bullish' && setupTimeframeDirection === 'Bullish') marketPhase = 'Bullish Continuation';
+  if (trendDirection === 'Bullish' && setupTimeframeDirection === 'Bullish') marketPhase = 'Bullish Continuation';
   else if (trendDirection === 'Bullish' && setupTimeframeDirection === 'Bearish') marketPhase = 'Bullish Pullback';
+  else if (trendDirection === 'Bullish HTF Pullback' && setupTimeframeDirection === 'Bearish') marketPhase = 'Bullish Pullback';
+  else if (trendDirection === 'Bullish HTF Pullback' && setupTimeframeDirection === 'Bullish') marketPhase = 'Pullback Recovery';
   else if (trendDirection === 'Bearish' && setupTimeframeDirection === 'Bearish') marketPhase = 'Bearish Continuation';
   else if (trendDirection === 'Bearish' && setupTimeframeDirection === 'Bullish') marketPhase = 'Bearish Pullback';
+  else if (trendDirection === 'Bearish HTF Pullback' && setupTimeframeDirection === 'Bullish') marketPhase = 'Bearish Pullback';
+  else if (trendDirection === 'Bearish HTF Pullback' && setupTimeframeDirection === 'Bearish') marketPhase = 'Pullback Rejection';
 
   return {
     trendDirection,
@@ -1474,8 +1475,12 @@ function buildTrendSetupPhase(
     setupTimeframeScore,
     setupTimeframeReason: setupFrame.reason,
     marketPhase,
-    marketPhaseReason: trendDirection === 'HTF Conflict'
-      ? `${trendLabelA} is ${dailyTrendDirection} while ${trendLabelB} is ${h4TrendDirection}.`
+    marketPhaseReason: trendDirection === 'Bullish HTF Pullback'
+      ? `${trendLabelA} bullish, ${trendLabelB} pulling back.`
+      : trendDirection === 'Bearish HTF Pullback'
+      ? `${trendLabelA} bearish, ${trendLabelB} pulling back.`
+      : trendDirection === 'Mixed / Transition'
+      ? `${trendLabelA} or ${trendLabelB} is neutral/mixed.`
       : isPullbackAgainstTrend
       ? `${setupTimeframeDirection} setup timeframe is moving against ${trendDirection} higher-timeframe trend.`
       : trendSetupAligned
