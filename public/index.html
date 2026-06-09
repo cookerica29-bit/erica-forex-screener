@@ -1538,6 +1538,8 @@
       : 'Transition';
     const dailyTrendDirection = r.dailyTrendDirection || 'Neutral';
     const h4TrendDirection = r.h4TrendDirection || 'Neutral';
+    const dailyTrendDisplay = dailyTrendDirection === 'Neutral' ? 'Mixed' : dailyTrendDirection;
+    const h4TrendDisplay = h4TrendDirection === 'Neutral' ? 'Mixed' : h4TrendDirection;
     const entryStatus = r.entryStatus || 'Waiting';
     const entryStatusCls = String(entryStatus).toLowerCase().replace(/\s+/g, '-');
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
@@ -1641,11 +1643,11 @@
             <div class="scout-levels">
               <div class="scout-level-box">
                 <div class="scout-level-label">Daily Trend</div>
-                <div class="scout-level-value" style="color:${contextColor(dailyTrendDirection)}">${escapeHtml(dailyTrendDirection)}</div>
+                <div class="scout-level-value" style="color:${contextColor(dailyTrendDisplay)}">${escapeHtml(dailyTrendDisplay)}</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">H4 Trend</div>
-                <div class="scout-level-value" style="color:${contextColor(h4TrendDirection)}">${escapeHtml(h4TrendDirection)}</div>
+                <div class="scout-level-value" style="color:${contextColor(h4TrendDisplay)}">${escapeHtml(h4TrendDisplay)}</div>
               </div>
             </div>
             <div class="scout-structure">

@@ -1434,7 +1434,7 @@ function buildTrendSetupPhase(
   const primaryTrend = analyzeDirectionalFrame(trendCandlesA, trendLabelA);
   const secondaryTrend = analyzeDirectionalFrame(trendCandlesB, trendLabelB);
   const trendSignedScore = (primaryTrend.signedScore * 0.6) + (secondaryTrend.signedScore * 0.4);
-  const dailyTrendDirection = dominantFrameDirection(primaryTrend);
+  const dailyTrendDirection = primaryTrend.structureDirection;
   const h4TrendDirection = dominantFrameDirection(secondaryTrend);
   let trendDirection: TrendLabel = 'Mixed / Transition';
   if (dailyTrendDirection === 'Bullish' && h4TrendDirection === 'Bullish') trendDirection = 'Bullish';
