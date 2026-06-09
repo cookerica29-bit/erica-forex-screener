@@ -1540,6 +1540,9 @@
     const h4TrendDirection = r.h4TrendDirection || 'Neutral';
     const dailyTrendDisplay = dailyTrendDirection === 'Neutral' ? 'Mixed' : dailyTrendDirection;
     const h4TrendDisplay = h4TrendDirection === 'Neutral' ? 'Mixed' : h4TrendDirection;
+    const dailySwingStructure = r.dailySwingStructure || 'Mixed';
+    const dailyBosDirection = r.dailyBosDirection === 'Neutral' ? 'None' : (r.dailyBosDirection || 'None');
+    const dailyChochDirection = r.dailyChochDirection === 'Neutral' ? 'None' : (r.dailyChochDirection || 'None');
     const entryStatus = r.entryStatus || 'Waiting';
     const entryStatusCls = String(entryStatus).toLowerCase().replace(/\s+/g, '-');
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
@@ -1648,6 +1651,22 @@
               <div class="scout-level-box">
                 <div class="scout-level-label">H4 Trend</div>
                 <div class="scout-level-value" style="color:${contextColor(h4TrendDisplay)}">${escapeHtml(h4TrendDisplay)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Daily Swing Structure</div>
+                <div class="scout-level-value">${escapeHtml(dailySwingStructure)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Last Daily BOS</div>
+                <div class="scout-level-value" style="color:${contextColor(dailyBosDirection)}">${escapeHtml(dailyBosDirection)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Last Daily CHoCH</div>
+                <div class="scout-level-value" style="color:${contextColor(dailyChochDirection)}">${escapeHtml(dailyChochDirection)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Current Daily Result</div>
+                <div class="scout-level-value" style="color:${contextColor(dailyTrendDisplay)}">${escapeHtml(dailyTrendDisplay)}</div>
               </div>
             </div>
             <div class="scout-structure">

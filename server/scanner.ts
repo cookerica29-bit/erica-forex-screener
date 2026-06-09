@@ -34,6 +34,7 @@ type TrendDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 type MarketState = 'TRENDING' | 'PULLBACK' | 'EXPANDING' | 'EXHAUSTED' | 'CHOPPY';
 type DirectionLabel = 'Bullish' | 'Bearish' | 'Neutral';
 type TrendLabel = 'Bullish' | 'Bearish' | 'Bullish HTF Pullback' | 'Bearish HTF Pullback' | 'Mixed / Transition';
+type StructureLabel = 'HH/HL' | 'LH/LL' | 'Mixed';
 type EntryStatus = 'Waiting' | 'Near Entry' | 'Tradeable' | 'Too Far';
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 type PullbackStatus =
@@ -98,6 +99,9 @@ export interface Setup {
   trendScore: number;
   trendReason: string;
   dailyTrendDirection: DirectionLabel;
+  dailySwingStructure: StructureLabel;
+  dailyBosDirection: DirectionLabel;
+  dailyChochDirection: DirectionLabel;
   h4TrendDirection: DirectionLabel;
   setupTimeframeDirection: DirectionLabel;
   setupTimeframeScore: number;
@@ -927,6 +931,9 @@ export interface ScoutReport {
   trendScore: number;
   trendReason: string;
   dailyTrendDirection: DirectionLabel;
+  dailySwingStructure: StructureLabel;
+  dailyBosDirection: DirectionLabel;
+  dailyChochDirection: DirectionLabel;
   h4TrendDirection: DirectionLabel;
   setupTimeframeDirection: DirectionLabel;
   setupTimeframeScore: number;
@@ -1322,6 +1329,9 @@ function analyzeDirectionalFrame(candles: Candle[], label: string) {
     return {
       direction: 'Neutral' as DirectionLabel,
       structureDirection: 'Neutral' as DirectionLabel,
+      swingStructure: 'Mixed' as StructureLabel,
+      lastBosDirection: 'Neutral' as DirectionLabel,
+      lastChochDirection: 'Neutral' as DirectionLabel,
       score: 0,
       signedScore: 0,
       reason: `${label}: not enough candles for directional read.`,
@@ -1337,6 +1347,7 @@ function analyzeDirectionalFrame(candles: Candle[], label: string) {
   const last = candles[candles.length - 1];
   let signedScore = 0;
   let structureDirection: DirectionLabel = 'Neutral';
+  let swingStructure: StructureLabel = 'Mixed';
   const reasons: string[] = [];
 
   if (highs.length >= 2 && lows.length >= 2) {
@@ -1347,10 +1358,12 @@ function analyzeDirectionalFrame(candles: Candle[], label: string) {
     if (higherHigh && higherLow) {
       signedScore += 2.5;
       structureDirection = 'Bullish';
+      swingStructure = 'HH/HL';
       reasons.push(`${label}: higher highs / higher lows`);
     } else if (lowerHigh && lowerLow) {
       signedScore -= 2.5;
       structureDirection = 'Bearish';
+      swingStructure = 'LH/LL';
       reasons.push(`${label}: lower highs / lower lows`);
     } else if (higherLow) {
       signedScore += 1;
@@ -1371,20 +1384,26 @@ function analyzeDirectionalFrame(candles: Candle[], label: string) {
   }
 
   const latestBos = structures.bosEvents.at(-1);
+  let lastBosDirection: DirectionLabel = 'Neutral';
   if (latestBos?.type === 'bullish') {
     signedScore += 1.5;
+    lastBosDirection = 'Bullish';
     reasons.push(`${label}: bullish BOS present`);
   } else if (latestBos?.type === 'bearish') {
     signedScore -= 1.5;
+    lastBosDirection = 'Bearish';
     reasons.push(`${label}: bearish BOS present`);
   }
 
   const latestChoch = structures.chochEvents.at(-1);
+  let lastChochDirection: DirectionLabel = 'Neutral';
   if (latestChoch?.type === 'bullish') {
     signedScore += 1.25;
+    lastChochDirection = 'Bullish';
     reasons.push(`${label}: bullish CHoCH present`);
   } else if (latestChoch?.type === 'bearish') {
     signedScore -= 1.25;
+    lastChochDirection = 'Bearish';
     reasons.push(`${label}: bearish CHoCH present`);
   }
 
@@ -1411,6 +1430,9 @@ function analyzeDirectionalFrame(candles: Candle[], label: string) {
   return {
     direction,
     structureDirection,
+    swingStructure,
+    lastBosDirection,
+    lastChochDirection,
     score,
     signedScore,
     reason: reasons[0] || `${label}: mixed structure and EMA conditions.`,
@@ -1470,6 +1492,9 @@ function buildTrendSetupPhase(
     trendScore,
     trendReason: `${primaryTrend.reason}; ${secondaryTrend.reason}`,
     dailyTrendDirection,
+    dailySwingStructure: primaryTrend.swingStructure,
+    dailyBosDirection: primaryTrend.lastBosDirection,
+    dailyChochDirection: primaryTrend.lastChochDirection,
     h4TrendDirection,
     setupTimeframeDirection,
     setupTimeframeScore,
