@@ -299,6 +299,20 @@
     .entry-status.waiting { color:var(--gold); border-color:rgba(245,166,35,0.35); background:rgba(245,166,35,0.08); }
     .entry-status.too-far { color:var(--slate-dim); border-color:rgba(148,163,184,0.22); background:rgba(148,163,184,0.04); }
     .entry-note { font-size:10px; color:var(--slate-dim); line-height:1.35; padding:7px 9px; border:1px solid rgba(148,163,184,0.08); border-radius:8px; background:rgba(148,163,184,0.035); margin-top:8px; }
+    .setup-status-box { margin:10px 0; padding:9px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.1); background:rgba(148,163,184,0.035); }
+    .setup-status-box.active { border-color:rgba(245,166,35,0.28); background:rgba(245,166,35,0.055); }
+    .setup-status-box.completed { border-color:rgba(96,165,250,0.28); background:rgba(96,165,250,0.055); }
+    .setup-status-box.early { border-color:rgba(245,166,35,0.32); background:rgba(245,166,35,0.06); }
+    .setup-status-box.strong { border-color:rgba(96,165,250,0.35); background:rgba(96,165,250,0.07); }
+    .setup-status-box.confirmed { border-color:rgba(0,255,136,0.35); background:rgba(0,255,136,0.07); }
+    .setup-status-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:3px; }
+    .setup-status-value { font-size:13px; font-weight:900; color:var(--slate); line-height:1.25; }
+    .setup-status-box.active .setup-status-value { color:var(--gold); }
+    .setup-status-box.completed .setup-status-value { color:var(--blue); }
+    .setup-status-box.early .setup-status-value { color:var(--gold); }
+    .setup-status-box.strong .setup-status-value { color:var(--blue); }
+    .setup-status-box.confirmed .setup-status-value { color:var(--green); }
+    .setup-status-reason { font-size:10px; color:var(--slate-dim); line-height:1.35; margin-top:3px; }
     .scout-structure { margin-top:8px; padding:8px 10px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; gap:4px; }
     .scout-struct-row { display:flex; align-items:center; gap:8px; }
     .scout-struct-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.05em; min-width:42px; }
@@ -1484,6 +1498,26 @@
     const confirmationState = confirmationScore >= 9 ? 'Confirmed' : confirmationScore >= 7 ? 'Strong' : confirmationScore >= 3 ? 'Building' : 'No Confirmation';
     const confirmationStateCls = confirmationScore >= 9 ? 'confirmed' : confirmationScore >= 7 ? 'strong' : confirmationScore >= 3 ? 'building' : 'none';
     const confirmationColor = confirmationScore >= 9 ? 'var(--green)' : confirmationScore >= 7 ? 'var(--blue)' : confirmationScore >= 3 ? 'var(--gold)' : 'var(--red)';
+    let setupStatus = 'Pullback Active';
+    let setupStatusCls = 'active';
+    let setupStatusReason = r.pullbackReason || 'Pullback is still active; waiting for cleaner completion evidence.';
+    if (r.confirmationConfirmed || confirmationScore >= 9) {
+      setupStatus = 'Trend Resumption Confirmed';
+      setupStatusCls = 'confirmed';
+      setupStatusReason = r.confirmationReason || 'Trend resumption has confirmed after the pullback.';
+    } else if (confirmationStatus === 'Strong confirmation' || confirmationScore >= 7) {
+      setupStatus = 'Strong Confirmation';
+      setupStatusCls = 'strong';
+      setupStatusReason = r.confirmationReason || 'Strong confirmation is building after the pullback.';
+    } else if (confirmationStatus === 'Building confirmation' || confirmationStatus === 'Early confirmation' || confirmationScore >= 3) {
+      setupStatus = 'Early Confirmation';
+      setupStatusCls = 'early';
+      setupStatusReason = r.confirmationReason || 'Early confirmation is appearing after the pullback.';
+    } else if (r.pullbackCompleted || pullbackStatus === 'Pullback completed' || pullbackScore >= 9) {
+      setupStatus = 'Pullback Completed';
+      setupStatusCls = 'completed';
+      setupStatusReason = r.pullbackReason || 'Pullback has completed; waiting for confirmation.';
+    }
     const contextColor = dir => {
       const value = String(dir || '');
       if (value === 'Bullish') return 'var(--green)';
@@ -1551,6 +1585,11 @@
             <div class="context-label">Entry Distance</div>
             <div class="context-value">${distanceAtr == null ? '—' : `${distanceAtr.toFixed(2)} ATR`}</div>
           </div>
+        </div>
+        <div class="setup-status-box ${setupStatusCls}">
+          <div class="setup-status-label">Setup Status</div>
+          <div class="setup-status-value">${escapeHtml(setupStatus)}</div>
+          <div class="setup-status-reason">${escapeHtml(setupStatusReason)}</div>
         </div>
         <div class="scout-levels">
           <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
@@ -1632,8 +1671,6 @@
               <div><span class="scout-ind-label">RSI</span><span class="scout-ind-value" style="color:${rsiColor}">${r.rsi ?? '—'}</span></div>
               <div><span class="scout-ind-label">ATR</span><span class="scout-ind-value">${r.atr != null ? Number(r.atr).toFixed(dp) : '—'}</span></div>
               <div><span class="scout-ind-label">EMA20</span><span class="scout-ind-value">${f(r.ema20)}</span></div>
-              <div><span class="scout-ind-label">Trend Score</span><span class="scout-ind-value">${Number(r.trendScore || 0)}/10</span></div>
-              <div><span class="scout-ind-label">Setup Score</span><span class="scout-ind-value">${Number(r.setupTimeframeScore || 0)}/10</span></div>
             </div>
           </div>
         </details>
