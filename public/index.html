@@ -1484,10 +1484,12 @@
     const confirmationState = confirmationScore >= 9 ? 'Confirmed' : confirmationScore >= 7 ? 'Strong' : confirmationScore >= 3 ? 'Building' : 'No Confirmation';
     const confirmationStateCls = confirmationScore >= 9 ? 'confirmed' : confirmationScore >= 7 ? 'strong' : confirmationScore >= 3 ? 'building' : 'none';
     const confirmationColor = confirmationScore >= 9 ? 'var(--green)' : confirmationScore >= 7 ? 'var(--blue)' : confirmationScore >= 3 ? 'var(--gold)' : 'var(--red)';
-    const contextColor = dir => dir === 'Bullish' ? 'var(--green)' : dir === 'Bearish' ? 'var(--red)' : 'var(--slate)';
+    const contextColor = dir => dir === 'Bullish' ? 'var(--green)' : dir === 'Bearish' ? 'var(--red)' : dir === 'HTF Conflict' ? 'var(--gold)' : 'var(--slate)';
     const trendDirection = r.trendDirection || 'Neutral';
     const setupTfDirection = r.setupTimeframeDirection || 'Neutral';
     const marketPhase = r.marketPhase || 'Mixed / Transition';
+    const dailyTrendDirection = r.dailyTrendDirection || 'Neutral';
+    const h4TrendDirection = r.h4TrendDirection || 'Neutral';
     const entryStatus = r.entryStatus || 'Waiting';
     const entryStatusCls = String(entryStatus).toLowerCase().replace(/\s+/g, '-');
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
@@ -1583,6 +1585,16 @@
               <span class="interest-badge ${r.interestLevel.toLowerCase()}">${intIcon} ${r.interestLevel}</span>
             </div>
             <div class="context-reason">${escapeHtml(r.marketPhaseReason || 'Trend/setup phase context is mixed.')}</div>
+            <div class="scout-levels">
+              <div class="scout-level-box">
+                <div class="scout-level-label">Daily Trend</div>
+                <div class="scout-level-value" style="color:${contextColor(dailyTrendDirection)}">${escapeHtml(dailyTrendDirection)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">H4 Trend</div>
+                <div class="scout-level-value" style="color:${contextColor(h4TrendDirection)}">${escapeHtml(h4TrendDirection)}</div>
+              </div>
+            </div>
             <div class="scout-structure">
               ${bosHtml}
               ${chochHtml}
