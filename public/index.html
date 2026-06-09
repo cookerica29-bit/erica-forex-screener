@@ -293,6 +293,12 @@
     .scout-level-box { background:rgba(255,255,255,0.03); border-radius:8px; padding:8px 10px; border:1px solid rgba(255,255,255,0.06); }
     .scout-level-label { font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--slate-dim); margin-bottom:2px; }
     .scout-level-value { font-size:13px; font-weight:600; }
+    .entry-status { display:inline-flex; align-items:center; justify-content:center; padding:5px 10px; border-radius:99px; border:1px solid rgba(148,163,184,0.24); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+    .entry-status.tradeable { color:var(--green); border-color:rgba(0,255,136,0.4); background:rgba(0,255,136,0.08); }
+    .entry-status.near-entry { color:var(--blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.08); }
+    .entry-status.waiting { color:var(--gold); border-color:rgba(245,166,35,0.35); background:rgba(245,166,35,0.08); }
+    .entry-status.too-far { color:var(--slate-dim); border-color:rgba(148,163,184,0.22); background:rgba(148,163,184,0.04); }
+    .entry-note { font-size:10px; color:var(--slate-dim); line-height:1.35; padding:7px 9px; border:1px solid rgba(148,163,184,0.08); border-radius:8px; background:rgba(148,163,184,0.035); margin-top:8px; }
     .scout-structure { margin-top:8px; padding:8px 10px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; gap:4px; }
     .scout-struct-row { display:flex; align-items:center; gap:8px; }
     .scout-struct-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.05em; min-width:42px; }
@@ -329,6 +335,12 @@
     .context-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.07em; margin-bottom:3px; }
     .context-value { font-size:12px; font-weight:800; color:var(--slate); line-height:1.25; }
     .context-reason { grid-column:1 / -1; font-size:10px; color:var(--slate-dim); line-height:1.35; padding:7px 9px; background:rgba(148,163,184,0.035); border:1px solid rgba(148,163,184,0.08); border-radius:8px; }
+    .diagnostics { margin-top:10px; border:1px solid rgba(148,163,184,0.1); border-radius:8px; background:rgba(148,163,184,0.025); }
+    .diagnostics summary { cursor:pointer; list-style:none; padding:8px 10px; font-size:10px; font-weight:800; color:var(--slate); text-transform:uppercase; letter-spacing:.08em; }
+    .diagnostics summary::-webkit-details-marker { display:none; }
+    .diagnostics summary::after { content:'+'; float:right; color:var(--slate-dim); }
+    .diagnostics[open] summary::after { content:'−'; }
+    .diagnostics-body { padding:0 10px 10px; }
     @media (max-width: 720px) { .market-context { grid-template-columns:1fr; } .context-reason { grid-column:auto; } }
     @media (max-width: 768px) {
       .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
@@ -1476,6 +1488,14 @@
     const trendDirection = r.trendDirection || 'Neutral';
     const setupTfDirection = r.setupTimeframeDirection || 'Neutral';
     const marketPhase = r.marketPhase || 'Mixed / Transition';
+    const entryStatus = r.entryStatus || 'Waiting';
+    const entryStatusCls = String(entryStatus).toLowerCase().replace(/\s+/g, '-');
+    const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
+    const distancePct = Number.isFinite(Number(r.distanceFromEntryPercent)) ? Number(r.distanceFromEntryPercent) : null;
+    const showTradeLevels = r.entry != null && distanceAtr != null && distanceAtr <= 0.5;
+    const entryDistanceText = distanceAtr == null
+      ? 'No nearby actionable entry zone identified.'
+      : `${distanceAtr.toFixed(2)} ATR · ${distancePct != null ? distancePct.toFixed(2) + '%' : '—'} from suggested entry`;
 
     return `<div class="setup-card ${intCls}" style="position:relative;">
       <div class="card-body">
@@ -1487,9 +1507,6 @@
             <div>
               <div class="symbol">${escapeHtml(displaySym)}</div>
               <div class="badges">
-                <span class="badge ${biasCls}">${r.bias}</span>
-                <span class="badge ${htfCls}" style="opacity:0.65">HTF: ${r.htfBias}</span>
-                <span class="badge ${zoneCls}">${r.zone}</span>
                 <span class="badge tf">${r.timeframe}</span>
                 ${r.session ? `<span class="badge session">${escapeHtml(r.session)}</span>` : ''}
                 ${r.newsRisk ? `<span class="news-risk-pill">⚠️ NEWS RISK</span>` : ''}
@@ -1497,37 +1514,47 @@
             </div>
           </div>
           <div style="text-align:right;flex-shrink:0;">
-            <div class="interest-badge ${r.interestLevel.toLowerCase()}">${intIcon} ${r.interestLevel}</div>
-            <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Interest</div>
+            <div class="entry-status ${entryStatusCls}">${escapeHtml(entryStatus)}</div>
+            <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Entry Status</div>
           </div>
         </div>
-        <div style="font-size:13px;color:var(--blue);font-weight:700;letter-spacing:.5px;margin-bottom:10px;">Price: <span>${f(r.price)}</span></div>
         <div class="market-context">
           <div class="context-cell">
             <div class="context-label">Trend</div>
-            <div class="context-value" style="color:${contextColor(trendDirection)}">${escapeHtml(trendDirection)} · ${Number(r.trendScore || 0)}/10</div>
+            <div class="context-value" style="color:${contextColor(trendDirection)}">${escapeHtml(trendDirection)}</div>
           </div>
           <div class="context-cell">
             <div class="context-label">Setup TF</div>
-            <div class="context-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)} · ${Number(r.setupTimeframeScore || 0)}/10</div>
+            <div class="context-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Market Phase</div>
+            <div class="context-label">Phase</div>
             <div class="context-value">${escapeHtml(marketPhase)}</div>
           </div>
-          <div class="context-reason">${escapeHtml(r.marketPhaseReason || 'Trend/setup phase context is mixed.')}</div>
+          <div class="context-cell">
+            <div class="context-label">Location</div>
+            <div class="context-value">${escapeHtml(r.zone || 'FAIR VALUE')}</div>
+          </div>
+          <div class="context-cell">
+            <div class="context-label">Current Price</div>
+            <div class="context-value" style="color:var(--blue)">${f(r.price)}</div>
+          </div>
+          <div class="context-cell">
+            <div class="context-label">Entry Distance</div>
+            <div class="context-value">${distanceAtr == null ? '—' : `${distanceAtr.toFixed(2)} ATR`}</div>
+          </div>
         </div>
         <div class="scout-levels">
           <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
-            <div class="scout-level-label">Resistance</div>
+            <div class="scout-level-label">Nearest Supply / Resistance</div>
             <div class="scout-level-value" style="color:var(--red)">${f(r.nearestResistance)}</div>
           </div>
           <div class="scout-level-box" style="border-color:rgba(0,255,136,0.2);border-left:3px solid rgba(0,255,136,0.5);">
-            <div class="scout-level-label">Support</div>
+            <div class="scout-level-label">Nearest Demand / Support</div>
             <div class="scout-level-value" style="color:var(--green)">${f(r.nearestSupport)}</div>
           </div>
         </div>
-        ${r.entry != null ? `
+        ${showTradeLevels ? `
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin:8px 0;">
           <div class="scout-level-box" style="border-color:rgba(96,165,250,0.2);border-left:3px solid rgba(96,165,250,0.5);">
             <div class="scout-level-label" style="color:rgba(96,165,250,0.7);">Entry</div>
@@ -1545,39 +1572,53 @@
             <div class="scout-level-label">R:R</div>
             <div class="scout-level-value" style="color:${r.rrRatio != null && r.rrRatio >= 1.5 ? 'var(--green)' : 'var(--slate)'};font-size:12px;">${r.rrRatio != null ? r.rrRatio.toFixed(2) + 'R' : '—'}</div>
           </div>
-        </div>` : ''}
-        <div class="scout-structure">
-          ${bosHtml}
-          ${chochHtml}
-        </div>
-        <div class="momentum-box">
-          <div>
-            <div class="momentum-label">Momentum</div>
-            <div class="momentum-value" style="color:${momentumColor};">${escapeHtml(r.momentumLabel || 'Neutral / Mixed')} (${momentumSigned})</div>
+        </div>` : `<div class="entry-note">${escapeHtml(entryDistanceText)} Suggested Entry / SL / TP hidden until price is within 0.5 ATR.</div>`}
+        <details class="diagnostics">
+          <summary>Details / Diagnostics</summary>
+          <div class="diagnostics-body">
+            <div class="badges" style="margin-bottom:8px;">
+              <span class="badge ${biasCls}">Setup Bias: ${r.bias}</span>
+              <span class="badge ${htfCls}" style="opacity:0.75">Legacy HTF: ${r.htfBias}</span>
+              <span class="badge ${zoneCls}">${r.zone}</span>
+              <span class="interest-badge ${r.interestLevel.toLowerCase()}">${intIcon} ${r.interestLevel}</span>
+            </div>
+            <div class="context-reason">${escapeHtml(r.marketPhaseReason || 'Trend/setup phase context is mixed.')}</div>
+            <div class="scout-structure">
+              ${bosHtml}
+              ${chochHtml}
+            </div>
+            <div class="momentum-box">
+              <div>
+                <div class="momentum-label">Momentum</div>
+                <div class="momentum-value" style="color:${momentumColor};">${escapeHtml(r.momentumLabel || 'Neutral / Mixed')} (${momentumSigned})</div>
+              </div>
+              <span class="momentum-state ${momentumStateCls}">${momentumState}</span>
+            </div>
+            <div class="pullback-box">
+              <div>
+                <div class="pullback-label">Pullback</div>
+                <div class="pullback-value" style="color:${pullbackColor};">${escapeHtml(pullbackStatus)} (${pullbackScore}/10)</div>
+                <div class="pullback-reason">${escapeHtml(r.pullbackReason || 'Mixed pullback evidence; no clear completion signal yet.')}</div>
+              </div>
+              <span class="pullback-state ${pullbackStateCls}">${pullbackState}</span>
+            </div>
+            <div class="confirmation-box">
+              <div>
+                <div class="confirmation-label">Confirmation</div>
+                <div class="confirmation-value" style="color:${confirmationColor};">${escapeHtml(confirmationStatus)} (${confirmationScore}/10)</div>
+                <div class="confirmation-reason">${escapeHtml(r.confirmationReason || 'No clear resumption signal yet.')}</div>
+              </div>
+              <span class="confirmation-state ${confirmationStateCls}">${confirmationState}</span>
+            </div>
+            <div class="scout-indicators">
+              <div><span class="scout-ind-label">RSI</span><span class="scout-ind-value" style="color:${rsiColor}">${r.rsi ?? '—'}</span></div>
+              <div><span class="scout-ind-label">ATR</span><span class="scout-ind-value">${r.atr != null ? Number(r.atr).toFixed(dp) : '—'}</span></div>
+              <div><span class="scout-ind-label">EMA20</span><span class="scout-ind-value">${f(r.ema20)}</span></div>
+              <div><span class="scout-ind-label">Trend Score</span><span class="scout-ind-value">${Number(r.trendScore || 0)}/10</span></div>
+              <div><span class="scout-ind-label">Setup Score</span><span class="scout-ind-value">${Number(r.setupTimeframeScore || 0)}/10</span></div>
+            </div>
           </div>
-          <span class="momentum-state ${momentumStateCls}">${momentumState}</span>
-        </div>
-        <div class="pullback-box">
-          <div>
-            <div class="pullback-label">Pullback</div>
-            <div class="pullback-value" style="color:${pullbackColor};">${escapeHtml(pullbackStatus)} (${pullbackScore}/10)</div>
-            <div class="pullback-reason">${escapeHtml(r.pullbackReason || 'Mixed pullback evidence; no clear completion signal yet.')}</div>
-          </div>
-          <span class="pullback-state ${pullbackStateCls}">${pullbackState}</span>
-        </div>
-        <div class="confirmation-box">
-          <div>
-            <div class="confirmation-label">Confirmation</div>
-            <div class="confirmation-value" style="color:${confirmationColor};">${escapeHtml(confirmationStatus)} (${confirmationScore}/10)</div>
-            <div class="confirmation-reason">${escapeHtml(r.confirmationReason || 'No clear resumption signal yet.')}</div>
-          </div>
-          <span class="confirmation-state ${confirmationStateCls}">${confirmationState}</span>
-        </div>
-        <div class="scout-indicators">
-          <div><span class="scout-ind-label">RSI</span><span class="scout-ind-value" style="color:${rsiColor}">${r.rsi ?? '—'}</span></div>
-          <div><span class="scout-ind-label">ATR</span><span class="scout-ind-value">${r.atr != null ? Number(r.atr).toFixed(dp) : '—'}</span></div>
-          <div><span class="scout-ind-label">EMA20</span><span class="scout-ind-value">${f(r.ema20)}</span></div>
-        </div>
+        </details>
         <div class="scanned-at" style="margin-top:8px;">Scanned: ${new Date(r.scannedAt).toLocaleTimeString()} · OANDA v20</div>
         <div class="card-actions" style="margin-top:10px;">
           <button class="send-bot-btn" onclick="sendSetupToCalculator(decodeURIComponent('${encoded}'))">Send to Calculator</button>

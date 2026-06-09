@@ -33,6 +33,7 @@ interface Swing  { index:number; price:number; type:'high'|'low'; }
 type TrendDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 type MarketState = 'TRENDING' | 'PULLBACK' | 'EXPANDING' | 'EXHAUSTED' | 'CHOPPY';
 type DirectionLabel = 'Bullish' | 'Bearish' | 'Neutral';
+type EntryStatus = 'Waiting' | 'Near Entry' | 'Tradeable' | 'Too Far';
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 type PullbackStatus =
   | 'Aggressive pullback / Not ready'
@@ -102,6 +103,9 @@ export interface Setup {
   marketPhaseReason: string;
   trendSetupAligned: boolean;
   isPullbackAgainstTrend: boolean;
+  entryStatus: EntryStatus;
+  distanceFromEntryAtr: number | null;
+  distanceFromEntryPercent: number | null;
 }
 
 export type JournalStats = Record<string, { wins: number; losses: number }>;
@@ -926,7 +930,10 @@ export interface ScoutReport {
   marketPhaseReason: string;
   trendSetupAligned: boolean;
   isPullbackAgainstTrend: boolean;
-  // Trade levels — derived from EMA20 + ATR + nearest structural target
+  entryStatus: EntryStatus;
+  distanceFromEntryAtr: number | null;
+  distanceFromEntryPercent: number | null;
+  // Trade levels — derived from active structure first, with EMA20 only as nearby fallback
   entry: number | null;
   sl: number | null;
   tp1: number | null;
@@ -1301,10 +1308,15 @@ function directionFromSignedScore(score: number): DirectionLabel {
   return 'Neutral';
 }
 
+function roundPrice(value: number) {
+  return Math.round(value * 1e5) / 1e5;
+}
+
 function analyzeDirectionalFrame(candles: Candle[], label: string) {
   if (candles.length < 55) {
     return {
       direction: 'Neutral' as DirectionLabel,
+      structureDirection: 'Neutral' as DirectionLabel,
       score: 0,
       signedScore: 0,
       reason: `${label}: not enough candles for directional read.`,
@@ -1319,6 +1331,7 @@ function analyzeDirectionalFrame(candles: Candle[], label: string) {
   const ema50 = calcEMA(candles, 50).at(-1);
   const last = candles[candles.length - 1];
   let signedScore = 0;
+  let structureDirection: DirectionLabel = 'Neutral';
   const reasons: string[] = [];
 
   if (highs.length >= 2 && lows.length >= 2) {
@@ -1328,9 +1341,11 @@ function analyzeDirectionalFrame(candles: Candle[], label: string) {
     const lowerLow = lows[lows.length - 1].price < lows[lows.length - 2].price;
     if (higherHigh && higherLow) {
       signedScore += 2.5;
+      structureDirection = 'Bullish';
       reasons.push(`${label}: higher highs / higher lows`);
     } else if (lowerHigh && lowerLow) {
       signedScore -= 2.5;
+      structureDirection = 'Bearish';
       reasons.push(`${label}: lower highs / lower lows`);
     } else if (higherLow) {
       signedScore += 1;
@@ -1385,8 +1400,12 @@ function analyzeDirectionalFrame(candles: Candle[], label: string) {
   }
 
   const score = Math.max(0, Math.min(10, Math.round(Math.abs(signedScore))));
+  let direction = directionFromSignedScore(signedScore);
+  if (structureDirection === 'Bullish' && direction === 'Bearish') direction = 'Neutral';
+  if (structureDirection === 'Bearish' && direction === 'Bullish') direction = 'Neutral';
   return {
-    direction: directionFromSignedScore(signedScore),
+    direction,
+    structureDirection,
     score,
     signedScore,
     reason: reasons[0] || `${label}: mixed structure and EMA conditions.`,
@@ -1406,7 +1425,22 @@ function buildTrendSetupPhase(
   const primaryTrend = analyzeDirectionalFrame(trendCandlesA, trendLabelA);
   const secondaryTrend = analyzeDirectionalFrame(trendCandlesB, trendLabelB);
   const trendSignedScore = (primaryTrend.signedScore * 0.6) + (secondaryTrend.signedScore * 0.4);
-  const trendDirection = directionFromSignedScore(trendSignedScore);
+  let trendDirection = directionFromSignedScore(trendSignedScore);
+  if (primaryTrend.structureDirection !== 'Neutral' && primaryTrend.structureDirection === secondaryTrend.structureDirection) {
+    trendDirection = primaryTrend.structureDirection;
+  } else if (
+    primaryTrend.structureDirection === 'Bullish' &&
+    secondaryTrend.structureDirection !== 'Bearish' &&
+    trendDirection === 'Bearish'
+  ) {
+    trendDirection = 'Neutral';
+  } else if (
+    primaryTrend.structureDirection === 'Bearish' &&
+    secondaryTrend.structureDirection !== 'Bullish' &&
+    trendDirection === 'Bullish'
+  ) {
+    trendDirection = 'Neutral';
+  }
   const trendScore = Math.max(0, Math.min(10, Math.round(Math.abs(trendSignedScore))));
   const setupFrame = analyzeDirectionalFrame(setupCandles, setupLabel);
   const setupTimeframeDirection = setupFrame.direction;
@@ -1426,13 +1460,6 @@ function buildTrendSetupPhase(
   else if (trendDirection === 'Bearish' && setupTimeframeDirection === 'Bearish') marketPhase = 'Bearish Continuation';
   else if (trendDirection === 'Bearish' && setupTimeframeDirection === 'Bullish') marketPhase = 'Bearish Pullback';
 
-  const setupStronglyOpposesTrend =
-    isPullbackAgainstTrend &&
-    setupTimeframeScore >= 7 &&
-    Math.abs(momentumScore) >= 7 &&
-    confirmationScore >= 7;
-  if (setupStronglyOpposesTrend) marketPhase = 'Potential Reversal';
-
   return {
     trendDirection,
     trendScore,
@@ -1441,15 +1468,67 @@ function buildTrendSetupPhase(
     setupTimeframeScore,
     setupTimeframeReason: setupFrame.reason,
     marketPhase,
-    marketPhaseReason: setupStronglyOpposesTrend
-      ? 'Setup timeframe strongly opposes HTF trend with momentum and confirmation; watching as possible reversal only.'
-      : isPullbackAgainstTrend
+    marketPhaseReason: isPullbackAgainstTrend
       ? `${setupTimeframeDirection} setup timeframe is moving against ${trendDirection} higher-timeframe trend.`
       : trendSetupAligned
       ? `${setupTimeframeDirection} setup timeframe agrees with ${trendDirection} higher-timeframe trend.`
       : 'Trend or setup timeframe is neutral/mixed.',
     trendSetupAligned,
     isPullbackAgainstTrend,
+  };
+}
+
+function nearestActiveZoneEntry(
+  candles: Candle[],
+  bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL',
+  price: number,
+  atr: number,
+  ema20: number,
+  nearestSupport: number | null,
+  nearestResistance: number | null
+) {
+  if (bias === 'NEUTRAL') return null;
+  const atrSafe = Math.max(atr, Math.abs(price) * 0.0001, 0.00001);
+  const structures = computeStructures(candles.slice(-120), 4);
+  const isLong = bias === 'BULLISH';
+  const zoneMids = (isLong ? structures.demandZones : structures.supplyZones)
+    .slice(-6)
+    .map(z => (z.high + z.low) / 2)
+    .filter(mid => isLong ? mid <= price + 0.25 * atrSafe : mid >= price - 0.25 * atrSafe)
+    .sort((a, b) => Math.abs(price - a) - Math.abs(price - b));
+
+  const candidates = [
+    ...zoneMids,
+    isLong ? nearestSupport : nearestResistance,
+    ema20,
+  ].filter((v): v is number => Number.isFinite(Number(v)));
+
+  const active = candidates.find(v => Math.abs(price - v) <= 1.25 * atrSafe);
+  return roundPrice(active ?? candidates[0] ?? ema20);
+}
+
+function classifyEntryDistance(price: number, entry: number | null, atr: number) {
+  if (entry === null || !Number.isFinite(entry)) {
+    return {
+      entryStatus: 'Waiting' as EntryStatus,
+      distanceFromEntryAtr: null,
+      distanceFromEntryPercent: null,
+    };
+  }
+
+  const atrSafe = Math.max(atr, Math.abs(price) * 0.0001, 0.00001);
+  const distance = Math.abs(price - entry);
+  const distanceFromEntryAtr = Math.round((distance / atrSafe) * 100) / 100;
+  const distanceFromEntryPercent = Math.round((distance / Math.max(Math.abs(price), 0.00001)) * 10000) / 100;
+  let entryStatus: EntryStatus = 'Too Far';
+  if (distanceFromEntryAtr <= 0.25) entryStatus = 'Tradeable';
+  else if (distanceFromEntryAtr <= 0.5) entryStatus = 'Near Entry';
+  else if (distanceFromEntryAtr <= 1) entryStatus = 'Waiting';
+
+  return {
+    entryStatus,
+    distanceFromEntryAtr,
+    distanceFromEntryPercent,
   };
 }
 
@@ -1813,7 +1892,8 @@ export function scoutAnalyzeCandles(
     interestScore >= 4 ? 'HIGH' : interestScore >= 2 ? 'MEDIUM' : 'LOW';
 
   // ── Trade levels ──────────────────────────────────────────────────────────
-  // Entry: EMA20 for pullback longs/shorts (best location near the dynamic level)
+  // Entry: nearest active demand/supply or recent pullback structure first;
+  // EMA20 is only a fallback when it is still close to current price action.
   // SL: 1×ATR beyond the nearest swing low/high
   // TP1: nearest structural target beyond entry + 1×ATR (skip minor structure)
   // TP2: second structural level
@@ -1825,11 +1905,11 @@ export function scoutAnalyzeCandles(
 
   if (finalBias !== 'NEUTRAL') {
     const isLong = finalBias === 'BULLISH';
-    entry = Math.round(ema20 * 1e5) / 1e5;
+    entry = nearestActiveZoneEntry(candles, finalBias, price, atr, ema20, nearestSupport, nearestResistance);
 
     if (isLong) {
       const slBase = nearestSupport ?? (entry - 2 * atr);
-      sl = Math.round((Math.min(slBase, entry - atr) - 0.3 * atr) * 1e5) / 1e5;
+      sl = roundPrice(Math.min(slBase, entry - atr) - 0.3 * atr);
       const risk = Math.abs(entry - sl);
       // TP: first swing high giving >= 2R (skip minor structure)
       const minTp = entry + Math.max(atr, 2 * risk);
@@ -1838,14 +1918,14 @@ export function scoutAnalyzeCandles(
         .filter(s => s.price > minTp)
         .sort((a, b) => a.price - b.price);
       tp1 = tpCandidates[0]
-        ? Math.round(tpCandidates[0].price * 1e5) / 1e5
-        : Math.round((entry + 2 * risk) * 1e5) / 1e5;
+        ? roundPrice(tpCandidates[0].price)
+        : roundPrice(entry + 2 * risk);
       tp2 = tpCandidates[1]
-        ? Math.round(tpCandidates[1].price * 1e5) / 1e5
-        : Math.round((entry + 3 * risk) * 1e5) / 1e5;
+        ? roundPrice(tpCandidates[1].price)
+        : roundPrice(entry + 3 * risk);
     } else {
       const slBase = nearestResistance ?? (entry + 2 * atr);
-      sl = Math.round((Math.max(slBase, entry + atr) + 0.3 * atr) * 1e5) / 1e5;
+      sl = roundPrice(Math.max(slBase, entry + atr) + 0.3 * atr);
       const risk = Math.abs(entry - sl);
       // TP: first swing low giving >= 2R (skip minor structure)
       const minTp = entry - Math.max(atr, 2 * risk);
@@ -1853,11 +1933,11 @@ export function scoutAnalyzeCandles(
         .filter(s => s.price < minTp)
         .sort((a, b) => b.price - a.price);
       tp1 = tpCandidates[0]
-        ? Math.round(tpCandidates[0].price * 1e5) / 1e5
-        : Math.round((entry - 2 * risk) * 1e5) / 1e5;
+        ? roundPrice(tpCandidates[0].price)
+        : roundPrice(entry - 2 * risk);
       tp2 = tpCandidates[1]
-        ? Math.round(tpCandidates[1].price * 1e5) / 1e5
-        : Math.round((entry - 3 * risk) * 1e5) / 1e5;
+        ? roundPrice(tpCandidates[1].price)
+        : roundPrice(entry - 3 * risk);
     }
 
     if (entry !== null && sl !== null && tp1 !== null) {
@@ -1866,6 +1946,7 @@ export function scoutAnalyzeCandles(
       if (risk > 0) rrRatio = Math.round((reward / risk) * 100) / 100;
     }
   }
+  const entryDistance = classifyEntryDistance(price, entry, atr);
 
   return {
     pair,
@@ -1890,6 +1971,7 @@ export function scoutAnalyzeCandles(
     ...pullbackCompletion,
     ...trendConfirmation,
     ...trendSetupPhase,
+    ...entryDistance,
     entry,
     sl,
     tp1,
