@@ -17,12 +17,12 @@ export const PAIRS = [
   'EUR_GBP','EUR_AUD',
   // Metals
   'XAU_USD','XAG_USD',
+  // Indices
+  'US30_USD','NAS100_USD',
 ];
 
 export const TRENDING_ASSETS = [
   ...PAIRS,
-  'US30_USD',
-  'NAS100_USD',
 ];
 
 const HTF_MAP: Record<string,string> = { M15:'H4', M30:'H4', H1:'D', H4:'W', D:'W' };

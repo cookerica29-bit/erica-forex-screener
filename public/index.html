@@ -748,7 +748,7 @@
   let priorityPairsPayload = null;
   let priorityWatchlistRows = [];
 
-  const FULL_SCAN_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','AUD_USD','NZD_USD','EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY','EUR_GBP','EUR_AUD','XAU_USD','XAG_USD'];
+  const FULL_SCAN_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','AUD_USD','NZD_USD','EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY','EUR_GBP','EUR_AUD','XAU_USD','XAG_USD','US30_USD','NAS100_USD'];
   // Pair list — overwritten on load from /api/priority-pairs; falls back to full 16 pairs
   let PAIRS = [...FULL_SCAN_PAIRS];
   let PAIR_LABELS = Object.fromEntries(FULL_SCAN_PAIRS.map(p => [p, makePairLabel(p)]));

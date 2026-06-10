@@ -146,7 +146,12 @@ async function sendTelegram(text: string, parseMode?: 'Markdown') {
   return data;
 }
 
+function isIndexSymbol(symbol: string) {
+  return ['US30_USD', 'NAS100_USD'].includes(symbol);
+}
+
 function isBotSignalEligible(report: ScoutReport) {
+  if (isIndexSymbol(report.pair)) return false;
   return (
     report.trendDirection === 'Bullish' &&
     report.setupTimeframeDirection === 'Bullish' &&
@@ -167,7 +172,8 @@ function journalCandidateDataKey(report: ScoutReport) {
 }
 
 function isTradeableScoutSignal(report: ScoutReport) {
-  return report.entryStatus === 'Tradeable' &&
+  return !isIndexSymbol(report.pair) &&
+    report.entryStatus === 'Tradeable' &&
     report.entry !== null &&
     report.sl !== null &&
     report.tp1 !== null;
@@ -516,7 +522,7 @@ function calculateRr(direction: 'LONG' | 'SHORT', entry: number, stopLoss: numbe
 }
 
 function queueSetups(setups: Setup[]) {
-  const premium = setups.filter(s => s.quality === 'PREMIUM' || s.quality === 'STRONG');
+  const premium = setups.filter(s => !isIndexSymbol(s.pair) && (s.quality === 'PREMIUM' || s.quality === 'STRONG'));
   for (const setup of premium) {
     const exists = pendingApprovals.some(
       p => p.pair === setup.pair && p.timeframe === setup.timeframe &&
