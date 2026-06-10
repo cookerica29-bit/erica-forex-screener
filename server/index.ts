@@ -30,7 +30,9 @@ let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
 const journalCandidateAlerts = new Map<string, number>();
+const tradeableSignalAlerts = new Map<string, number>();
 const JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+const TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const AUTO_JOURNAL_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const journalCandidateCandleTimes = new Map<string, string>();
 
@@ -162,6 +164,24 @@ function journalCandidateAlertKey(report: ScoutReport) {
 
 function journalCandidateDataKey(report: ScoutReport) {
   return [report.pair, report.timeframe].join('|');
+}
+
+function isTradeableScoutSignal(report: ScoutReport) {
+  return report.entryStatus === 'Tradeable' &&
+    report.entry !== null &&
+    report.sl !== null &&
+    report.tp1 !== null;
+}
+
+function tradeableSignalAlertKey(report: ScoutReport) {
+  return [
+    report.pair,
+    report.timeframe,
+    report.candleTime,
+    report.entry,
+    report.sl,
+    report.tp1,
+  ].join('|');
 }
 
 function getNewYorkMarketParts(now = new Date()) {
@@ -343,6 +363,49 @@ async function notifyBiasLocationAlignedCandidates(reports: ScoutReport[]) {
   }
 }
 
+async function notifyTradeableScoutSignals(reports: ScoutReport[], source: string) {
+  const tradeable = reports.filter(isTradeableScoutSignal);
+  if (!tradeable.length) return;
+
+  if (!isForexMarketOpen()) {
+    console.log(`[Telegram] ${source}: market closed; skipped ${tradeable.length} tradeable scout signal${tradeable.length === 1 ? '' : 's'}`);
+    return;
+  }
+
+  const now = Date.now();
+  for (const [key, alertedAt] of tradeableSignalAlerts) {
+    if (now - alertedAt >= TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS) tradeableSignalAlerts.delete(key);
+  }
+
+  for (const report of tradeable) {
+    const key = tradeableSignalAlertKey(report);
+    const alertedAt = tradeableSignalAlerts.get(key);
+    if (alertedAt && now - alertedAt < TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS) {
+      console.log(`[Telegram] Tradeable scout signal suppressed by cooldown for ${report.pair} ${report.timeframe}`);
+      continue;
+    }
+
+    const direction = report.bias === 'BULLISH'
+      ? '🟢 LONG'
+      : report.bias === 'BEARISH'
+      ? '🔴 SHORT'
+      : '⚪ REVIEW';
+    const trendDisplay = report.dailyTrendDirection === 'Neutral' ? 'Mixed' : report.dailyTrendDirection;
+    const h4Display = report.h4TrendDirection === 'Neutral' ? 'Mixed' : report.h4TrendDirection;
+    const text = `✅ *TRADEABLE SCOUT SIGNAL — ${report.displaySymbol}*\n${direction} | TF: ${report.timeframe}\nTrend: ${trendDisplay} | H4: ${h4Display}\nPhase: ${report.marketPhase}\nLocation: ${report.zone}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nEntry Status: ${report.entryStatus}\nReason: Price is within 0.25 ATR of the active entry zone\n→ https://erica-forex-screener-production.up.railway.app`;
+
+    try {
+      const data = await sendTelegram(text, 'Markdown');
+      if (data.ok) {
+        tradeableSignalAlerts.set(key, now);
+        console.log(`[Telegram] Tradeable scout signal sent for ${report.pair} ${report.timeframe}`);
+      }
+    } catch (e: any) {
+      console.error(`[Telegram] Tradeable scout signal failed for ${report.pair}:`, e.message);
+    }
+  }
+}
+
 function getSurfacedTrends(results: TrendScanResult) {
   const surfaced = new Map<string, { report: TrendReport; section: string }>();
   const add = (reports: TrendReport[], section: string) => {
@@ -515,6 +578,7 @@ async function scheduledScan(forceTf?: string) {
     try {
       latestScoutResults = await runScoutScan(forceTf || 'H4');
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
+      await notifyTradeableScoutSignals(latestScoutResults, 'scheduled scout scan');
       const freshJournalCandidates = getFreshJournalCandidateReports(latestScoutResults, 'scheduled scout scan');
       await autoJournalBiasLocationAlignedCandidates(freshJournalCandidates);
       await notifyBiasLocationAlignedCandidates(freshJournalCandidates);
@@ -567,6 +631,7 @@ app.post('/api/scout', async (req, res) => {
       console.log(`[Scout] Priority mode active for setup queue, ignored for scout card coverage (${priorityPairsData.pairs.length} priority pairs)`);
     }
     latestScoutResults = await runScoutScan(tf);
+    await notifyTradeableScoutSignals(latestScoutResults, 'manual scout scan');
     const freshJournalCandidates = getFreshJournalCandidateReports(latestScoutResults, 'manual scout scan');
     await autoJournalBiasLocationAlignedCandidates(freshJournalCandidates);
     await notifyBiasLocationAlignedCandidates(freshJournalCandidates);
