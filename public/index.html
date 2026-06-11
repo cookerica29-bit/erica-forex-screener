@@ -37,7 +37,7 @@
     .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .spin { animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .stats-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+    .stats-bar { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
     .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; border-top: 2px solid rgba(96,165,250,0.3); border-radius: 0 0 8px 8px; }
     .stat-value { font-size: 24px; font-weight: 800; }
     .stat-label { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; margin-top: 2px; letter-spacing: 0.5px; }
@@ -422,50 +422,52 @@
 
 <div id="content-scanner" class="tab-content active">
 
-<div class="controls">
-  <div class="control-group">
-    <span class="control-label">Interest</span>
-    <button class="pill active" onclick="setInterest('ALL')" id="int-ALL">All</button>
-    <button class="pill" onclick="setInterest('HIGH')" id="int-HIGH">🔥 High</button>
-    <button class="pill" onclick="setInterest('MEDIUM')" id="int-MEDIUM">👀 Medium</button>
-    <button class="pill" onclick="setInterest('LOW')" id="int-LOW">Low</button>
-  </div>
-  <div class="control-group">
-    <span class="control-label">Bias</span>
-    <button class="pill active" onclick="setBias('ALL')" id="bias-ALL">All</button>
-    <button class="pill" onclick="setBias('BULLISH')" id="bias-BULLISH">Bullish</button>
-    <button class="pill" onclick="setBias('BEARISH')" id="bias-BEARISH">Bearish</button>
-    <button class="pill" onclick="setBias('NEUTRAL')" id="bias-NEUTRAL">Neutral</button>
-  </div>
-</div>
-
 <div class="stats-bar">
   <div class="stat-box"><div class="stat-value" id="s-total" style="color:var(--text)">—</div><div class="stat-label">Scanned</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-high" style="color:var(--gold)">—</div><div class="stat-label">High Interest</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-tradeable" style="color:var(--green)">—</div><div class="stat-label">Tradeable</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-near" style="color:var(--blue)">—</div><div class="stat-label">Near Entry</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-waiting" style="color:var(--gold)">—</div><div class="stat-label">Waiting</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-too-far" style="color:var(--slate)">—</div><div class="stat-label">Too Far</div></div>
   <div class="stat-box"><div class="stat-value" id="s-bullish" style="color:var(--green)">—</div><div class="stat-label">Bullish</div></div>
   <div class="stat-box"><div class="stat-value" id="s-bearish" style="color:var(--red)">—</div><div class="stat-label">Bearish</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-neutral" style="color:var(--slate)">—</div><div class="stat-label">Neutral</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-choch" style="color:var(--blue)">—</div><div class="stat-label">ChoCH Alert</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-mixed" style="color:var(--slate)">—</div><div class="stat-label">Mixed</div></div>
 </div>
 
 <div class="filter-row">
   <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
+  <select class="filter-select" id="entryStatusFilter" onchange="renderSetups()" aria-label="Entry status filter">
+    <option value="ALL">Entry Status: All Entry Statuses</option>
+    <option value="Tradeable">Entry Status: Tradeable</option>
+    <option value="Near Entry">Entry Status: Near Entry</option>
+    <option value="Waiting">Entry Status: Waiting</option>
+    <option value="Too Far">Entry Status: Too Far</option>
+  </select>
+  <select class="filter-select" id="trendFilter" onchange="renderSetups()" aria-label="Trend filter">
+    <option value="ALL">Trend: All Trends</option>
+    <option value="Bullish">Trend: Bullish</option>
+    <option value="Bearish">Trend: Bearish</option>
+    <option value="Mixed">Trend: Mixed</option>
+  </select>
+  <select class="filter-select" id="phaseFilter" onchange="renderSetups()" aria-label="Phase filter">
+    <option value="ALL">Phase: All Phases</option>
+    <option value="Trend Move">Phase: Trend Move</option>
+    <option value="Pullback">Phase: Pullback</option>
+    <option value="Recovery">Phase: Recovery</option>
+    <option value="Transition">Phase: Transition</option>
+  </select>
+  <select class="filter-select" id="setupStatusFilter" onchange="renderSetups()" aria-label="Setup status filter">
+    <option value="ALL">Setup Status: All Setup Statuses</option>
+    <option value="Pullback Active">Setup Status: Pullback Active</option>
+    <option value="Pullback Complete">Setup Status: Pullback Complete</option>
+    <option value="Early Confirmation">Setup Status: Early Confirmation</option>
+    <option value="Strong Confirmation">Setup Status: Strong Confirmation</option>
+    <option value="Trend Resumption Confirmed">Setup Status: Trend Resumption Confirmed</option>
+  </select>
   <select class="filter-select" id="locationFilter" onchange="renderSetups()" aria-label="Location filter">
-    <option value="HIDE_MID">Location: Hide MID</option>
-    <option value="ALL">Location: All locations</option>
-    <option value="PREMIUM">Location: Premium only</option>
-    <option value="DISCOUNT">Location: Discount only</option>
-    <option value="MID">Location: MID only</option>
-  </select>
-  <select class="filter-select" id="htfAlignmentFilter" onchange="renderSetups()" aria-label="HTF alignment filter">
-    <option value="ALIGNED">HTF: Aligned only</option>
-    <option value="ALL">HTF: All bias states</option>
-    <option value="MIXED">HTF: Mixed only</option>
-  </select>
-  <select class="filter-select" id="qualityFilter" onchange="renderSetups()" aria-label="Quality filter">
-    <option value="ALL">Quality: All</option>
-    <option value="BIAS_ALIGNED">Quality: Bias aligned</option>
-    <option value="BIAS_LOCATION_ALIGNED">Quality: Bias + Location aligned</option>
+    <option value="ALL">Location: All Locations</option>
+    <option value="DISCOUNT">Location: Discount</option>
+    <option value="PREMIUM">Location: Premium</option>
+    <option value="MID">Location: Mid</option>
   </select>
   <span id="resultCount" class="result-count"></span>
 </div>
@@ -742,7 +744,7 @@
 </div>
 
 <script>
-  let allSetups = [], allNearMisses = [], interestFilter = 'ALL', biasFilter = 'ALL', scanning = false;
+  let allSetups = [], allNearMisses = [], scanning = false;
   let autoRefreshTimer = null;
   let nearMissOpen = false;
   let priorityPairsPayload = null;
@@ -1391,18 +1393,78 @@
 
   function getFiltered() {
     const s = document.getElementById('searchBox').value.toLowerCase();
-    const location = document.getElementById('locationFilter')?.value || 'HIDE_MID';
-    const htfAlignment = document.getElementById('htfAlignmentFilter')?.value || 'ALIGNED';
-    const quality = document.getElementById('qualityFilter')?.value || 'ALL';
+    const entryStatus = document.getElementById('entryStatusFilter')?.value || 'ALL';
+    const trend = document.getElementById('trendFilter')?.value || 'ALL';
+    const phase = document.getElementById('phaseFilter')?.value || 'ALL';
+    const setupStatus = document.getElementById('setupStatusFilter')?.value || 'ALL';
+    const location = document.getElementById('locationFilter')?.value || 'ALL';
     return allSetups.filter(x => {
-      if (interestFilter !== 'ALL' && x.interestLevel !== interestFilter) return false;
-      if (biasFilter !== 'ALL' && x.bias !== biasFilter) return false;
+      if (entryStatus !== 'ALL' && x.entryStatus !== entryStatus) return false;
+      if (trend !== 'ALL' && displayTrendForReport(x) !== trend) return false;
+      if (phase !== 'ALL' && displayPhaseForReport(x) !== phase) return false;
+      if (setupStatus !== 'ALL' && displaySetupStatusForReport(x) !== setupStatus) return false;
       if (!matchesLocationFilter(x.zone, location)) return false;
-      if (!matchesHtfAlignmentFilter(x.htfBias, x.bias, htfAlignment)) return false;
-      if (!matchesQualityFilter(x.htfBias, x.bias, x.zone, quality)) return false;
-      if (s && !x.displaySymbol.toLowerCase().includes(s)) return false;
+      const symbol = String(x.displaySymbol || x.pair || '').toLowerCase();
+      if (s && !symbol.includes(s)) return false;
       return true;
     });
+  }
+
+  function entryStatusRank(status) {
+    return { 'Tradeable': 0, 'Near Entry': 1, 'Waiting': 2, 'Too Far': 3 }[status] ?? 4;
+  }
+
+  function displayPhaseForReport(r) {
+    const daily = displayTrendForReport(r);
+    const h4 = r.h4TrendDirection === 'Neutral' ? 'Mixed' : (r.h4TrendDirection || 'Mixed');
+    if ((daily === 'Bullish' && h4 === 'Bullish') || (daily === 'Bearish' && h4 === 'Bearish')) return 'Trend Move';
+    if ((daily === 'Bullish' && h4 === 'Bearish') || (daily === 'Bearish' && h4 === 'Bullish')) return 'Pullback';
+    if (String(r.marketPhase || '').includes('Recovery')) return 'Recovery';
+    return 'Transition';
+  }
+
+  function displayTrendForReport(r) {
+    const daily = r.dailyTrendDirection === 'Neutral' ? 'Mixed' : (r.dailyTrendDirection || r.trendDirection || 'Mixed');
+    return daily === 'Bullish' ? 'Bullish' : daily === 'Bearish' ? 'Bearish' : 'Mixed';
+  }
+
+  function displaySetupStatusForReport(r) {
+    const pullbackScore = Number.isFinite(Number(r.pullbackScore)) ? Number(r.pullbackScore) : 0;
+    const pullbackStatus = r.pullbackStatus || 'Aggressive pullback / Not ready';
+    const confirmationScore = Number.isFinite(Number(r.confirmationScore)) ? Number(r.confirmationScore) : 0;
+    const confirmationStatus = r.confirmationStatus || 'No confirmation';
+    if (r.confirmationConfirmed || confirmationScore >= 9) return 'Trend Resumption Confirmed';
+    if (confirmationStatus === 'Strong confirmation' || confirmationScore >= 7) return 'Strong Confirmation';
+    if (confirmationStatus === 'Building confirmation' || confirmationStatus === 'Early confirmation' || confirmationScore >= 3) return 'Early Confirmation';
+    if (r.pullbackCompleted || pullbackStatus === 'Pullback completed' || pullbackScore >= 9) return 'Pullback Complete';
+    return 'Pullback Active';
+  }
+
+  function phaseRank(phase) {
+    return { 'Trend Move': 0, 'Pullback': 1, 'Recovery': 2, 'Transition': 3 }[phase] ?? 4;
+  }
+
+  function displaySymbolForSort(r) {
+    return String(r.displaySymbol || r.pair || '').toUpperCase();
+  }
+
+  function sortScoutCardsForDisplay(rows) {
+    return rows.slice().sort((a, b) => {
+      const entryDiff = entryStatusRank(a.entryStatus) - entryStatusRank(b.entryStatus);
+      if (entryDiff) return entryDiff;
+      const phaseDiff = phaseRank(displayPhaseForReport(a)) - phaseRank(displayPhaseForReport(b));
+      if (phaseDiff) return phaseDiff;
+      return displaySymbolForSort(a).localeCompare(displaySymbolForSort(b));
+    });
+  }
+
+  function entryStatusSummary(rows) {
+    const counts = rows.reduce((acc, row) => {
+      const status = ['Tradeable', 'Near Entry', 'Waiting', 'Too Far'].includes(row.entryStatus) ? row.entryStatus : 'Unknown';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+    return `Tradeable: ${counts.Tradeable || 0} | Near Entry: ${counts['Near Entry'] || 0} | Waiting: ${counts.Waiting || 0} | Too Far: ${counts['Too Far'] || 0}`;
   }
 
   function matchesLocationFilter(zone, filter) {
@@ -1415,39 +1477,16 @@
     return !isMid;
   }
 
-  function matchesHtfAlignmentFilter(htfBias, setupDirection, filter) {
-    if (filter === 'ALL') return true;
-    const htf = String(htfBias || '').toUpperCase();
-    const direction = String(setupDirection || '').toUpperCase();
-    const aligned =
-      (htf === 'BULLISH' && (direction === 'BULLISH' || direction === 'LONG')) ||
-      (htf === 'BEARISH' && (direction === 'BEARISH' || direction === 'SHORT'));
-    const mixed =
-      (htf === 'BULLISH' && (direction === 'BEARISH' || direction === 'SHORT')) ||
-      (htf === 'BEARISH' && (direction === 'BULLISH' || direction === 'LONG'));
-    return filter === 'MIXED' ? mixed : aligned;
-  }
-
-  function matchesQualityFilter(htfBias, setupDirection, zone, filter) {
-    if (filter === 'ALL') return true;
-    const aligned = matchesHtfAlignmentFilter(htfBias, setupDirection, 'ALIGNED');
-    if (filter === 'BIAS_ALIGNED') return aligned;
-    const direction = String(setupDirection || '').toUpperCase();
-    const location = String(zone || '').toUpperCase();
-    return aligned && (
-      ((direction === 'BULLISH' || direction === 'LONG') && location === 'DISCOUNT') ||
-      ((direction === 'BEARISH' || direction === 'SHORT') && location === 'PREMIUM')
-    );
-  }
-
   function renderSetups() {
-    const filtered = getFiltered(), all = allSetups;
+    const filtered = sortScoutCardsForDisplay(getFiltered()), all = allSetups;
     document.getElementById('s-total').textContent = all.length || '—';
-    document.getElementById('s-high').textContent = all.filter(s => s.interestLevel === 'HIGH').length || '—';
-    document.getElementById('s-bullish').textContent = all.filter(s => s.bias === 'BULLISH').length || '—';
-    document.getElementById('s-bearish').textContent = all.filter(s => s.bias === 'BEARISH').length || '—';
-    document.getElementById('s-neutral').textContent = all.filter(s => s.bias === 'NEUTRAL').length || '—';
-    document.getElementById('s-choch').textContent = all.filter(s => s.recentChoCH).length || '—';
+    document.getElementById('s-tradeable').textContent = all.filter(s => s.entryStatus === 'Tradeable').length || '—';
+    document.getElementById('s-near').textContent = all.filter(s => s.entryStatus === 'Near Entry').length || '—';
+    document.getElementById('s-waiting').textContent = all.filter(s => s.entryStatus === 'Waiting').length || '—';
+    document.getElementById('s-too-far').textContent = all.filter(s => s.entryStatus === 'Too Far').length || '—';
+    document.getElementById('s-bullish').textContent = all.filter(s => displayTrendForReport(s) === 'Bullish').length || '—';
+    document.getElementById('s-bearish').textContent = all.filter(s => displayTrendForReport(s) === 'Bearish').length || '—';
+    document.getElementById('s-mixed').textContent = all.filter(s => displayTrendForReport(s) === 'Mixed').length || '—';
     const main = document.getElementById('mainContent');
     if (!all.length) {
       const scanLabel = priorityPairsActive ? `${currentScanLabel()}: ${PAIRS.map(makePairLabel).join(', ')}` : currentScanLabel();
@@ -1455,7 +1494,7 @@
       document.getElementById('resultCount').textContent = '';
       return;
     }
-    document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of ${all.length} setups`;
+    document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of ${all.length} setups · ${entryStatusSummary(filtered)}`;
     if (!filtered.length) { main.innerHTML = '<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No pairs match your filters</div></div>'; return; }
     main.innerHTML = '<div class="setup-grid">' + filtered.map(r => renderScoutCard(r)).join('') + '</div>';
   }
@@ -2209,22 +2248,11 @@
     if (chev) { chev.className = 'near-miss-chevron' + (nearMissOpen ? ' open' : ''); }
   }
 
-  function setInterest(v) {
-    interestFilter = v;
-    ['ALL','HIGH','MEDIUM','LOW'].forEach(x => { const el = document.getElementById('int-'+x); if(el) { el.className = 'pill' + (x === v ? ' active' : ''); } });
-    renderSetups();
-  }
-  function setBias(v) {
-    biasFilter = v;
-    ['ALL','BULLISH','BEARISH','NEUTRAL'].forEach(x => { const el = document.getElementById('bias-'+x); if(el) { el.className = 'pill' + (x === v ? ' active' : ''); } });
-    renderSetups();
-  }
   // legacy stubs — controls removed but may still be referenced
   function setRR(v){renderSetups();}
   function setDir(v){renderSetups();}
-  function setQuality(v){renderSetups();}
   function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...':' Scan';}
-  function showLoading(){const modeLabel=currentScanLabel();document.getElementById('mainContent').innerHTML=`<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCOUTING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · ${modeLabel}</div></div></div>`;document.getElementById('resultCount').textContent='';['s-total','s-high','s-bullish','s-bearish','s-neutral','s-choch'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='—';});}
+  function showLoading(){const modeLabel=currentScanLabel();document.getElementById('mainContent').innerHTML=`<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCOUTING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · ${modeLabel}</div></div></div>`;document.getElementById('resultCount').textContent='';['s-total','s-tradeable','s-near','s-waiting','s-too-far','s-bullish','s-bearish','s-mixed'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='—';});}
 
   const journalMap = {};
   let journalEntries = [];
