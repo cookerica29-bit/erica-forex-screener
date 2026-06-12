@@ -29,12 +29,9 @@ let latestRejected: Array<{ pair: string; reason: string; detail: any; granulari
 let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
-const journalCandidateAlerts = new Map<string, number>();
 const tradeableSignalAlerts = new Map<string, number>();
-const JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+const tradeableSignalCandleTimes = new Map<string, string>();
 const TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
-const AUTO_JOURNAL_COOLDOWN_MS = 4 * 60 * 60 * 1000;
-const journalCandidateCandleTimes = new Map<string, string>();
 
 // Priority pairs — pushed by Claude after each forex scan via POST /api/priority-pairs
 // When set, the scanner and frontend only scan these pairs instead of the full 16-pair list.
@@ -150,33 +147,41 @@ function isIndexSymbol(symbol: string) {
   return ['US30_USD', 'NAS100_USD'].includes(symbol);
 }
 
-function isBotSignalEligible(report: ScoutReport) {
-  if (isIndexSymbol(report.pair)) return false;
-  return (
-    report.trendDirection === 'Bullish' &&
-    report.setupTimeframeDirection === 'Bullish' &&
-    report.zone === 'DISCOUNT'
-  ) || (
-    report.trendDirection === 'Bearish' &&
-    report.setupTimeframeDirection === 'Bearish' &&
-    report.zone === 'PREMIUM'
-  );
-}
-
-function journalCandidateAlertKey(report: ScoutReport) {
-  return [report.pair, report.timeframe, report.trendDirection, report.setupTimeframeDirection, report.zone].join('|');
-}
-
-function journalCandidateDataKey(report: ScoutReport) {
-  return [report.pair, report.timeframe].join('|');
-}
-
 function isTradeableScoutSignal(report: ScoutReport) {
   return !isIndexSymbol(report.pair) &&
     report.entryStatus === 'Tradeable' &&
+    Boolean(report.trendDirection) &&
+    Boolean(report.setupTimeframeDirection) &&
+    Boolean(displayScoutPhase(report)) &&
+    Boolean(displayScoutSetupStatus(report)) &&
     report.entry !== null &&
     report.sl !== null &&
     report.tp1 !== null;
+}
+
+function displayScoutTrend(report: ScoutReport) {
+  if (report.dailyTrendDirection === 'Bullish' || report.trendDirection === 'Bullish') return 'Bullish';
+  if (report.dailyTrendDirection === 'Bearish' || report.trendDirection === 'Bearish') return 'Bearish';
+  return 'Mixed';
+}
+
+function displayScoutPhase(report: ScoutReport) {
+  const trend = displayScoutTrend(report);
+  const h4 = report.h4TrendDirection === 'Neutral' ? 'Mixed' : (report.h4TrendDirection || 'Mixed');
+  if ((trend === 'Bullish' && h4 === 'Bullish') || (trend === 'Bearish' && h4 === 'Bearish')) return 'Trend Move';
+  if ((trend === 'Bullish' && h4 === 'Bearish') || (trend === 'Bearish' && h4 === 'Bullish')) return 'Pullback';
+  if (String(report.marketPhase || '').includes('Recovery')) return 'Recovery';
+  return 'Transition';
+}
+
+function displayScoutSetupStatus(report: ScoutReport) {
+  const confirmationScore = Number.isFinite(Number(report.confirmationScore)) ? Number(report.confirmationScore) : 0;
+  const pullbackScore = Number.isFinite(Number(report.pullbackScore)) ? Number(report.pullbackScore) : 0;
+  if (report.confirmationConfirmed || confirmationScore >= 9) return 'Trend Resumption Confirmed';
+  if (report.confirmationStatus === 'Strong confirmation' || confirmationScore >= 7) return 'Strong Confirmation';
+  if (report.confirmationStatus === 'Building confirmation' || report.confirmationStatus === 'Early confirmation' || confirmationScore >= 3) return 'Early Confirmation';
+  if (report.pullbackCompleted || report.pullbackStatus === 'Pullback completed' || pullbackScore >= 9) return 'Pullback Complete';
+  return 'Pullback Active';
 }
 
 function tradeableSignalAlertKey(report: ScoutReport) {
@@ -188,6 +193,10 @@ function tradeableSignalAlertKey(report: ScoutReport) {
     report.sl,
     report.tp1,
   ].join('|');
+}
+
+function tradeableSignalDataKey(report: ScoutReport) {
+  return [report.pair, report.timeframe].join('|');
 }
 
 function getNewYorkMarketParts(now = new Date()) {
@@ -215,158 +224,9 @@ function isForexMarketOpen(now = new Date()) {
   return true;
 }
 
-function getFreshJournalCandidateReports(reports: ScoutReport[], source: string) {
-  const aligned = reports.filter(isBotSignalEligible);
-  if (!aligned.length) return [];
-
-  if (!isForexMarketOpen()) {
-    console.log(`[Journal] ${source}: market closed; skipped ${aligned.length} journal candidate${aligned.length === 1 ? '' : 's'}`);
-    return [];
-  }
-
-  const fresh: ScoutReport[] = [];
-  for (const report of aligned) {
-    const candleTime = report.candleTime;
-    if (!candleTime) {
-      console.warn(`[Journal] ${source}: skipped ${report.pair} ${report.timeframe}; missing candle timestamp`);
-      continue;
-    }
-
-    const key = journalCandidateDataKey(report);
-    const previousCandleTime = journalCandidateCandleTimes.get(key);
-    journalCandidateCandleTimes.set(key, candleTime);
-
-    if (!previousCandleTime) {
-      console.log(`[Journal] ${source}: baseline candle recorded for ${report.pair} ${report.timeframe} @ ${candleTime}`);
-      continue;
-    }
-
-    if (previousCandleTime === candleTime) {
-      console.log(`[Journal] ${source}: stale candle skipped for ${report.pair} ${report.timeframe} @ ${candleTime}`);
-      continue;
-    }
-
-    fresh.push(report);
-  }
-
-  return fresh;
-}
-
 function formatScoutLevel(value: number | null) {
   if (value === null) return 'N/A';
   return value >= 100 ? value.toFixed(3) : value.toFixed(5);
-}
-
-function isOpenJournalIdea(entry: any) {
-  const result = String(entry.result || 'PENDING').toUpperCase();
-  const outcome = String(entry.outcome || 'PENDING').toUpperCase();
-  return result === 'PENDING' || result === 'RUNNING' || outcome === 'PENDING';
-}
-
-function isMateriallySameJournalIdea(entry: any, report: ScoutReport, direction: 'LONG' | 'SHORT', now: number) {
-  if (entry.symbol !== report.pair || entry.direction !== direction || entry.timeframe !== report.timeframe) {
-    return false;
-  }
-
-  if (isOpenJournalIdea(entry)) {
-    return true;
-  }
-
-  const pushedAt = new Date(entry.pushedAt || 0).getTime();
-  const entryTolerance = report.pair.includes('JPY') ? 0.1 : 0.001;
-  return Number.isFinite(pushedAt) &&
-    now - pushedAt < AUTO_JOURNAL_COOLDOWN_MS &&
-    Math.abs(Number(entry.entry) - report.entry!) < entryTolerance;
-}
-
-async function autoJournalBiasLocationAlignedCandidates(reports: ScoutReport[]) {
-  const aligned = reports.filter(isBotSignalEligible);
-  if (!aligned.length) return;
-
-  let existing: any[];
-  try {
-    existing = await getJournalEntries();
-  } catch (e: any) {
-    console.error('[Journal] Auto-journal lookup failed:', e.message);
-    return;
-  }
-  const now = Date.now();
-  for (const report of aligned) {
-    if (report.entry === null || report.sl === null || report.tp1 === null) {
-      console.warn(`[Journal] Auto-journal skipped for ${report.pair}: missing entry, SL, or TP`);
-      continue;
-    }
-
-    const direction = report.trendDirection === 'Bullish' ? 'LONG' : 'SHORT';
-    const duplicate = existing.some((entry: any) => isMateriallySameJournalIdea(entry, report, direction, now));
-    if (duplicate) {
-      console.log(`[Journal] Auto-journal existing idea reused for ${report.pair} ${report.timeframe} ${direction}`);
-      continue;
-    }
-
-    try {
-      const id = await createJournalEntry({
-        symbol: report.pair,
-        displaySymbol: report.displaySymbol,
-        direction,
-        quality: 'DEVELOPING',
-        pattern: 'Trend + Setup + Location Aligned',
-        timeframe: report.timeframe,
-        entry: report.entry,
-        stopLoss: report.sl,
-        tp1: report.tp1,
-        tp2: report.tp2 ?? undefined,
-        rr1: report.rrRatio ?? undefined,
-        session: report.session,
-        notes: `Auto-journal candidate: ${report.trendDirection} trend + ${report.setupTimeframeDirection} setup TF + ${report.zone} location`,
-        result: 'PENDING',
-        directionCorrect: 'PENDING',
-        entryQuality: 'PENDING',
-        reviewNotes: '',
-      });
-      existing.unshift({
-        id,
-        symbol: report.pair,
-        direction,
-        timeframe: report.timeframe,
-        entry: String(report.entry),
-        outcome: 'PENDING',
-        result: 'PENDING',
-        pushedAt: new Date().toISOString(),
-      });
-      console.log(`[Journal] Auto-journaled trend + setup + location candidate ${report.pair} ${report.timeframe}`);
-    } catch (e: any) {
-      console.error(`[Journal] Auto-journal insert failed for ${report.pair}:`, e.message);
-    }
-  }
-}
-
-async function notifyBiasLocationAlignedCandidates(reports: ScoutReport[]) {
-  const now = Date.now();
-  for (const [key, alertedAt] of journalCandidateAlerts) {
-    if (now - alertedAt >= JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS) journalCandidateAlerts.delete(key);
-  }
-
-  for (const report of reports.filter(isBotSignalEligible)) {
-    const key = journalCandidateAlertKey(report);
-    const alertedAt = journalCandidateAlerts.get(key);
-    if (alertedAt && now - alertedAt < JOURNAL_CANDIDATE_ALERT_COOLDOWN_MS) {
-      console.log(`[Telegram] Journal candidate suppressed by cooldown for ${report.pair} ${report.timeframe}`);
-      continue;
-    }
-
-    const direction = report.trendDirection === 'Bullish' ? 'LONG' : 'SHORT';
-    const text = `🧪 *JOURNAL CANDIDATE — Trend + Setup + Location Aligned*\nPair: ${report.displaySymbol}\nDirection: ${direction}\nTrend: ${report.trendDirection}\nSetup TF: ${report.setupTimeframeDirection}\nLocation: ${report.zone}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nTimeframe: ${report.timeframe}\nReason: Trend, setup timeframe, and location aligned for review\n→ https://erica-forex-screener-production.up.railway.app`;
-    try {
-      const data = await sendTelegram(text, 'Markdown');
-      if (data.ok) {
-        journalCandidateAlerts.set(key, now);
-        console.log(`[Telegram] Journal candidate alert sent for ${report.pair} ${report.timeframe}`);
-      }
-    } catch (e: any) {
-      console.error(`[Telegram] Journal candidate alert failed for ${report.pair}:`, e.message);
-    }
-  }
 }
 
 async function notifyTradeableScoutSignals(reports: ScoutReport[], source: string) {
@@ -384,6 +244,18 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
   }
 
   for (const report of tradeable) {
+    if (!report.candleTime) {
+      console.warn(`[Telegram] ${source}: skipped ${report.pair} ${report.timeframe}; missing scout candle timestamp`);
+      continue;
+    }
+
+    const dataKey = tradeableSignalDataKey(report);
+    const previousCandleTime = tradeableSignalCandleTimes.get(dataKey);
+    if (previousCandleTime === report.candleTime) {
+      console.log(`[Telegram] Tradeable scout signal stale candle skipped for ${report.pair} ${report.timeframe} @ ${report.candleTime}`);
+      continue;
+    }
+
     const key = tradeableSignalAlertKey(report);
     const alertedAt = tradeableSignalAlerts.get(key);
     if (alertedAt && now - alertedAt < TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS) {
@@ -396,14 +268,16 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
       : report.bias === 'BEARISH'
       ? '🔴 SHORT'
       : '⚪ REVIEW';
-    const trendDisplay = report.dailyTrendDirection === 'Neutral' ? 'Mixed' : report.dailyTrendDirection;
-    const h4Display = report.h4TrendDirection === 'Neutral' ? 'Mixed' : report.h4TrendDirection;
-    const text = `✅ *TRADEABLE SCOUT SIGNAL — ${report.displaySymbol}*\n${direction} | TF: ${report.timeframe}\nTrend: ${trendDisplay} | H4: ${h4Display}\nPhase: ${report.marketPhase}\nLocation: ${report.zone}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nEntry Status: ${report.entryStatus}\nReason: Price is within 0.25 ATR of the active entry zone\n→ https://erica-forex-screener-production.up.railway.app`;
+    const trendDisplay = displayScoutTrend(report);
+    const phaseDisplay = displayScoutPhase(report);
+    const setupStatus = displayScoutSetupStatus(report);
+    const text = `✅ *TRADEABLE SCOUT SIGNAL — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nDirection: ${direction}\nTrend: ${trendDisplay}\nSetup TF: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nSetup Status: ${setupStatus}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: New simplified Scout card is Tradeable\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
       const data = await sendTelegram(text, 'Markdown');
       if (data.ok) {
         tradeableSignalAlerts.set(key, now);
+        tradeableSignalCandleTimes.set(dataKey, report.candleTime);
         console.log(`[Telegram] Tradeable scout signal sent for ${report.pair} ${report.timeframe}`);
       }
     } catch (e: any) {
@@ -448,11 +322,7 @@ async function notifyNewTrendingPairs(results: TrendScanResult) {
     ...[...previousTrendingPairs].filter(pair => !analyzedPairs.has(pair)),
   ]);
   for (const { report, section } of added) {
-    const direction = report.direction === 'BULLISH' ? '🟢 BULLISH' : report.direction === 'BEARISH' ? '🔴 BEARISH' : '⚪ NEUTRAL';
-    const text = `🔥 *NEW TRENDING MARKET — ${report.displaySymbol}*\n${direction} | ${section}\nTrend score: ${report.trendScore.toFixed(1)}/10 | Cleanliness: ${report.cleanlinessScore.toFixed(1)}/10\nState: ${report.marketState} | ${report.htfAlignment}\nSession: ${report.session}\n→ https://erica-forex-screener-production.up.railway.app`;
-    sendTelegram(text, 'Markdown').then((data: any) => {
-      if (data.ok) console.log(`[Trending] Telegram alert sent for new market ${report.pair}`);
-    }).catch((e: any) => console.error(`[Trending] Telegram alert failed for ${report.pair}:`, e.message));
+    console.log(`[Trending] New ${section} surfaced without Telegram alert: ${report.pair}`);
   }
   if (added.length) console.log(`[Trending] ${added.length} newly surfaced market${added.length === 1 ? '' : 's'} detected`);
 }
@@ -530,14 +400,7 @@ function queueSetups(setups: Setup[]) {
     );
     if (!exists) {
       pendingApprovals.push({ ...setup, id: `${setup.pair}-${Date.now()}` });
-      const dir = setup.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
-      const emoji = setup.quality === 'PREMIUM' ? '🔥' : '⚡';
-      const label = setup.quality === 'PREMIUM' ? 'PREMIUM' : 'STRONG';
-      const newsPrefix = setup.newsRisk ? '⚠️ NEWS RISK\n' : '';
-      const text = `${newsPrefix}${emoji} *${label} SETUP — ${setup.pair.replace('_','/')}*\n${dir} | R:R: ${setup.rrRatio} | ${setup.session} session\nEntry: ${setup.entry} | SL: ${setup.sl.toFixed(5)} | TP: ${setup.tp1.toFixed(5)}\nPattern: ${setup.pattern} | TF: ${setup.timeframe}\n→ https://erica-forex-screener-production.up.railway.app`;
-      sendTelegram(text, 'Markdown').then((data: any) => {
-        if (data.ok) console.log(`[Telegram] Alert sent for ${setup.pair} ${setup.quality}`);
-      }).catch((e: any) => console.error('[Telegram] fetch failed:', e.message));
+      console.log(`[Legacy] Queued old strategy setup without Telegram alert for ${setup.pair} ${setup.timeframe}`);
     }
   }
   if (pendingApprovals.length > 20) {
@@ -585,9 +448,6 @@ async function scheduledScan(forceTf?: string) {
       latestScoutResults = await runScoutScan(forceTf || 'H4');
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
       await notifyTradeableScoutSignals(latestScoutResults, 'scheduled scout scan');
-      const freshJournalCandidates = getFreshJournalCandidateReports(latestScoutResults, 'scheduled scout scan');
-      await autoJournalBiasLocationAlignedCandidates(freshJournalCandidates);
-      await notifyBiasLocationAlignedCandidates(freshJournalCandidates);
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
     }
@@ -638,9 +498,6 @@ app.post('/api/scout', async (req, res) => {
     }
     latestScoutResults = await runScoutScan(tf);
     await notifyTradeableScoutSignals(latestScoutResults, 'manual scout scan');
-    const freshJournalCandidates = getFreshJournalCandidateReports(latestScoutResults, 'manual scout scan');
-    await autoJournalBiasLocationAlignedCandidates(freshJournalCandidates);
-    await notifyBiasLocationAlignedCandidates(freshJournalCandidates);
     lastScanTime = new Date().toISOString();
     res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
   } catch (e: any) {
@@ -930,19 +787,8 @@ app.post('/api/tradingview-alert', async (req, res) => {
       tradeType: 'paper',
     });
 
-    const directionIcon = direction === 'LONG' ? 'LONG' : 'SHORT';
-    const text = [
-      `TradingView paper alert: ${displaySymbol}`,
-      `${directionIcon} | ${timeframe} | ${strategy}`,
-      `Entry: ${entry}`,
-      `SL: ${stopLoss}`,
-      `TP: ${tp1}`,
-      `R:R: ${rr1}`,
-      `Journal ID: ${id}`,
-    ].join('\n');
-
-    const telegram = await sendTelegram(text);
-    return res.json({ success: true, journalId: id, telegram: telegram.ok ? 'sent' : 'skipped', mode: 'paper' });
+    console.log(`[TradingView] Paper alert journaled without Telegram alert for ${displaySymbol}`);
+    return res.json({ success: true, journalId: id, telegram: 'disabled', mode: 'paper' });
   } catch (e: any) {
     console.error('[TradingView] Alert failed:', e.message);
     return res.status(500).json({ error: 'Failed to process TradingView alert' });
