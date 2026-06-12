@@ -262,6 +262,7 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
       console.log(`[Telegram] Tradeable scout signal suppressed by cooldown for ${report.pair} ${report.timeframe}`);
       continue;
     }
+    tradeableSignalCandleTimes.set(dataKey, report.candleTime);
 
     const direction = report.bias === 'BULLISH'
       ? '🟢 LONG'
@@ -277,7 +278,6 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
       const data = await sendTelegram(text, 'Markdown');
       if (data.ok) {
         tradeableSignalAlerts.set(key, now);
-        tradeableSignalCandleTimes.set(dataKey, report.candleTime);
         console.log(`[Telegram] Tradeable scout signal sent for ${report.pair} ${report.timeframe}`);
       }
     } catch (e: any) {
