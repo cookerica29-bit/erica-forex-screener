@@ -463,7 +463,6 @@
     <option value="Early Confirmation">Setup Status: Early Confirmation</option>
     <option value="Strong Confirmation">Setup Status: Strong Confirmation</option>
     <option value="Trend Resumption Confirmed">Setup Status: Trend Resumption Confirmed</option>
-    <option value="Reversal Forming">Setup Status: Reversal Forming</option>
   </select>
   <select class="filter-select" id="locationFilter" onchange="renderSetups()" aria-label="Location filter">
     <option value="ALL">Location: All Locations</option>
@@ -1436,7 +1435,6 @@
     const pullbackStatus = r.pullbackStatus || 'Aggressive pullback / Not ready';
     const confirmationScore = Number.isFinite(Number(r.confirmationScore)) ? Number(r.confirmationScore) : 0;
     const confirmationStatus = r.confirmationStatus || 'No confirmation';
-    if (isReversalContext(r)) return 'Reversal Forming';
     if (r.confirmationConfirmed || confirmationScore >= 9) return 'Trend Resumption Confirmed';
     if (confirmationStatus === 'Strong confirmation' || confirmationScore >= 7) return 'Strong Confirmation';
     if (confirmationStatus === 'Building confirmation' || confirmationStatus === 'Early confirmation' || confirmationScore >= 3) return 'Early Confirmation';
@@ -1694,6 +1692,10 @@
           <div class="context-cell">
             <div class="context-label">Phase</div>
             <div class="context-value">${escapeHtml(displayPhaseForReport(r))}</div>
+          </div>
+          <div class="context-cell">
+            <div class="context-label">Context</div>
+            <div class="context-value">${escapeHtml(contextLabel)}</div>
           </div>
           <div class="context-cell">
             <div class="context-label">Location</div>
