@@ -453,6 +453,7 @@
     <option value="Trend Move">Phase: Trend Move</option>
     <option value="Pullback">Phase: Pullback</option>
     <option value="Recovery">Phase: Recovery</option>
+    <option value="Reversal Forming">Phase: Reversal Forming</option>
     <option value="Transition">Phase: Transition</option>
   </select>
   <select class="filter-select" id="setupStatusFilter" onchange="renderSetups()" aria-label="Setup status filter">
@@ -462,6 +463,7 @@
     <option value="Early Confirmation">Setup Status: Early Confirmation</option>
     <option value="Strong Confirmation">Setup Status: Strong Confirmation</option>
     <option value="Trend Resumption Confirmed">Setup Status: Trend Resumption Confirmed</option>
+    <option value="Reversal Forming">Setup Status: Reversal Forming</option>
   </select>
   <select class="filter-select" id="locationFilter" onchange="renderSetups()" aria-label="Location filter">
     <option value="ALL">Location: All Locations</option>
@@ -1417,6 +1419,7 @@
   function displayPhaseForReport(r) {
     const daily = displayTrendForReport(r);
     const h4 = r.h4TrendDirection === 'Neutral' ? 'Mixed' : (r.h4TrendDirection || 'Mixed');
+    if (isReversalContext(r)) return 'Reversal Forming';
     if ((daily === 'Bullish' && h4 === 'Bullish') || (daily === 'Bearish' && h4 === 'Bearish')) return 'Trend Move';
     if ((daily === 'Bullish' && h4 === 'Bearish') || (daily === 'Bearish' && h4 === 'Bullish')) return 'Pullback';
     if (String(r.marketPhase || '').includes('Recovery')) return 'Recovery';
@@ -1433,6 +1436,7 @@
     const pullbackStatus = r.pullbackStatus || 'Aggressive pullback / Not ready';
     const confirmationScore = Number.isFinite(Number(r.confirmationScore)) ? Number(r.confirmationScore) : 0;
     const confirmationStatus = r.confirmationStatus || 'No confirmation';
+    if (isReversalContext(r)) return 'Reversal Forming';
     if (r.confirmationConfirmed || confirmationScore >= 9) return 'Trend Resumption Confirmed';
     if (confirmationStatus === 'Strong confirmation' || confirmationScore >= 7) return 'Strong Confirmation';
     if (confirmationStatus === 'Building confirmation' || confirmationStatus === 'Early confirmation' || confirmationScore >= 3) return 'Early Confirmation';
@@ -1440,8 +1444,62 @@
     return 'Pullback Active';
   }
 
+  function tradeDirectionForReport(r) {
+    const direction = String(r.tradeDirection || '').toUpperCase();
+    if (direction === 'LONG' || direction === 'SHORT') return direction;
+    if (r.bias === 'BULLISH') return 'LONG';
+    if (r.bias === 'BEARISH') return 'SHORT';
+    return 'NEUTRAL';
+  }
+
+  function scoutDirectionForReport(r) {
+    const direction = String(r.scoutDirection || '').toUpperCase();
+    if (direction === 'LONG' || direction === 'SHORT') return direction;
+    return tradeDirectionForReport(r);
+  }
+
+  function directionText(direction) {
+    if (direction === 'LONG') return 'Bullish';
+    if (direction === 'SHORT') return 'Bearish';
+    return 'Neutral';
+  }
+
+  function entryPlanDirectionForReport(r) {
+    const entry = Number(r.entry);
+    const sl = Number(r.sl);
+    const tp1 = Number(r.tp1);
+    if (![entry, sl, tp1].every(Number.isFinite)) return 'NEUTRAL';
+    if (sl < entry && tp1 > entry) return 'LONG';
+    if (sl > entry && tp1 < entry) return 'SHORT';
+    return 'NEUTRAL';
+  }
+
+  function directionLabelFromTrade(direction) {
+    return direction === 'LONG' ? 'Bullish' : direction === 'SHORT' ? 'Bearish' : 'Mixed';
+  }
+
+  function isDirectionalDisagreement(r) {
+    const trend = displayTrendForReport(r);
+    const setupTf = r.setupTimeframeDirection === 'Neutral' ? 'Mixed' : (r.setupTimeframeDirection || 'Mixed');
+    const trade = directionLabelFromTrade(tradeDirectionForReport(r));
+    if (trade === 'Mixed') return false;
+    return trend !== trade || setupTf !== trade;
+  }
+
+  function isReversalContext(r) {
+    const trade = directionLabelFromTrade(tradeDirectionForReport(r));
+    const trend = displayTrendForReport(r);
+    const setupTf = r.setupTimeframeDirection === 'Neutral' ? 'Mixed' : (r.setupTimeframeDirection || 'Mixed');
+    const confirmationScore = Number.isFinite(Number(r.confirmationScore)) ? Number(r.confirmationScore) : 0;
+    const pullbackScore = Number.isFinite(Number(r.pullbackScore)) ? Number(r.pullbackScore) : 0;
+    if (trade === 'Mixed') return false;
+    const opposesTrend = (trend === 'Bullish' && trade === 'Bearish') || (trend === 'Bearish' && trade === 'Bullish');
+    const forming = confirmationScore >= 3 || pullbackScore >= 7 || String(r.pullbackStatus || '').includes('Reversal forming');
+    return forming && (trend === 'Mixed' || setupTf === 'Mixed' || opposesTrend);
+  }
+
   function phaseRank(phase) {
-    return { 'Trend Move': 0, 'Pullback': 1, 'Recovery': 2, 'Transition': 3 }[phase] ?? 4;
+    return { 'Trend Move': 0, 'Pullback': 1, 'Recovery': 2, 'Reversal Forming': 3, 'Transition': 4 }[phase] ?? 5;
   }
 
   function displaySymbolForSort(r) {
@@ -1502,13 +1560,14 @@
   function renderCard(s, idx) { return renderScoutCard(s); } // legacy alias
 
   function renderScoutCard(r) {
-    const biasCls = r.bias === 'BULLISH' ? 'bullish' : r.bias === 'BEARISH' ? 'bearish' : 'neutral';
-    const htfCls  = r.htfBias === 'BULLISH' ? 'bullish' : r.htfBias === 'BEARISH' ? 'bearish' : 'neutral';
-    const zoneCls = r.zone === 'PREMIUM' ? 'premium-zone' : r.zone === 'DISCOUNT' ? 'discount-zone' : 'fair-zone';
-    const intCls  = r.interestLevel === 'HIGH' ? 'high-interest' : r.interestLevel === 'MEDIUM' ? 'medium-interest' : '';
-    const intIcon = r.interestLevel === 'HIGH' ? '🔥' : r.interestLevel === 'MEDIUM' ? '👀' : '·';
-    const biasArrow = r.bias === 'BULLISH' ? '↑' : r.bias === 'BEARISH' ? '↓' : '↔';
-    const biasColor = r.bias === 'BULLISH' ? 'var(--green)' : r.bias === 'BEARISH' ? 'var(--red)' : 'var(--slate)';
+    const tradeDirection = tradeDirectionForReport(r);
+    const scoutDirection = scoutDirectionForReport(r);
+    const entryPlanDirection = entryPlanDirectionForReport(r);
+    const tradeDirectionDisplay = directionText(tradeDirection);
+    const scoutDirectionDisplay = directionText(scoutDirection);
+    const entryPlanDirectionDisplay = directionText(entryPlanDirection);
+    const directionArrow = tradeDirection === 'LONG' ? '↑' : tradeDirection === 'SHORT' ? '↓' : '↔';
+    const directionColor = tradeDirection === 'LONG' ? 'var(--green)' : tradeDirection === 'SHORT' ? 'var(--red)' : 'var(--slate)';
     const isJpy = r.pair && (r.pair.includes('JPY') || r.pair.includes('XAU') || r.pair.includes('XAG'));
     const dp = isJpy ? 3 : 5;
     const f = v => v == null ? '—' : Number(v).toFixed(dp);
@@ -1537,10 +1596,14 @@
     const confirmationState = confirmationScore >= 9 ? 'Confirmed' : confirmationScore >= 7 ? 'Strong' : confirmationScore >= 3 ? 'Building' : 'No Confirmation';
     const confirmationStateCls = confirmationScore >= 9 ? 'confirmed' : confirmationScore >= 7 ? 'strong' : confirmationScore >= 3 ? 'building' : 'none';
     const confirmationColor = confirmationScore >= 9 ? 'var(--green)' : confirmationScore >= 7 ? 'var(--blue)' : confirmationScore >= 3 ? 'var(--gold)' : 'var(--red)';
-    let setupStatus = 'Pullback Active';
+    const frameworkSetupStatus = displaySetupStatusForReport(r);
+    let setupStatus = frameworkSetupStatus;
     let setupStatusCls = 'active';
     let setupStatusReason = r.pullbackReason || 'Pullback is still active; waiting for cleaner completion evidence.';
-    if (r.confirmationConfirmed || confirmationScore >= 9) {
+    if (setupStatus === 'Reversal Forming') {
+      setupStatusCls = 'early';
+      setupStatusReason = r.confirmationReason || r.pullbackReason || 'Trade direction differs from current trend/setup while reversal evidence is forming.';
+    } else if (r.confirmationConfirmed || confirmationScore >= 9) {
       setupStatus = 'Trend Resumption Confirmed';
       setupStatusCls = 'confirmed';
       setupStatusReason = r.confirmationReason || 'Trend resumption has confirmed after the pullback.';
@@ -1570,14 +1633,6 @@
     const dailyTrendDisplay = dailyTrendDirection === 'Neutral' ? 'Mixed' : dailyTrendDirection;
     const h4TrendDisplay = h4TrendDirection === 'Neutral' ? 'Mixed' : h4TrendDirection;
     const displayTrend = dailyTrendDisplay === 'Bullish' ? 'Bullish' : dailyTrendDisplay === 'Bearish' ? 'Bearish' : 'Mixed';
-    const displayPhase =
-      (displayTrend === 'Bullish' && h4TrendDisplay === 'Bullish') ||
-      (displayTrend === 'Bearish' && h4TrendDisplay === 'Bearish')
-        ? 'Trend Move'
-        : (displayTrend === 'Bullish' && h4TrendDisplay === 'Bearish') ||
-          (displayTrend === 'Bearish' && h4TrendDisplay === 'Bullish')
-        ? 'Pullback'
-        : 'Transition';
     const dailySwingStructure = r.dailySwingStructure || 'Mixed';
     const dailyBosDirection = r.dailyBosDirection === 'Neutral' ? 'None' : (r.dailyBosDirection || 'None');
     const dailyChochDirection = r.dailyChochDirection === 'Neutral' ? 'None' : (r.dailyChochDirection || 'None');
@@ -1589,13 +1644,16 @@
     const entryDistanceText = distanceAtr == null
       ? 'No nearby actionable entry zone identified.'
       : `${distanceAtr.toFixed(2)} ATR · ${distancePct != null ? distancePct.toFixed(2) + '%' : '—'} from suggested entry`;
+    const mixedContextWarning = isDirectionalDisagreement(r)
+      ? '<div class="entry-note" style="margin:8px 0 0;">Mixed context — trade direction differs from trend/setup.</div>'
+      : '';
 
-    return `<div class="setup-card ${intCls}" style="position:relative;">
+    return `<div class="setup-card" style="position:relative;">
       <div class="card-body">
         <div class="card-top">
           <div class="card-left">
-            <div class="dir-icon ${r.bias === 'BULLISH' ? 'long' : r.bias === 'BEARISH' ? 'short' : ''}" style="${r.bias === 'NEUTRAL' ? 'background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.15);' : ''}">
-              <span style="font-size:16px;color:${biasColor}">${biasArrow}</span>
+            <div class="dir-icon ${tradeDirection === 'LONG' ? 'long' : tradeDirection === 'SHORT' ? 'short' : ''}" style="${tradeDirection === 'NEUTRAL' ? 'background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.15);' : ''}">
+              <span style="font-size:16px;color:${directionColor}">${directionArrow}</span>
             </div>
             <div>
               <div class="symbol">${escapeHtml(displaySym)}</div>
@@ -1622,7 +1680,7 @@
           </div>
           <div class="context-cell">
             <div class="context-label">Phase</div>
-            <div class="context-value">${escapeHtml(displayPhase)}</div>
+            <div class="context-value">${escapeHtml(displayPhaseForReport(r))}</div>
           </div>
           <div class="context-cell">
             <div class="context-label">Location</div>
@@ -1674,14 +1732,56 @@
         <details class="diagnostics">
           <summary>Details / Diagnostics</summary>
           <div class="diagnostics-body">
-            <div class="badges" style="margin-bottom:8px;">
-              <span class="badge ${biasCls}">Setup Bias: ${r.bias}</span>
-              <span class="badge ${htfCls}" style="opacity:0.75">Legacy HTF: ${r.htfBias}</span>
-              <span class="badge ${zoneCls}">${r.zone}</span>
-              <span class="interest-badge ${r.interestLevel.toLowerCase()}">${intIcon} ${r.interestLevel}</span>
+            <div class="context-reason">Trend = current Daily trend. Setup TF = scanned timeframe direction. Trade Direction = Entry/SL/TP plan direction.</div>
+            ${mixedContextWarning}
+            <div class="scout-levels" style="margin-top:8px;">
+              <div class="scout-level-box">
+                <div class="scout-level-label">Trade Direction</div>
+                <div class="scout-level-value" style="color:${contextColor(directionLabelFromTrade(tradeDirection))}">${escapeHtml(tradeDirectionDisplay)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Trend</div>
+                <div class="scout-level-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Setup TF</div>
+                <div class="scout-level-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Phase</div>
+                <div class="scout-level-value">${escapeHtml(displayPhaseForReport(r))}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Setup Status</div>
+                <div class="scout-level-value">${escapeHtml(setupStatus)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Entry Status</div>
+                <div class="scout-level-value">${escapeHtml(entryStatus)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Location</div>
+                <div class="scout-level-value">${escapeHtml(r.zone || 'FAIR VALUE')}</div>
+              </div>
             </div>
             <div class="context-reason">${escapeHtml(r.marketPhaseReason || 'Trend/setup phase context is mixed.')}</div>
             <div class="scout-levels">
+              <div class="scout-level-box">
+                <div class="scout-level-label">Trend Direction</div>
+                <div class="scout-level-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Setup TF Direction</div>
+                <div class="scout-level-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Scout Direction</div>
+                <div class="scout-level-value" style="color:${contextColor(directionLabelFromTrade(scoutDirection))}">${escapeHtml(scoutDirectionDisplay)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Entry Plan Direction</div>
+                <div class="scout-level-value" style="color:${contextColor(directionLabelFromTrade(entryPlanDirection))}">${escapeHtml(entryPlanDirectionDisplay)}</div>
+              </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Daily Trend</div>
                 <div class="scout-level-value" style="color:${contextColor(dailyTrendDisplay)}">${escapeHtml(dailyTrendDisplay)}</div>
