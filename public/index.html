@@ -1455,13 +1455,15 @@
   function scoutDirectionForReport(r) {
     const direction = String(r.scoutDirection || '').toUpperCase();
     if (direction === 'LONG' || direction === 'SHORT') return direction;
-    return tradeDirectionForReport(r);
+    if (direction === 'NEUTRAL') return 'NEUTRAL';
+    return 'UNKNOWN';
   }
 
   function directionText(direction) {
     if (direction === 'LONG') return 'Bullish';
     if (direction === 'SHORT') return 'Bearish';
-    return 'Neutral';
+    if (direction === 'NEUTRAL') return 'Mixed / Neutral';
+    return 'Mixed / Unknown';
   }
 
   function entryPlanDirectionForReport(r) {
@@ -1496,6 +1498,16 @@
     const opposesTrend = (trend === 'Bullish' && trade === 'Bearish') || (trend === 'Bearish' && trade === 'Bullish');
     const forming = confirmationScore >= 3 || pullbackScore >= 7 || String(r.pullbackStatus || '').includes('Reversal forming');
     return forming && (trend === 'Mixed' || setupTf === 'Mixed' || opposesTrend);
+  }
+
+  function contextLabelForReport(r) {
+    const phase = displayPhaseForReport(r);
+    const setupStatus = displaySetupStatusForReport(r);
+    if (phase === 'Reversal Forming' || setupStatus === 'Reversal Forming') return 'Reversal / Counter-trend';
+    if (phase === 'Trend Move') return 'Continuation';
+    if (phase === 'Pullback') return 'Pullback';
+    if (phase === 'Recovery') return 'Recovery';
+    return 'Transition';
   }
 
   function phaseRank(phase) {
@@ -1644,6 +1656,7 @@
     const entryDistanceText = distanceAtr == null
       ? 'No nearby actionable entry zone identified.'
       : `${distanceAtr.toFixed(2)} ATR · ${distancePct != null ? distancePct.toFixed(2) + '%' : '—'} from suggested entry`;
+    const contextLabel = contextLabelForReport(r);
     const mixedContextWarning = isDirectionalDisagreement(r)
       ? '<div class="entry-note" style="margin:8px 0 0;">Mixed context — trade direction differs from trend/setup.</div>'
       : '';
@@ -1735,6 +1748,10 @@
             <div class="context-reason">Trend = current Daily trend. Setup TF = scanned timeframe direction. Trade Direction = Entry/SL/TP plan direction.</div>
             ${mixedContextWarning}
             <div class="scout-levels" style="margin-top:8px;">
+              <div class="scout-level-box">
+                <div class="scout-level-label">Context</div>
+                <div class="scout-level-value">${escapeHtml(contextLabel)}</div>
+              </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Trade Direction</div>
                 <div class="scout-level-value" style="color:${contextColor(directionLabelFromTrade(tradeDirection))}">${escapeHtml(tradeDirectionDisplay)}</div>
