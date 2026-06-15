@@ -750,6 +750,8 @@
   let nearMissOpen = false;
   let priorityPairsPayload = null;
   let priorityWatchlistRows = [];
+  const scoutDirMap = {};
+  const scoutReportMap = {};
 
   const FULL_SCAN_PAIRS = ['EUR_USD','GBP_USD','USD_JPY','USD_CAD','USD_CHF','AUD_USD','NZD_USD','EUR_JPY','GBP_JPY','AUD_JPY','NZD_JPY','CAD_JPY','EUR_GBP','EUR_AUD','XAU_USD','XAG_USD','US30_USD','NAS100_USD'];
   // Pair list — overwritten on load from /api/priority-pairs; falls back to full 16 pairs
@@ -1583,8 +1585,9 @@
     const f = v => v == null ? '—' : Number(v).toFixed(dp);
     const displaySym = r.displaySymbol || (r.pair || '').replace('_', '/');
     const encoded = encodeURIComponent(JSON.stringify(r)).replace(/'/g, '%27');
-    scoutReportMap[r.pair] = r;
-    if (!scoutDirMap[r.pair]) scoutDirMap[r.pair] = tradeDirection === 'SHORT' ? 'SHORT' : 'LONG';
+    const scoutKey = r.pair || displaySym;
+    scoutReportMap[scoutKey] = r;
+    if (!scoutDirMap[scoutKey]) scoutDirMap[scoutKey] = tradeDirection === 'SHORT' ? 'SHORT' : 'LONG';
 
     const bosHtml = r.recentBOS
       ? `<div class="scout-struct-row"><span class="scout-struct-label">BOS</span><span style="font-size:11px;color:${r.recentBOS.type === 'bullish' ? 'var(--green)' : 'var(--red)'};">⚡ ${r.recentBOS.type} @ ${f(r.recentBOS.level)}</span></div>`
@@ -1865,43 +1868,42 @@
         <div class="scanned-at" style="margin-top:8px;">Scanned: ${new Date(r.scannedAt).toLocaleTimeString()} · OANDA v20</div>
         <div class="card-actions" style="margin-top:10px;">
           <button class="send-bot-btn" onclick="sendSetupToCalculator(decodeURIComponent('${encoded}'))">Send to Calculator</button>
-          <button class="push-btn" id="scout-push-${r.pair}" onclick="toggleScoutJournal('${r.pair}')">📓 Log Trade</button>
+          <button class="push-btn" id="scout-push-${scoutKey}" onclick="toggleScoutJournal('${scoutKey}')">📓 Log Trade</button>
         </div>
-        <div class="journal-panel" id="scout-journal-${r.pair}" style="display:none;">
+        <div class="journal-panel" id="scout-journal-${scoutKey}" style="display:none;">
           <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Log your trade — fill in levels from your own analysis</div>
           <div class="outcome-row" style="margin-bottom:8px;">
             <span class="outcome-label">Direction:</span>
-            <button class="outcome-btn ${tradeDirection === 'LONG' ? 'win active-outcome' : 'win'}" id="scout-dir-long-${r.pair}" onclick="scoutSetDir('${r.pair}','LONG')">LONG</button>
-            <button class="outcome-btn ${tradeDirection === 'SHORT' ? 'loss active-outcome' : 'loss'}" id="scout-dir-short-${r.pair}" onclick="scoutSetDir('${r.pair}','SHORT')">SHORT</button>
+            <button class="outcome-btn ${tradeDirection === 'LONG' ? 'win active-outcome' : 'win'}" id="scout-dir-long-${scoutKey}" onclick="scoutSetDir('${scoutKey}','LONG')">LONG</button>
+            <button class="outcome-btn ${tradeDirection === 'SHORT' ? 'loss active-outcome' : 'loss'}" id="scout-dir-short-${scoutKey}" onclick="scoutSetDir('${scoutKey}','SHORT')">SHORT</button>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
             <div>
               <div style="font-size:9px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:3px;">Entry</div>
-              <input type="number" class="pnl-input" id="scout-entry-${r.pair}" value="${r.entry == null ? '' : f(r.entry)}" placeholder="${f(r.price)}" step="0.00001" style="width:100%;" />
+              <input type="number" class="pnl-input" id="scout-entry-${scoutKey}" value="${r.entry == null ? '' : f(r.entry)}" placeholder="${f(r.price)}" step="0.00001" style="width:100%;" />
             </div>
             <div>
               <div style="font-size:9px;color:var(--red);text-transform:uppercase;margin-bottom:3px;">Stop Loss</div>
-              <input type="number" class="pnl-input" id="scout-sl-${r.pair}" value="${r.sl == null ? '' : f(r.sl)}" placeholder="SL" step="0.00001" style="width:100%;border-color:rgba(255,59,92,0.3);" />
+              <input type="number" class="pnl-input" id="scout-sl-${scoutKey}" value="${r.sl == null ? '' : f(r.sl)}" placeholder="SL" step="0.00001" style="width:100%;border-color:rgba(255,59,92,0.3);" />
             </div>
             <div>
               <div style="font-size:9px;color:var(--green);text-transform:uppercase;margin-bottom:3px;">TP1</div>
-              <input type="number" class="pnl-input" id="scout-tp-${r.pair}" value="${r.tp1 == null ? '' : f(r.tp1)}" placeholder="TP1" step="0.00001" style="width:100%;border-color:rgba(0,255,136,0.3);" />
+              <input type="number" class="pnl-input" id="scout-tp-${scoutKey}" value="${r.tp1 == null ? '' : f(r.tp1)}" placeholder="TP1" step="0.00001" style="width:100%;border-color:rgba(0,255,136,0.3);" />
             </div>
           </div>
           <div class="notes-row" style="margin-bottom:8px;">
-            <textarea class="notes-input" id="scout-notes-${r.pair}" placeholder="Notes from your analysis..." style="min-height:48px;"></textarea>
+            <textarea class="notes-input" id="scout-notes-${scoutKey}" placeholder="Notes from your analysis..." style="min-height:48px;"></textarea>
           </div>
+          <div class="entry-note" id="scout-error-${scoutKey}" style="display:none;margin-bottom:8px;color:var(--red);border-color:rgba(255,59,92,0.25);background:rgba(255,59,92,0.06);"></div>
           <div style="display:flex;gap:8px;">
-            <button class="push-btn" id="scout-save-${r.pair}" onclick="saveScoutTrade('${r.pair}','${escapeHtml(r.displaySymbol || r.pair.replace('_','/'))}','${r.timeframe}','${r.session||''}',${r.newsRisk||false})">Save to Journal</button>
-            <button class="push-btn" onclick="toggleScoutJournal('${r.pair}')" style="border-color:rgba(148,163,184,0.3);background:transparent;color:var(--slate-dim);">Cancel</button>
+            <button class="push-btn" id="scout-save-${scoutKey}" onclick="saveScoutTrade('${scoutKey}','${escapeHtml(r.displaySymbol || r.pair.replace('_','/'))}','${r.timeframe}','${r.session||''}',${r.newsRisk||false})">Save to Journal</button>
+            <button class="push-btn" onclick="toggleScoutJournal('${scoutKey}')" style="border-color:rgba(148,163,184,0.3);background:transparent;color:var(--slate-dim);">Cancel</button>
           </div>
         </div>
       </div>
     </div>`;
   }
 
-  const scoutDirMap = {};
-  const scoutReportMap = {};
   function toggleScoutJournal(pair) {
     const panel = document.getElementById('scout-journal-' + pair);
     if (!panel) return;
@@ -1915,39 +1917,87 @@
     if (longBtn)  { longBtn.className  = 'outcome-btn win'  + (dir === 'LONG'  ? ' active-outcome' : ''); }
     if (shortBtn) { shortBtn.className = 'outcome-btn loss' + (dir === 'SHORT' ? ' active-outcome' : ''); }
   }
+  function setScoutJournalError(pair, message) {
+    const el = document.getElementById('scout-error-' + pair);
+    if (!el) {
+      if (message) alert(message);
+      return;
+    }
+    el.textContent = message || '';
+    el.style.display = message ? 'block' : 'none';
+  }
+  function parseScoutTradeLevel(pair, field, fallback) {
+    const input = document.getElementById(`scout-${field}-${pair}`);
+    const raw = input?.value;
+    const candidate = raw !== undefined && raw !== null && String(raw).trim() !== '' ? raw : fallback;
+    const value = Number(candidate);
+    return { value, valid: Number.isFinite(value), raw: candidate };
+  }
   async function saveScoutTrade(pair, displaySymbol, timeframe, session, newsRisk) {
     const report = scoutReportMap[pair] || {};
-    const fallbackDir = report.tradeDirection === 'SHORT' || report.bias === 'BEARISH' ? 'SHORT' : 'LONG';
+    const fallbackTradeDirection = tradeDirectionForReport(report);
+    const fallbackDir = fallbackTradeDirection === 'SHORT' || report.bias === 'BEARISH' ? 'SHORT' : 'LONG';
     const dir    = scoutDirMap[pair] || fallbackDir;
-    const entry  = parseFloat(document.getElementById('scout-entry-' + pair)?.value || report.entry);
-    const sl     = parseFloat(document.getElementById('scout-sl-'    + pair)?.value || report.sl);
-    const tp1    = parseFloat(document.getElementById('scout-tp-'    + pair)?.value || report.tp1);
+    const entryLevel = parseScoutTradeLevel(pair, 'entry', report.entry);
+    const slLevel = parseScoutTradeLevel(pair, 'sl', report.sl);
+    const tp1Level = parseScoutTradeLevel(pair, 'tp', report.tp1);
+    const entry  = entryLevel.value;
+    const sl     = slLevel.value;
+    const tp1    = tp1Level.value;
     const notes  = document.getElementById('scout-notes-'  + pair)?.value || '';
-    if (![entry, sl, tp1].every(Number.isFinite)) { alert('Entry, Stop Loss, and TP1 are required.'); return; }
+    const invalidFields = [
+      ['Entry', entryLevel],
+      ['Stop Loss', slLevel],
+      ['TP1', tp1Level],
+    ].filter(([, level]) => !level.valid).map(([name]) => name);
+    console.log('[ScoutJournal] save attempt', {
+      pair, reportKeyFound: Boolean(scoutReportMap[pair]), dir,
+      entry: entryLevel.raw, sl: slLevel.raw, tp1: tp1Level.raw,
+      invalidFields,
+    });
+    if (invalidFields.length) {
+      setScoutJournalError(pair, `${invalidFields.join(', ')} ${invalidFields.length === 1 ? 'is' : 'are'} missing or invalid. Enter valid numeric levels before saving.`);
+      return;
+    }
+    setScoutJournalError(pair, '');
     const risk = Math.abs(entry - sl);
     const rr1  = risk > 0 ? parseFloat((Math.abs(tp1 - entry) / risk).toFixed(1)) : null;
     const saveBtn = document.getElementById('scout-save-' + pair);
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+    const scoutSnapshot = [
+      `Trend: ${displayTrendForReport(report)}`,
+      `Setup TF: ${report.setupTimeframeDirection || 'Mixed'}`,
+      `Phase: ${displayPhaseForReport(report)}`,
+      `Context: ${contextLabelForReport(report)}`,
+      `Setup Status: ${displaySetupStatusForReport(report)}`,
+      `Entry Status: ${report.entryStatus || 'Waiting'}`,
+      `Location: ${report.zone || 'FAIR VALUE'}`,
+    ].join(' | ');
+    const fullNotes = [notes, scoutSnapshot].filter(Boolean).join('\n');
     try {
       const res = await fetch('/api/journal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           symbol: pair, displaySymbol, direction: dir, quality: 'DEVELOPING',
-          pattern: 'Scout — manual entry', timeframe,
-          entry, stopLoss: sl, tp1, rr1, session, newsRisk, notes,
+          pattern: `${displayPhaseForReport(report)} Scout`,
+          timeframe,
+          entry, stopLoss: sl, tp1, rr1, session, newsRisk, notes: fullNotes,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => ({}));
+      console.log('[ScoutJournal] write result', { pair, status: res.status, data });
+      if (res.ok && data.success) {
         const pushBtn = document.getElementById('scout-push-' + pair);
         if (pushBtn) { pushBtn.textContent = '✓ Journaled'; pushBtn.classList.add('pushed'); pushBtn.disabled = true; }
         toggleScoutJournal(pair);
+        if (typeof loadJournal === 'function') await loadJournal();
       } else {
-        throw new Error(data.error || 'Save failed');
+        throw new Error(data.error || `Save failed (${res.status})`);
       }
     } catch(e) {
-      alert('Failed to save: ' + e.message);
+      console.error('[ScoutJournal] save failed', e);
+      setScoutJournalError(pair, 'Failed to save journal row: ' + e.message);
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save to Journal'; }
     }
   }
