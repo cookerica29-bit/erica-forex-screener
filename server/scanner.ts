@@ -900,6 +900,8 @@ export interface ScoutReport {
   displaySymbol: string;
   price: number;
   bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  scoutDirection: 'LONG' | 'SHORT' | 'NEUTRAL';
+  tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL';
   htfBias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
   zone: 'PREMIUM' | 'DISCOUNT' | 'FAIR VALUE';
   nearestResistance: number | null;
@@ -1570,6 +1572,33 @@ function classifyEntryDistance(price: number, entry: number | null, atr: number)
   };
 }
 
+function directionLabelToBias(direction: DirectionLabel): 'BULLISH' | 'BEARISH' | 'NEUTRAL' {
+  if (direction === 'Bullish') return 'BULLISH';
+  if (direction === 'Bearish') return 'BEARISH';
+  return 'NEUTRAL';
+}
+
+function biasToTradeDirection(bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL'): 'LONG' | 'SHORT' | 'NEUTRAL' {
+  if (bias === 'BULLISH') return 'LONG';
+  if (bias === 'BEARISH') return 'SHORT';
+  return 'NEUTRAL';
+}
+
+function alignedScoutBias(context: ReturnType<typeof buildTrendSetupPhase>): 'BULLISH' | 'BEARISH' | 'NEUTRAL' {
+  const dailyBias = directionLabelToBias(context.dailyTrendDirection);
+  const setupBias = directionLabelToBias(context.setupTimeframeDirection);
+  const trendBias = context.trendDirection === 'Bullish'
+    ? 'BULLISH'
+    : context.trendDirection === 'Bearish'
+    ? 'BEARISH'
+    : 'NEUTRAL';
+
+  if (dailyBias !== 'NEUTRAL' && dailyBias === setupBias && dailyBias === trendBias) {
+    return dailyBias;
+  }
+  return 'NEUTRAL';
+}
+
 export interface TrendReport {
   pair: string;
   displaySymbol: string;
@@ -1896,6 +1925,26 @@ export function scoutAnalyzeCandles(
   let finalBias = bias;
   if (recentChoCH?.type === 'bearish') finalBias = 'BEARISH';
   else if (recentChoCH?.type === 'bullish') finalBias = 'BULLISH';
+  const trendSetupPhase = buildTrendSetupPhase(
+    candles,
+    dailyCandles?.length ? dailyCandles : htf,
+    h4Candles?.length ? h4Candles : candles,
+    granularity,
+    'Daily',
+    'H4'
+  );
+  const scoutBias = alignedScoutBias(trendSetupPhase);
+  if (scoutBias !== 'NEUTRAL' && finalBias !== 'NEUTRAL' && scoutBias !== finalBias) {
+    console.warn(
+      `[Scout Direction] ${pair} ${granularity}: overriding ${finalBias} trade bias with ${scoutBias} ` +
+      `because Trend=${trendSetupPhase.trendDirection}, Daily=${trendSetupPhase.dailyTrendDirection}, ` +
+      `SetupTF=${trendSetupPhase.setupTimeframeDirection}.`
+    );
+    finalBias = scoutBias;
+  } else if (scoutBias !== 'NEUTRAL' && finalBias === 'NEUTRAL') {
+    finalBias = scoutBias;
+  }
+
   const currentMomentum = scoreCurrentMomentum(candles, atr, finalBias, recentBOS, recentChoCH);
   const pullbackCompletion = scorePullbackCompletion(
     candles,
@@ -1907,16 +1956,8 @@ export function scoutAnalyzeCandles(
     nearestResistance
   );
   const trendConfirmation = scoreTrendConfirmation(candles, atr, finalBias, recentBOS, recentChoCH);
-  const trendSetupPhase = buildTrendSetupPhase(
-    candles,
-    dailyCandles?.length ? dailyCandles : htf,
-    h4Candles?.length ? h4Candles : candles,
-    granularity,
-    'Daily',
-    'H4',
-    currentMomentum.momentumScore,
-    trendConfirmation.confirmationScore
-  );
+  const scoutDirection = biasToTradeDirection(scoutBias);
+  const tradeDirection = biasToTradeDirection(finalBias);
 
   // Interest level: how many bullish factors align
   let interestScore = 0;
@@ -1991,6 +2032,8 @@ export function scoutAnalyzeCandles(
     displaySymbol: pair.replace('_', '/'),
     price,
     bias: finalBias,
+    scoutDirection,
+    tradeDirection,
     htfBias,
     zone,
     nearestResistance,
