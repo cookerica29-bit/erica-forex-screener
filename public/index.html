@@ -1444,6 +1444,21 @@
     return 'Pullback Active';
   }
 
+  function simpleSetupStatusForReport(r) {
+    const grade = r.setupGrade || 'C';
+    if (grade === 'C') return 'Counter-trend';
+    if (grade === 'B') return 'Still Pulling Back';
+    if (r.reversalConfirmed || r.confirmationConfirmed || Number(r.confirmationScore) >= 3) return 'Confirmation Started';
+    return 'Still Pulling Back';
+  }
+
+  function setupHeadlineForReport(r) {
+    const grade = r.setupGrade || 'C';
+    if (grade === 'A') return `A Setup — ${simpleSetupStatusForReport(r)}`;
+    if (grade === 'B') return 'B Setup — Wait';
+    return 'C Setup — Counter-trend';
+  }
+
   function tradeDirectionForReport(r) {
     const direction = String(r.tradeDirection || '').toUpperCase();
     if (direction === 'LONG' || direction === 'SHORT') return direction;
@@ -1503,7 +1518,7 @@
   function contextLabelForReport(r) {
     const phase = displayPhaseForReport(r);
     const setupStatus = displaySetupStatusForReport(r);
-    if (phase === 'Reversal Forming' || setupStatus === 'Reversal Forming') return 'Reversal / Counter-trend';
+    if (phase === 'Reversal Forming' || setupStatus === 'Reversal Forming') return 'Counter-trend';
     if (phase === 'Trend Move') return 'Continuation';
     if (phase === 'Pullback') return 'Pullback';
     if (phase === 'Recovery') return 'Recovery';
@@ -1656,9 +1671,11 @@
     const reversalConfirmed = Boolean(r.reversalConfirmed);
     const reversalLabel = reversalConfirmed ? 'Confirmed' : 'Not Confirmed';
     const reversalIcon = reversalConfirmed ? '✅' : '❌';
-    const entryStatusDisplay = entryStatus === 'Tradeable'
-      ? (reversalConfirmed ? 'Confirmed Tradeable' : 'Tradeable Scout — Wait for Reversal')
-      : entryStatus;
+    const setupHeadline = setupHeadlineForReport(r);
+    const simpleSetupStatus = simpleSetupStatusForReport(r);
+    const grade = r.setupGrade || 'C';
+    const gradeColor = grade === 'A' ? 'var(--green)' : grade === 'B' ? 'var(--blue)' : 'var(--gold)';
+    const entryStatusDisplay = entryStatus === 'Tradeable' ? setupHeadline : entryStatus;
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
     const distancePct = Number.isFinite(Number(r.distanceFromEntryPercent)) ? Number(r.distanceFromEntryPercent) : null;
     const showTradeLevels = r.entry != null && distanceAtr != null && distanceAtr <= 0.5;
@@ -1697,8 +1714,12 @@
             <div class="context-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Setup TF</div>
+            <div class="context-label">Short-term Flow</div>
             <div class="context-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
+          </div>
+          <div class="context-cell">
+            <div class="context-label">Grade</div>
+            <div class="context-value" style="color:${gradeColor}">${escapeHtml(grade)} Setup</div>
           </div>
           <div class="context-cell">
             <div class="context-label">Phase</div>
@@ -1726,9 +1747,9 @@
           </div>
         </div>
         <div class="setup-status-box ${setupStatusCls}">
-          <div class="setup-status-label">Setup Status</div>
-          <div class="setup-status-value">${escapeHtml(setupStatus)}</div>
-          <div class="setup-status-reason">${escapeHtml(setupStatusReason)}</div>
+          <div class="setup-status-label">Setup</div>
+          <div class="setup-status-value">${escapeHtml(setupHeadline)}</div>
+          <div class="setup-status-reason">${escapeHtml(r.setupGradeReason || setupStatusReason)}</div>
           <div class="setup-status-reason">Reversal: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Reversal has started.' : 'Waiting for reversal confirmation.'))}</div>
         </div>
         <div class="scout-levels">
@@ -1779,8 +1800,12 @@
                 <div class="scout-level-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Setup TF</div>
+                <div class="scout-level-label">Short-term Flow</div>
                 <div class="scout-level-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Grade</div>
+                <div class="scout-level-value" style="color:${gradeColor}">${escapeHtml(grade)} Setup</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Phase</div>
@@ -1788,7 +1813,7 @@
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Setup Status</div>
-                <div class="scout-level-value">${escapeHtml(setupStatus)}</div>
+                <div class="scout-level-value">${escapeHtml(simpleSetupStatus)}</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Entry Status</div>
@@ -1984,7 +2009,9 @@
       `Setup TF: ${report.setupTimeframeDirection || 'Mixed'}`,
       `Phase: ${displayPhaseForReport(report)}`,
       `Context: ${contextLabelForReport(report)}`,
-      `Setup Status: ${displaySetupStatusForReport(report)}`,
+      `Grade: ${report.setupGrade || ''}`,
+      `Grade Reason: ${report.setupGradeReason || ''}`,
+      `Setup Status: ${simpleSetupStatusForReport(report)}`,
       `Entry Status: ${report.entryStatus || 'Waiting'}`,
       `Reversal: ${report.reversalConfirmed ? 'Confirmed' : 'Not Confirmed'}`,
       `Reversal Reason: ${report.reversalReason || ''}`,
@@ -2002,6 +2029,8 @@
           entry, stopLoss: sl, tp1, rr1, session, newsRisk, notes: fullNotes,
           reversalConfirmed: Boolean(report.reversalConfirmed),
           reversalReason: report.reversalReason || '',
+          setupGrade: report.setupGrade || '',
+          setupGradeReason: report.setupGradeReason || '',
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -2783,12 +2812,14 @@
   function exportJournalCSV() {
     const entries = _journalEntries || [];
     if (!entries.length) return;
-    const headers = ['Date','Pair','Direction','Quality','Pattern','Timeframe','Session','Entry','SL','TP1','RR','Reversal Confirmed','Reversal Reason','Result','Direction Correct?','Entry Quality','PnL','Type','Notes','Review Notes'];
+    const headers = ['Date','Pair','Direction','Quality','Setup Grade','Setup Grade Reason','Pattern','Timeframe','Session','Entry','SL','TP1','RR','Reversal Confirmed','Reversal Reason','Result','Direction Correct?','Entry Quality','PnL','Type','Notes','Review Notes'];
     const rows = entries.map(e => [
       new Date(e.createdAt || e.pushedAt).toLocaleDateString(),
       e.displaySymbol || e.pair || e.symbol,
       e.direction,
       e.quality,
+      e.setupGrade || '',
+      (e.setupGradeReason || '').replace(/,/g, ';'),
       e.pattern,
       e.timeframe,
       e.session,
@@ -2870,6 +2901,7 @@
       const directionCorrect = e.directionCorrect || 'PENDING';
       const entryQuality = e.entryQuality || 'PENDING';
       const reversalConfirmed = Boolean(e.reversalConfirmed);
+      const setupGrade = e.setupGrade || 'C';
       const rrClass = parseFloat(e.rr1) >= 3 ? 'rr-great' : parseFloat(e.rr1) >= 2 ? 'rr-good' : 'rr-ok';
       const fmtP = (n) => n ? (isJpy(e.symbol) ? parseFloat(n).toFixed(3) : parseFloat(n).toFixed(5)) : '—';
       const pnlVal = parseFloat(e.pnl);
@@ -2887,6 +2919,7 @@
               <span class="badge ${isLong ? 'long' : 'short'}">${e.direction}</span>
               <span class="badge tf">${e.timeframe}</span>
               <span class="badge ${(e.quality || '').toLowerCase()}">${e.quality}</span>
+              <span class="badge ${setupGrade === 'A' ? 'long' : setupGrade === 'B' ? 'tf' : 'short'}">${setupGrade} Setup</span>
               <span class="badge ${reversalConfirmed ? 'long' : 'tf'}">Reversal ${reversalConfirmed ? 'Confirmed' : 'Not Confirmed'}</span>
               ${e.newsRisk ? `<span class="news-risk-pill">⚠️ NEWS RISK</span>` : ''}
             </div>

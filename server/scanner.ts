@@ -36,6 +36,7 @@ type DirectionLabel = 'Bullish' | 'Bearish' | 'Neutral';
 type TrendLabel = 'Bullish' | 'Bearish' | 'Bullish HTF Pullback' | 'Bearish HTF Pullback' | 'Mixed / Transition';
 type StructureLabel = 'HH/HL' | 'LH/LL' | 'Mixed';
 type EntryStatus = 'Waiting' | 'Near Entry' | 'Tradeable' | 'Too Far';
+type SetupGrade = 'A' | 'B' | 'C';
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 type PullbackStatus =
   | 'Aggressive pullback / Not ready'
@@ -97,6 +98,8 @@ export interface Setup {
   confirmationReason: string;
   reversalConfirmed: boolean;
   reversalReason: string;
+  setupGrade: SetupGrade;
+  setupGradeReason: string;
   trendDirection: TrendLabel;
   trendScore: number;
   trendReason: string;
@@ -933,6 +936,8 @@ export interface ScoutReport {
   confirmationReason: string;
   reversalConfirmed: boolean;
   reversalReason: string;
+  setupGrade: SetupGrade;
+  setupGradeReason: string;
   trendDirection: TrendLabel;
   trendScore: number;
   trendReason: string;
@@ -1378,6 +1383,68 @@ function detectReversalConfirmation(
     reversalReason: isLong
       ? 'Waiting for bullish structure shift, close above minor swing high, or bullish CHoCH.'
       : 'Waiting for bearish structure shift, close below minor swing low, or bearish CHoCH.',
+  };
+}
+
+function setupStatusLabelFromScores(
+  pullbackCompleted: boolean,
+  pullbackStatusValue: PullbackStatus,
+  pullbackScore: number,
+  confirmationConfirmed: boolean,
+  confirmationStatusValue: ConfirmationStatus,
+  confirmationScore: number
+) {
+  if (confirmationConfirmed || confirmationScore >= 9) return 'Trend Resumption Confirmed';
+  if (confirmationStatusValue === 'Strong confirmation' || confirmationScore >= 7) return 'Strong Confirmation';
+  if (confirmationStatusValue === 'Building confirmation' || confirmationStatusValue === 'Early confirmation' || confirmationScore >= 3) return 'Early Confirmation';
+  if (pullbackCompleted || pullbackStatusValue === 'Pullback completed' || pullbackScore >= 9) return 'Pullback Complete';
+  return 'Pullback Active';
+}
+
+function gradeScoutSetup(
+  tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
+  dailyTrendDirection: DirectionLabel,
+  setupTimeframeDirection: DirectionLabel,
+  zone: 'PREMIUM' | 'DISCOUNT' | 'FAIR VALUE',
+  setupStatus: string,
+  reversalConfirmed: boolean
+) {
+  const tradeTrend = tradeDirection === 'LONG' ? 'Bullish' : tradeDirection === 'SHORT' ? 'Bearish' : 'Mixed';
+  const trendDisplay = dailyTrendDirection === 'Bullish' || dailyTrendDirection === 'Bearish' ? dailyTrendDirection : 'Mixed';
+  const trendAligned = tradeTrend !== 'Mixed' && trendDisplay === tradeTrend;
+  const locationAligned = (tradeDirection === 'LONG' && zone === 'DISCOUNT') || (tradeDirection === 'SHORT' && zone === 'PREMIUM');
+  const locationConflict = (tradeDirection === 'LONG' && zone === 'PREMIUM') || (tradeDirection === 'SHORT' && zone === 'DISCOUNT');
+  const counterTrend = tradeTrend !== 'Mixed' && trendDisplay !== 'Mixed' && trendDisplay !== tradeTrend;
+  const mixedReversalContext = setupTimeframeDirection === 'Neutral' && setupStatus !== 'Pullback Active';
+
+  if (trendDisplay === 'Mixed' || counterTrend || locationConflict || mixedReversalContext) {
+    const reason = trendDisplay === 'Mixed'
+      ? 'Trend is mixed.'
+      : locationConflict
+      ? 'Location conflicts with trade direction.'
+      : mixedReversalContext
+      ? 'Short-term flow is mixed while reversal evidence is forming.'
+      : 'Trade direction is counter-trend.';
+    return { setupGrade: 'C' as SetupGrade, setupGradeReason: reason };
+  }
+
+  if (trendAligned && locationAligned && (reversalConfirmed || setupStatus === 'Early Confirmation' || setupStatus === 'Strong Confirmation' || setupStatus === 'Trend Resumption Confirmed')) {
+    return {
+      setupGrade: 'A' as SetupGrade,
+      setupGradeReason: reversalConfirmed ? 'Trend, location, and reversal confirmation align.' : 'Trend, location, and confirmation have started.',
+    };
+  }
+
+  if (trendAligned && locationAligned) {
+    return {
+      setupGrade: 'B' as SetupGrade,
+      setupGradeReason: 'Trend and location align, but pullback/reversal is still developing.',
+    };
+  }
+
+  return {
+    setupGrade: 'C' as SetupGrade,
+    setupGradeReason: 'Trend/location alignment is incomplete.',
   };
 }
 
@@ -2029,6 +2096,22 @@ export function scoutAnalyzeCandles(
     trendSetupPhase.setupTimeframeDirection,
     recentChoCH
   );
+  const setupStatusForGrade = setupStatusLabelFromScores(
+    pullbackCompletion.pullbackCompleted,
+    pullbackCompletion.pullbackStatus,
+    pullbackCompletion.pullbackScore,
+    trendConfirmation.confirmationConfirmed,
+    trendConfirmation.confirmationStatus,
+    trendConfirmation.confirmationScore
+  );
+  const setupGrade = gradeScoutSetup(
+    tradeDirection,
+    trendSetupPhase.dailyTrendDirection,
+    trendSetupPhase.setupTimeframeDirection,
+    zone,
+    setupStatusForGrade,
+    reversalConfirmation.reversalConfirmed
+  );
 
   // Interest level: how many bullish factors align
   let interestScore = 0;
@@ -2123,6 +2206,7 @@ export function scoutAnalyzeCandles(
     ...pullbackCompletion,
     ...trendConfirmation,
     ...reversalConfirmation,
+    ...setupGrade,
     ...trendSetupPhase,
     ...entryDistance,
     entry,

@@ -25,6 +25,8 @@ export const journalEntries = mysqlTable('journal_entries', {
   reviewNotes: text('review_notes'),
   reversalConfirmed: boolean('reversal_confirmed').default(false),
   reversalReason: text('reversal_reason'),
+  setupGrade: varchar('setup_grade', { length: 1 }),
+  setupGradeReason: text('setup_grade_reason'),
   confluences: text('confluences'),
   session: varchar('session', { length: 30 }),
   newsRisk: boolean('news_risk').default(false),

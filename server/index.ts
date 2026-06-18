@@ -184,6 +184,13 @@ function displayScoutSetupStatus(report: ScoutReport) {
   return 'Pullback Active';
 }
 
+function simpleScoutStatus(report: ScoutReport) {
+  if (report.setupGrade === 'C') return 'Counter-trend';
+  if (report.setupGrade === 'B') return 'Still Pulling Back';
+  if (report.reversalConfirmed || report.confirmationConfirmed || Number(report.confirmationScore) >= 3) return 'Confirmation Started';
+  return 'Still Pulling Back';
+}
+
 function tradeableSignalAlertKey(report: ScoutReport) {
   return [
     report.pair,
@@ -271,9 +278,9 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
       : '⚪ REVIEW';
     const trendDisplay = displayScoutTrend(report);
     const phaseDisplay = displayScoutPhase(report);
-    const setupStatus = displayScoutSetupStatus(report);
+    const setupStatus = simpleScoutStatus(report);
     const reversalText = report.reversalConfirmed ? '✅ Confirmed' : '❌ Not Confirmed';
-    const text = `✅ *TRADEABLE SCOUT SIGNAL — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nDirection: ${direction}\nTrend: ${trendDisplay}\nSetup TF: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nSetup Status: ${setupStatus}\nReversal: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: New simplified Scout card is Tradeable\n→ https://erica-forex-screener-production.up.railway.app`;
+    const text = `✅ *TRADEABLE SCOUT SIGNAL — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nDirection: ${direction}\nTrend: ${trendDisplay}\nShort-term Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nReversal: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${report.setupGradeReason || 'New simplified Scout card is Tradeable'}\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
       const data = await sendTelegram(text, 'Markdown');
@@ -685,6 +692,8 @@ app.post('/api/journal', async (req, res) => {
       reviewNotes:   b.review_notes ?? b.reviewNotes,
       reversalConfirmed: b.reversal_confirmed ?? b.reversalConfirmed,
       reversalReason: b.reversal_reason ?? b.reversalReason,
+      setupGrade: b.setup_grade ?? b.setupGrade,
+      setupGradeReason: b.setup_grade_reason ?? b.setupGradeReason,
     };
     const id = await createJournalEntry(normalized);
     return res.json({ success: true, id });
@@ -708,6 +717,8 @@ app.patch('/api/journal/:id', async (req, res) => {
       reviewNotes: b.review_notes ?? b.reviewNotes,
       reversalConfirmed: b.reversal_confirmed ?? b.reversalConfirmed,
       reversalReason: b.reversal_reason ?? b.reversalReason,
+      setupGrade: b.setup_grade ?? b.setupGrade,
+      setupGradeReason: b.setup_grade_reason ?? b.setupGradeReason,
     });
     return res.json({ success: true });
   } catch (err) {
