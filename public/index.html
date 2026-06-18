@@ -1653,6 +1653,12 @@
     const dailyChochDirection = r.dailyChochDirection === 'Neutral' ? 'None' : (r.dailyChochDirection || 'None');
     const entryStatus = r.entryStatus || 'Waiting';
     const entryStatusCls = String(entryStatus).toLowerCase().replace(/\s+/g, '-');
+    const reversalConfirmed = Boolean(r.reversalConfirmed);
+    const reversalLabel = reversalConfirmed ? 'Confirmed' : 'Not Confirmed';
+    const reversalIcon = reversalConfirmed ? '✅' : '❌';
+    const entryStatusDisplay = entryStatus === 'Tradeable'
+      ? (reversalConfirmed ? 'Confirmed Tradeable' : 'Tradeable Scout — Wait for Reversal')
+      : entryStatus;
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
     const distancePct = Number.isFinite(Number(r.distanceFromEntryPercent)) ? Number(r.distanceFromEntryPercent) : null;
     const showTradeLevels = r.entry != null && distanceAtr != null && distanceAtr <= 0.5;
@@ -1681,7 +1687,7 @@
             </div>
           </div>
           <div style="text-align:right;flex-shrink:0;">
-            <div class="entry-status ${entryStatusCls}">${escapeHtml(entryStatus)}</div>
+            <div class="entry-status ${entryStatusCls}">${escapeHtml(entryStatusDisplay)}</div>
             <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Entry Status</div>
           </div>
         </div>
@@ -1714,11 +1720,16 @@
             <div class="context-label">Entry Distance</div>
             <div class="context-value">${distanceAtr == null ? '—' : `${distanceAtr.toFixed(2)} ATR`}</div>
           </div>
+          <div class="context-cell">
+            <div class="context-label">Reversal</div>
+            <div class="context-value" style="color:${reversalConfirmed ? 'var(--green)' : 'var(--gold)'}">${reversalIcon} ${escapeHtml(reversalLabel)}</div>
+          </div>
         </div>
         <div class="setup-status-box ${setupStatusCls}">
           <div class="setup-status-label">Setup Status</div>
           <div class="setup-status-value">${escapeHtml(setupStatus)}</div>
           <div class="setup-status-reason">${escapeHtml(setupStatusReason)}</div>
+          <div class="setup-status-reason">Reversal: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Reversal has started.' : 'Waiting for reversal confirmation.'))}</div>
         </div>
         <div class="scout-levels">
           <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
@@ -1781,7 +1792,11 @@
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Entry Status</div>
-                <div class="scout-level-value">${escapeHtml(entryStatus)}</div>
+                <div class="scout-level-value">${escapeHtml(entryStatusDisplay)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Reversal</div>
+                <div class="scout-level-value" style="color:${reversalConfirmed ? 'var(--green)' : 'var(--gold)'}">${reversalIcon} ${escapeHtml(reversalLabel)}</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Location</div>
@@ -1971,6 +1986,8 @@
       `Context: ${contextLabelForReport(report)}`,
       `Setup Status: ${displaySetupStatusForReport(report)}`,
       `Entry Status: ${report.entryStatus || 'Waiting'}`,
+      `Reversal: ${report.reversalConfirmed ? 'Confirmed' : 'Not Confirmed'}`,
+      `Reversal Reason: ${report.reversalReason || ''}`,
       `Location: ${report.zone || 'FAIR VALUE'}`,
     ].join(' | ');
     const fullNotes = [notes, scoutSnapshot].filter(Boolean).join('\n');
@@ -1983,6 +2000,8 @@
           pattern: `${displayPhaseForReport(report)} Scout`,
           timeframe,
           entry, stopLoss: sl, tp1, rr1, session, newsRisk, notes: fullNotes,
+          reversalConfirmed: Boolean(report.reversalConfirmed),
+          reversalReason: report.reversalReason || '',
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -2764,7 +2783,7 @@
   function exportJournalCSV() {
     const entries = _journalEntries || [];
     if (!entries.length) return;
-    const headers = ['Date','Pair','Direction','Quality','Pattern','Timeframe','Session','Entry','SL','TP1','RR','Result','Direction Correct?','Entry Quality','PnL','Type','Notes','Review Notes'];
+    const headers = ['Date','Pair','Direction','Quality','Pattern','Timeframe','Session','Entry','SL','TP1','RR','Reversal Confirmed','Reversal Reason','Result','Direction Correct?','Entry Quality','PnL','Type','Notes','Review Notes'];
     const rows = entries.map(e => [
       new Date(e.createdAt || e.pushedAt).toLocaleDateString(),
       e.displaySymbol || e.pair || e.symbol,
@@ -2777,6 +2796,8 @@
       e.sl || e.stopLoss,
       e.tp1,
       e.rr1 || e.rrRatio,
+      e.reversalConfirmed ? 'TRUE' : 'FALSE',
+      (e.reversalReason || '').replace(/,/g, ';'),
       journalResult(e),
       e.directionCorrect || 'PENDING',
       e.entryQuality || 'PENDING',
@@ -2848,6 +2869,7 @@
       const outcome = result.toLowerCase();
       const directionCorrect = e.directionCorrect || 'PENDING';
       const entryQuality = e.entryQuality || 'PENDING';
+      const reversalConfirmed = Boolean(e.reversalConfirmed);
       const rrClass = parseFloat(e.rr1) >= 3 ? 'rr-great' : parseFloat(e.rr1) >= 2 ? 'rr-good' : 'rr-ok';
       const fmtP = (n) => n ? (isJpy(e.symbol) ? parseFloat(n).toFixed(3) : parseFloat(n).toFixed(5)) : '—';
       const pnlVal = parseFloat(e.pnl);
@@ -2865,6 +2887,7 @@
               <span class="badge ${isLong ? 'long' : 'short'}">${e.direction}</span>
               <span class="badge tf">${e.timeframe}</span>
               <span class="badge ${(e.quality || '').toLowerCase()}">${e.quality}</span>
+              <span class="badge ${reversalConfirmed ? 'long' : 'tf'}">Reversal ${reversalConfirmed ? 'Confirmed' : 'Not Confirmed'}</span>
               ${e.newsRisk ? `<span class="news-risk-pill">⚠️ NEWS RISK</span>` : ''}
             </div>
             <div class="pattern-name">${e.pattern}</div>

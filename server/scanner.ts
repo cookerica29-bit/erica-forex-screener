@@ -95,6 +95,8 @@ export interface Setup {
   confirmationStatus: ConfirmationStatus;
   confirmationConfirmed: boolean;
   confirmationReason: string;
+  reversalConfirmed: boolean;
+  reversalReason: string;
   trendDirection: TrendLabel;
   trendScore: number;
   trendReason: string;
@@ -929,6 +931,8 @@ export interface ScoutReport {
   confirmationStatus: ConfirmationStatus;
   confirmationConfirmed: boolean;
   confirmationReason: string;
+  reversalConfirmed: boolean;
+  reversalReason: string;
   trendDirection: TrendLabel;
   trendScore: number;
   trendReason: string;
@@ -1313,6 +1317,67 @@ function scoreTrendConfirmation(
     confirmationStatus: confirmationStatus(confirmationScore),
     confirmationConfirmed: confirmationScore >= 9,
     confirmationReason: reasons[0] || 'No clear resumption signal yet.',
+  };
+}
+
+function detectReversalConfirmation(
+  candles: Candle[],
+  tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
+  setupTimeframeDirection: DirectionLabel,
+  recentChoCH: { type: 'bullish' | 'bearish'; level: number } | null = null
+) {
+  if (tradeDirection === 'NEUTRAL') {
+    return {
+      reversalConfirmed: false,
+      reversalReason: 'No trade direction available for reversal confirmation.',
+    };
+  }
+
+  const isLong = tradeDirection === 'LONG';
+  const neededStructure = isLong ? 'Bullish' : 'Bearish';
+  const neededChoch = isLong ? 'bullish' : 'bearish';
+  if (setupTimeframeDirection === neededStructure) {
+    return {
+      reversalConfirmed: true,
+      reversalReason: `${neededStructure} setup timeframe structure shift is active.`,
+    };
+  }
+
+  if (recentChoCH?.type === neededChoch) {
+    return {
+      reversalConfirmed: true,
+      reversalReason: `${neededChoch} CHoCH detected after the pullback.`,
+    };
+  }
+
+  const recent = candles.slice(-28);
+  const swings = findSwings(recent, 2);
+  const last = recent.at(-1);
+  if (last) {
+    if (isLong) {
+      const minorHigh = swings.filter(s => s.type === 'high' && s.index < recent.length - 1).at(-1);
+      if (minorHigh && last.c > minorHigh.price) {
+        return {
+          reversalConfirmed: true,
+          reversalReason: `Price closed above recent minor swing high ${roundPrice(minorHigh.price)}.`,
+        };
+      }
+    } else {
+      const minorLow = swings.filter(s => s.type === 'low' && s.index < recent.length - 1).at(-1);
+      if (minorLow && last.c < minorLow.price) {
+        return {
+          reversalConfirmed: true,
+          reversalReason: `Price closed below recent minor swing low ${roundPrice(minorLow.price)}.`,
+        };
+      }
+    }
+  }
+
+  return {
+    reversalConfirmed: false,
+    reversalReason: isLong
+      ? 'Waiting for bullish structure shift, close above minor swing high, or bullish CHoCH.'
+      : 'Waiting for bearish structure shift, close below minor swing low, or bearish CHoCH.',
   };
 }
 
@@ -1958,6 +2023,12 @@ export function scoutAnalyzeCandles(
   const trendConfirmation = scoreTrendConfirmation(candles, atr, finalBias, recentBOS, recentChoCH);
   const scoutDirection = biasToTradeDirection(scoutBias);
   const tradeDirection = biasToTradeDirection(finalBias);
+  const reversalConfirmation = detectReversalConfirmation(
+    candles,
+    tradeDirection,
+    trendSetupPhase.setupTimeframeDirection,
+    recentChoCH
+  );
 
   // Interest level: how many bullish factors align
   let interestScore = 0;
@@ -2051,6 +2122,7 @@ export function scoutAnalyzeCandles(
     ...currentMomentum,
     ...pullbackCompletion,
     ...trendConfirmation,
+    ...reversalConfirmation,
     ...trendSetupPhase,
     ...entryDistance,
     entry,

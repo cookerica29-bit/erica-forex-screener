@@ -272,7 +272,8 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const trendDisplay = displayScoutTrend(report);
     const phaseDisplay = displayScoutPhase(report);
     const setupStatus = displayScoutSetupStatus(report);
-    const text = `✅ *TRADEABLE SCOUT SIGNAL — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nDirection: ${direction}\nTrend: ${trendDisplay}\nSetup TF: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nSetup Status: ${setupStatus}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: New simplified Scout card is Tradeable\n→ https://erica-forex-screener-production.up.railway.app`;
+    const reversalText = report.reversalConfirmed ? '✅ Confirmed' : '❌ Not Confirmed';
+    const text = `✅ *TRADEABLE SCOUT SIGNAL — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nDirection: ${direction}\nTrend: ${trendDisplay}\nSetup TF: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nSetup Status: ${setupStatus}\nReversal: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: New simplified Scout card is Tradeable\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
       const data = await sendTelegram(text, 'Markdown');
@@ -682,6 +683,8 @@ app.post('/api/journal', async (req, res) => {
       directionCorrect: b.direction_correct ?? b.directionCorrect,
       entryQuality:  b.entry_quality ?? b.entryQuality,
       reviewNotes:   b.review_notes ?? b.reviewNotes,
+      reversalConfirmed: b.reversal_confirmed ?? b.reversalConfirmed,
+      reversalReason: b.reversal_reason ?? b.reversalReason,
     };
     const id = await createJournalEntry(normalized);
     return res.json({ success: true, id });
@@ -703,6 +706,8 @@ app.patch('/api/journal/:id', async (req, res) => {
       directionCorrect: b.direction_correct ?? b.directionCorrect,
       entryQuality: b.entry_quality ?? b.entryQuality,
       reviewNotes: b.review_notes ?? b.reviewNotes,
+      reversalConfirmed: b.reversal_confirmed ?? b.reversalConfirmed,
+      reversalReason: b.reversal_reason ?? b.reversalReason,
     });
     return res.json({ success: true });
   } catch (err) {

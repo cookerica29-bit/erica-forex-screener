@@ -133,6 +133,8 @@ async function initSchema(pool: mysql.Pool) {
       pnl DECIMAL(10,2),
       notes TEXT,
       review_notes TEXT,
+      reversal_confirmed BOOLEAN DEFAULT FALSE,
+      reversal_reason TEXT,
       confluences TEXT,
       session VARCHAR(30),
       pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -202,6 +204,21 @@ async function initSchema(pool: mysql.Pool) {
     await pool.execute(`ALTER TABLE journal_entries ADD COLUMN review_notes TEXT`);
     console.log('[Database] Added review_notes column');
   }
+  const [reversalRows] = await pool.execute(`
+    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'journal_entries'
+      AND COLUMN_NAME IN ('reversal_confirmed', 'reversal_reason')
+  `) as any[];
+  const reversalColumns = new Set(reversalRows.map((row: any) => row.COLUMN_NAME));
+  if (!reversalColumns.has('reversal_confirmed')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN reversal_confirmed BOOLEAN DEFAULT FALSE`);
+    console.log('[Database] Added reversal_confirmed column');
+  }
+  if (!reversalColumns.has('reversal_reason')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN reversal_reason TEXT`);
+    console.log('[Database] Added reversal_reason column');
+  }
   console.log('[Database] Schema ready');
 }
 
@@ -249,6 +266,8 @@ export async function createJournalEntry(data: {
   directionCorrect?: DirectionCorrect;
   entryQuality?: EntryQuality;
   reviewNotes?: string;
+  reversalConfirmed?: boolean;
+  reversalReason?: string;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
@@ -276,6 +295,8 @@ export async function createJournalEntry(data: {
     directionCorrect: data.directionCorrect ?? 'PENDING',
     entryQuality: data.entryQuality ?? 'PENDING',
     reviewNotes: data.reviewNotes ?? null,
+    reversalConfirmed: data.reversalConfirmed ?? false,
+    reversalReason: data.reversalReason ?? null,
     outcome: resultToOutcome(data.result ?? 'PENDING'),
   }).$returningId();
   return result[0].id;
@@ -290,6 +311,8 @@ export async function updateJournalEntry(id: number, data: {
   directionCorrect?: DirectionCorrect;
   entryQuality?: EntryQuality;
   reviewNotes?: string;
+  reversalConfirmed?: boolean;
+  reversalReason?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
@@ -304,6 +327,8 @@ export async function updateJournalEntry(id: number, data: {
     ...(data.directionCorrect !== undefined && { directionCorrect: data.directionCorrect }),
     ...(data.entryQuality !== undefined && { entryQuality: data.entryQuality }),
     ...(data.reviewNotes !== undefined && { reviewNotes: data.reviewNotes }),
+    ...(data.reversalConfirmed !== undefined && { reversalConfirmed: data.reversalConfirmed }),
+    ...(data.reversalReason !== undefined && { reversalReason: data.reversalReason }),
   }).where(eq(journalEntries.id, id));
 }
 
