@@ -166,10 +166,77 @@
     .trend-reasons { margin-top:8px; display:flex; flex-direction:column; gap:5px; }
     .trend-reason { font-size:11px; color:var(--slate); line-height:1.35; }
     .trend-empty { color:var(--slate-dim); border:1px dashed rgba(148,163,184,.18); border-radius:10px; padding:24px; text-align:center; font-size:12px; }
+    .video-studio-page { padding:18px 24px 28px; max-width:1400px; margin:0 auto; }
+    .studio-layout { display:grid; gap:16px; grid-template-columns:minmax(320px,420px) minmax(0,1fr); }
+    .studio-card, .creator-dashboard { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; }
+    .creator-dashboard { margin-bottom:16px; }
+    .creator-dashboard-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+    .creator-dashboard-grid { display:grid; gap:10px; grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .creator-metric { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px; }
+    .creator-label { color:var(--slate-dim); font-size:10px; margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em; }
+    .creator-value { color:var(--text); font-size:14px; font-weight:850; line-height:1.3; overflow-wrap:anywhere; }
+    .creator-unsaved { color:#fcd34d; font-size:11px; font-weight:800; margin-top:6px; }
+    .studio-title { color:var(--text); font-size:15px; font-weight:900; letter-spacing:.04em; margin-bottom:4px; }
+    .studio-subtitle { color:var(--slate-dim); font-size:11px; line-height:1.45; margin-bottom:14px; }
+    .project-status-row, .studio-actions, .scene-checks, .project-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .project-status-badge { border-radius:999px; display:inline-flex; font-size:10px; font-weight:900; letter-spacing:.04em; padding:5px 9px; text-transform:uppercase; white-space:nowrap; }
+    .project-status-badge.draft { background:rgba(148,163,184,.12); color:#cbd5e1; }
+    .project-status-badge.ready-to-record { background:rgba(96,165,250,.14); color:#93c5fd; }
+    .project-status-badge.recording-complete { background:rgba(0,255,136,.12); color:#86efac; }
+    .project-status-badge.ready-to-edit { background:rgba(245,166,35,.14); color:#fcd34d; }
+    .project-status-badge.published { background:rgba(99,102,241,.16); color:#c4b5fd; }
+    .trade-select-list { display:flex; flex-direction:column; gap:8px; max-height:520px; overflow:auto; padding-right:4px; }
+    .trade-option { align-items:flex-start; background:rgba(148,163,184,.035); border:1px solid rgba(148,163,184,.08); border-radius:8px; cursor:pointer; display:flex; gap:9px; padding:9px 10px; }
+    .trade-option:hover { background:rgba(148,163,184,.075); }
+    .trade-option input { margin-top:2px; }
+    .trade-option-main { flex:1; min-width:0; }
+    .trade-option-title { color:var(--text); font-size:12px; font-weight:850; }
+    .trade-option-meta { color:var(--slate-dim); font-size:10px; line-height:1.45; margin-top:3px; }
+    .studio-input, .studio-select, .studio-textarea { width:100%; padding:7px 9px; background:var(--inner); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:11px; font-family:inherit; outline:none; }
+    .studio-textarea { min-height:64px; resize:vertical; }
+    .studio-form-row { margin-bottom:12px; }
+    .studio-form-row label { display:block; color:var(--slate-dim); font-size:10px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:5px; }
+    .studio-btn { padding:6px 12px; border-radius:8px; border:1px solid rgba(96,165,250,.35); background:rgba(96,165,250,.08); color:var(--blue); font-size:11px; font-family:inherit; cursor:pointer; font-weight:700; }
+    .studio-btn:hover { background:rgba(96,165,250,.16); }
+    .studio-btn.secondary { border-color:rgba(148,163,184,.18); background:rgba(148,163,184,.05); color:var(--slate); }
+    .studio-btn.danger { border-color:rgba(255,59,92,.35); background:rgba(255,59,92,.07); color:#fca5a5; }
+    .studio-btn.small { padding:4px 8px; font-size:10px; }
+    .studio-output-grid { display:grid; gap:12px; }
+    .studio-output { background:rgba(2,6,23,.22); border:1px solid rgba(148,163,184,.08); border-radius:10px; padding:12px; }
+    .studio-output-head { align-items:center; display:flex; justify-content:space-between; gap:10px; margin-bottom:8px; }
+    .studio-output h3 { color:#cbd5e1; font-size:12px; font-weight:850; letter-spacing:.03em; }
+    .studio-output-body { color:#dbe4ef; font-size:12px; line-height:1.55; white-space:pre-wrap; }
+    .studio-empty { color:var(--slate-dim); padding:42px 0; text-align:center; font-size:12px; line-height:1.5; }
+    .recording-assistant, .shorts-pack { margin-top:16px; }
+    .scene-card { background:rgba(15,23,42,.32); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:12px; }
+    .scene-card-head { align-items:center; display:flex; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .scene-title { color:var(--text); font-size:13px; font-weight:850; }
+    .scene-field { margin-top:8px; }
+    .scene-label { color:var(--slate-dim); font-size:10px; font-weight:850; letter-spacing:.05em; margin-bottom:3px; text-transform:uppercase; }
+    .scene-text { color:#dbe4ef; font-size:12px; line-height:1.45; }
+    .asset-builder, .script-builder, .shorts-pack { background:rgba(2,6,23,.22); border:1px solid rgba(148,163,184,.08); border-radius:8px; padding:10px; }
+    .script-builder { background:rgba(99,102,241,.07); border-color:rgba(99,102,241,.16); margin-top:12px; }
+    .shorts-pack { background:rgba(0,255,136,.045); border-color:rgba(0,255,136,.12); }
+    .asset-grid, .script-grid, .shorts-grid { display:grid; gap:8px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .asset-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .asset-summary { display:grid; gap:10px; grid-template-columns:repeat(3,minmax(0,1fr)); margin-bottom:12px; }
+    .asset-summary-card, .script-block, .shorts-block { background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.08); border-radius:8px; padding:10px; }
+    .asset-summary-label { color:var(--slate-dim); font-size:10px; margin-bottom:3px; }
+    .asset-summary-value { color:var(--text); font-size:18px; font-weight:900; }
+    .script-copy-row { align-items:center; display:flex; gap:8px; justify-content:space-between; margin-bottom:6px; }
+    .shorts-block.full { grid-column:1 / -1; }
+    .project-list { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+    .project-row { align-items:center; background:rgba(148,163,184,.04); border:1px solid rgba(148,163,184,.08); border-radius:8px; display:flex; gap:8px; justify-content:space-between; padding:8px 10px; }
+    .project-title { color:var(--text); font-size:12px; font-weight:850; }
+    .project-meta { color:var(--slate-dim); font-size:10px; margin-top:2px; line-height:1.45; }
+    .video-toast { position:fixed; right:18px; bottom:18px; z-index:9999; background:rgba(15,23,42,.96); border:1px solid rgba(96,165,250,.28); color:var(--text); border-radius:10px; padding:10px 12px; font-size:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.35); }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
       .setup-grid { grid-template-columns: 1fr; padding: 10px; }
       .trend-grid { grid-template-columns:1fr; }
+      .video-studio-page { padding:12px; }
+      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid { grid-template-columns:1fr; }
+      .shorts-block.full { grid-column:auto; }
     }
     .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
     .tab-btn { padding: 14px 20px; font-size: 12px; font-family: inherit; border: none; background: transparent; color: var(--slate-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; font-weight: 500; letter-spacing: 0.3px; }
@@ -417,6 +484,7 @@
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
   <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
   <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">🧮 Calculator</button>
+  <button class="tab-btn" onclick="switchTab('video')" id="tab-video">🎬 Video Studio</button>
   <button class="tab-btn" onclick="switchTab('bot')" id="tab-bot">🤖 Bot</button>
 </div>
 
@@ -744,12 +812,119 @@
   </div>
 </div>
 
+<div id="content-video" class="tab-content">
+  <div class="video-studio-page">
+    <div class="creator-dashboard">
+      <div class="creator-dashboard-head">
+        <div>
+          <div class="studio-title">Creator Dashboard</div>
+          <div class="studio-subtitle" style="margin-bottom:0;">Project readiness, recording progress, scripts, shorts, and assets.</div>
+          <div id="creatorUnsavedWarning" class="creator-unsaved" style="display:none;">Unsaved changes</div>
+        </div>
+        <div class="project-status-row">
+          <span id="projectStatusBadge" class="project-status-badge draft">Draft</span>
+          <select id="projectStatusSelect" class="studio-select" style="width:auto;" onchange="updateProjectStatus(this.value)">
+            <option value="Draft">Draft</option>
+            <option value="Ready to Record">Ready to Record</option>
+            <option value="Recording Complete">Recording Complete</option>
+            <option value="Ready to Edit">Ready to Edit</option>
+            <option value="Published">Published</option>
+          </select>
+        </div>
+      </div>
+      <div class="creator-dashboard-grid">
+        <div class="creator-metric"><div class="creator-label">Saved video projects</div><div class="creator-value" id="creatorSavedCount">0</div></div>
+        <div class="creator-metric"><div class="creator-label">Current project</div><div class="creator-value" id="creatorCurrentTitle">No project loaded</div></div>
+        <div class="creator-metric"><div class="creator-label">Selected trades</div><div class="creator-value" id="creatorSelectedTrades">0</div></div>
+        <div class="creator-metric"><div class="creator-label">Scene completion</div><div class="creator-value" id="creatorSceneProgress">0 / 0</div></div>
+        <div class="creator-metric"><div class="creator-label">Asset completion</div><div class="creator-value" id="creatorAssetProgress">0 / 0</div></div>
+        <div class="creator-metric"><div class="creator-label">Script status</div><div class="creator-value" id="creatorScriptStatus">Not generated</div></div>
+        <div class="creator-metric"><div class="creator-label">Shorts pack</div><div class="creator-value" id="creatorShortsStatus">Not generated</div></div>
+        <div class="creator-metric"><div class="creator-label">Project status</div><div class="creator-value" id="creatorProjectStatus">Draft</div></div>
+        <div class="creator-metric"><div class="creator-label">Last saved</div><div class="creator-value" id="creatorLastSaved">Never</div></div>
+      </div>
+    </div>
+    <div class="studio-layout">
+      <div class="studio-card">
+        <div class="studio-title">Video Studio</div>
+        <div class="studio-subtitle">Template-based content outlines from forex journal rows. Select up to 5 trades.</div>
+        <div class="studio-form-row">
+          <label>Video Type</label>
+          <select id="videoType" class="studio-select">
+            <option value="Scanner Intro">Scanner Intro</option>
+            <option value="Weekly Scanner Report">Weekly Scanner Report</option>
+            <option value="Trade Breakdown">Trade Breakdown</option>
+            <option value="Setup Grade Review">Setup Grade Review</option>
+            <option value="Entry Timing Review">Entry Timing Review</option>
+            <option value="Prop Firm Update">Prop Firm Update</option>
+          </select>
+        </div>
+        <div class="studio-form-row">
+          <label>Script Style</label>
+          <select id="scriptStyle" class="studio-select" onchange="changeScriptStyle(this.value)">
+            <option value="Casual">Casual</option>
+            <option value="Educational">Educational</option>
+            <option value="Documentary">Documentary</option>
+            <option value="Transparent/Journey">Transparent/Journey</option>
+          </select>
+        </div>
+        <div class="studio-subtitle" id="videoTradeCount">0 trades selected</div>
+        <div id="videoTradeList" class="trade-select-list"></div>
+        <div class="studio-actions">
+          <button class="studio-btn" onclick="generateVideoOutline()">Generate Video Outline</button>
+          <button class="studio-btn secondary" onclick="renderVideoStudio()">Refresh Trades</button>
+          <button class="studio-btn secondary" onclick="saveVideoProject()">Save Video Project</button>
+          <button class="studio-btn secondary" onclick="loadSavedVideoProjects()">Load Saved Projects</button>
+          <button class="studio-btn secondary" onclick="exportVideoMarkdown()">Export Outline as Markdown</button>
+          <button class="studio-btn secondary" onclick="exportAssetChecklistMarkdown()">Export Asset Checklist as Markdown</button>
+          <button class="studio-btn secondary" onclick="copyFullScript()">Copy Full Script</button>
+          <button class="studio-btn secondary" onclick="exportScriptMarkdown()">Export Script as Markdown</button>
+          <button class="studio-btn secondary" onclick="generateShortsPack()">Generate Shorts/Reels Pack</button>
+          <button class="studio-btn secondary" onclick="copyShortScript()">Copy Short Script</button>
+          <button class="studio-btn secondary" onclick="exportShortsMarkdown()">Export Shorts Pack as Markdown</button>
+          <button class="studio-btn secondary" onclick="startScannerIntroProject()">Start Scanner Intro Project</button>
+          <button class="studio-btn secondary" onclick="renameCurrentProject()">Rename Current Project</button>
+          <button class="studio-btn secondary" onclick="duplicateCurrentProject()">Duplicate Current Project</button>
+          <button class="studio-btn danger" onclick="clearCurrentProject()">Clear Current Project</button>
+        </div>
+        <div id="savedVideoProjects" class="project-list"></div>
+      </div>
+      <div class="studio-card">
+        <div class="studio-title">Generated Outline</div>
+        <div class="studio-subtitle">Client-side template output. No AI API calls are used.</div>
+        <div id="videoOutput" class="studio-output-grid">
+          <div class="studio-empty">Select 1-5 trades and generate an outline, or start a Scanner Intro project without journal rows.</div>
+        </div>
+        <div class="recording-assistant">
+          <div class="studio-title" style="margin-top:18px;">Recording Assistant</div>
+          <div class="studio-subtitle">Scene cards for planning screenshots, visuals, scripts, and recording progress.</div>
+          <div id="assetChecklistSummary"></div>
+          <div id="recordingAssistant" class="studio-output-grid">
+            <div class="studio-empty">Generate an outline to create scene cards.</div>
+          </div>
+          <div class="shorts-pack">
+            <div class="studio-title">Shorts/Reels Generator</div>
+            <div class="studio-subtitle">Short-form ideas and scripts from the selected video project.</div>
+            <div id="shortsOutput" class="studio-output-grid">
+              <div class="studio-empty">Generate or load a video project, then create a shorts pack.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   let allSetups = [], allNearMisses = [], scanning = false;
   let autoRefreshTimer = null;
   let nearMissOpen = false;
   let priorityPairsPayload = null;
   let priorityWatchlistRows = [];
+  const VIDEO_PROJECTS_KEY = 'forex_scanner_video_projects';
+  let currentVideoProject = null;
+  let videoProjectDirty = false;
+  let videoTradeRows = [];
   const scoutDirMap = {};
   const scoutReportMap = {};
 
@@ -2491,6 +2666,7 @@
     if (tab === 'analytics') await loadAnalytics();
     if (tab === 'calculator') { document.getElementById('calc-account').value = '25308'; calcPosition(); }
     if (tab === 'trending') await loadTrending();
+    if (tab === 'video') { await loadJournal(); renderVideoStudio(); }
     clearInterval(autoRefreshTimer);
     if (tab === 'scanner') {
       await loadPriorityPairs();
@@ -3055,6 +3231,1031 @@
       body: JSON.stringify({ direction_correct: directionCorrect, entry_quality: entryQuality, review_notes: reviewNotes }),
     });
     await loadJournal();
+  }
+
+  // Video Studio is frontend-only. It reads existing journal rows and stores
+  // creator projects in browser localStorage without changing scanner data.
+  function setVideoText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function showVideoToast(message) {
+    let toast = document.getElementById('videoToast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'videoToast';
+      toast.className = 'video-toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.display = 'block';
+    clearTimeout(showVideoToast._timer);
+    showVideoToast._timer = setTimeout(() => { toast.style.display = 'none'; }, 2200);
+  }
+
+  function getVideoJournalRows() {
+    const rows = Array.isArray(_journalEntries) && _journalEntries.length ? _journalEntries : journalEntries;
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  function videoTradeId(entry, idx) {
+    return String(entry.id || entry.tradeId || entry.createdAt || entry.pushedAt || `${entry.pair || entry.symbol || 'row'}-${idx}`);
+  }
+
+  function videoSymbol(entry) {
+    return entry.displaySymbol || entry.pair || entry.symbol || '—';
+  }
+
+  function videoDirection(entry) {
+    return entry.direction || entry.tradeDirection || entry.bias || 'N/A';
+  }
+
+  function videoResult(entry) {
+    return journalResult(entry) || entry.result || 'PENDING';
+  }
+
+  function videoGrade(entry) {
+    return entry.setupGrade ? `${entry.setupGrade} Setup` : (entry.quality || 'Ungraded');
+  }
+
+  function videoConfirmation(entry) {
+    if (entry.reversalConfirmed === true || entry.confirmationStarted === true) return 'Confirmed';
+    if (entry.reversalConfirmed === false || entry.confirmationStarted === false) return 'Not Confirmed';
+    return entry.confirmationStatus || 'Untracked';
+  }
+
+  function videoTradeLabel(entry) {
+    return `${videoSymbol(entry)} · ${videoDirection(entry)} · ${videoGrade(entry)} · ${entry.entryStatus || entry.status || 'Untracked'} · ${videoConfirmation(entry)}`;
+  }
+
+  function videoTradeMeta(entry) {
+    const trend = entry.trend || entry.trendDirection || entry.htfBias || '—';
+    const flow = entry.setupTf || entry.setupTimeframeDirection || entry.timeframe || '—';
+    const phase = entry.phase || entry.marketPhase || '—';
+    const date = entry.createdAt || entry.pushedAt || entry.date;
+    return `${date ? new Date(date).toLocaleString() : 'No date'} · Trend ${trend} · Flow ${flow} · Phase ${phase}`;
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (!videoProjectDirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
+  function markVideoProjectDirty() {
+    if (!currentVideoProject) return;
+    videoProjectDirty = true;
+    renderCreatorDashboard();
+  }
+
+  function markVideoProjectSaved() {
+    videoProjectDirty = false;
+    renderCreatorDashboard();
+  }
+
+  function confirmDiscardUnsaved() {
+    return !videoProjectDirty || confirm('You have unsaved Video Studio changes. Continue and discard them?');
+  }
+
+  function formatProjectDate(value) {
+    return value ? new Date(value).toLocaleString() : 'Never';
+  }
+
+  function projectStatusClass(status) {
+    return String(status || 'Draft').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'draft';
+  }
+
+  function projectTitle(project = currentVideoProject) {
+    return project?.title || project?.outline?.titles?.[0] || project?.type || 'No project loaded';
+  }
+
+  function loadVideoProjects() {
+    try { return JSON.parse(localStorage.getItem(VIDEO_PROJECTS_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  function saveVideoProjects(projects) {
+    localStorage.setItem(VIDEO_PROJECTS_KEY, JSON.stringify(projects));
+  }
+
+  function sceneCompletionCounts(project = currentVideoProject) {
+    const scenes = project?.scenes || [];
+    return { total: scenes.length, completed: scenes.filter(scene => scene.completed).length };
+  }
+
+  function assetChecklistCounts(scenes = []) {
+    return scenes.reduce((acc, scene) => {
+      const needed = scene.assetType !== 'No Asset Needed';
+      if (needed) acc.total += 1;
+      if (needed && scene.assetStatus === 'Captured') acc.captured += 1;
+      if (needed && scene.assetStatus === 'Missing') acc.missing += 1;
+      return acc;
+    }, { total: 0, captured: 0, missing: 0 });
+  }
+
+  function scriptStatus(project = currentVideoProject) {
+    if (!project?.scenes?.length) return 'Not generated';
+    ensureSceneScripts(project);
+    return project.scenes.every(scene => scene.script?.naturalTalking && scene.script?.shortVoiceover) ? 'Ready' : 'Incomplete';
+  }
+
+  function shortsStatus(project = currentVideoProject) {
+    return project?.shortsPack ? 'Generated' : 'Not generated';
+  }
+
+  function renderCreatorDashboard() {
+    const projects = loadVideoProjects();
+    const status = currentVideoProject?.status || 'Draft';
+    const scenes = sceneCompletionCounts();
+    const assets = assetChecklistCounts(currentVideoProject?.scenes || []);
+    const selected = document.querySelectorAll('.video-trade-check:checked').length;
+    setVideoText('creatorSavedCount', String(projects.length));
+    setVideoText('creatorCurrentTitle', projectTitle());
+    setVideoText('creatorSelectedTrades', String(selected));
+    setVideoText('creatorSceneProgress', `${scenes.completed} / ${scenes.total}`);
+    setVideoText('creatorAssetProgress', `${assets.captured} / ${assets.total}`);
+    setVideoText('creatorScriptStatus', scriptStatus());
+    setVideoText('creatorShortsStatus', shortsStatus());
+    setVideoText('creatorProjectStatus', status);
+    setVideoText('creatorLastSaved', formatProjectDate(currentVideoProject?.lastSavedAt));
+    const dirty = document.getElementById('creatorUnsavedWarning');
+    if (dirty) dirty.style.display = videoProjectDirty ? 'block' : 'none';
+    const badge = document.getElementById('projectStatusBadge');
+    if (badge) {
+      badge.textContent = status;
+      badge.className = `project-status-badge ${projectStatusClass(status)}`;
+    }
+    const select = document.getElementById('projectStatusSelect');
+    if (select && select.value !== status) select.value = status;
+  }
+
+  function renderVideoStudio() {
+    const list = document.getElementById('videoTradeList');
+    const count = document.getElementById('videoTradeCount');
+    if (!list || !count) return;
+    renderCreatorDashboard();
+    videoTradeRows = getVideoJournalRows()
+      .slice()
+      .sort((a, b) => String(b.createdAt || b.pushedAt || b.date || '').localeCompare(String(a.createdAt || a.pushedAt || a.date || '')))
+      .slice(0, 80);
+
+    if (!videoTradeRows.length) {
+      count.textContent = '0 trades selected';
+      list.innerHTML = '<div class="studio-empty" style="padding:24px 0;">No journal trades yet. Log trades from Scanner cards to build trade-based videos, or use Start Scanner Intro Project to create an intro without journal rows.</div>';
+      renderCreatorDashboard();
+      return;
+    }
+
+    list.innerHTML = videoTradeRows.map((entry, idx) => `
+      <label class="trade-option">
+        <input type="checkbox" class="video-trade-check" value="${idx}" data-video-id="${escapeHtml(videoTradeId(entry, idx))}" onchange="handleVideoTradeSelection(this)" />
+        <span class="trade-option-main">
+          <span class="trade-option-title">${escapeHtml(videoTradeLabel(entry))}</span>
+          <span class="trade-option-meta">${escapeHtml(videoTradeMeta(entry))}</span>
+        </span>
+      </label>
+    `).join('');
+    updateVideoTradeCount();
+  }
+
+  function handleVideoTradeSelection(box) {
+    const selected = Array.from(document.querySelectorAll('.video-trade-check:checked'));
+    if (selected.length > 5) {
+      box.checked = false;
+      alert('Select up to 5 trades.');
+    }
+    updateVideoTradeCount();
+  }
+
+  function updateVideoTradeCount() {
+    const selected = document.querySelectorAll('.video-trade-check:checked').length;
+    const count = document.getElementById('videoTradeCount');
+    if (count) count.textContent = `${selected} trade${selected === 1 ? '' : 's'} selected`;
+    renderCreatorDashboard();
+  }
+
+  function selectedVideoTrades() {
+    return Array.from(document.querySelectorAll('.video-trade-check:checked'))
+      .map(el => videoTradeRows[Number(el.value)])
+      .filter(Boolean);
+  }
+
+  function tradeSummaryLine(entry) {
+    return `${videoSymbol(entry)} ${videoDirection(entry)}: ${videoGrade(entry)}, ${entry.trend || entry.trendDirection || '—'} trend, ${entry.phase || entry.marketPhase || '—'}, ${entry.entryStatus || '—'} entry status, ${videoResult(entry)} result.`;
+  }
+
+  function gradeMix(trades) {
+    const counts = trades.reduce((acc, entry) => {
+      const grade = entry.setupGrade || entry.quality || 'Ungraded';
+      acc[grade] = (acc[grade] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts).map(([grade, count]) => `${grade}: ${count}`).join(' · ') || 'No graded trades';
+  }
+
+  function buildScannerIntroOutline() {
+    return {
+      titles: [
+        'Why I Built My Forex Scanner',
+        'Inside My Forex Scanner: Trend, Location, Confirmation',
+        'How I Use A/B/C Setup Grades for Forex Review',
+        'Building a Cleaner Forex Watchlist Workflow',
+        'The Scanner I Built to Stop Chasing Random Forex Setups',
+      ],
+      hook: 'I built this scanner because I needed a calmer way to find forex trade candidates without pretending every alert is a perfect signal.',
+      structure: [
+        'Introduce the problem: too many pairs, too much noise, and inconsistent review.',
+        'Explain the scanner framework: Daily trend, short-term flow, premium/discount location, entry status, setup grade, and confirmation.',
+        'Show how A/B/C grades separate confirmed pullbacks, wait setups, and caution setups.',
+        'Explain the journal: tracking direction, entry timing, outcome, and review notes.',
+        'Close with honest limitations and the testing plan before trusting the data.',
+      ],
+      scenes: [
+        'Dashboard opening shot with Scanner tab visible.',
+        'Close-up of a Scout card showing Trend, Short-term Flow, Location, Grade, and Confirmation.',
+        'Journal tab showing how forex trades are reviewed after the fact.',
+        'Analytics tab showing how the data will be compared over 50-100 trades.',
+        'Closing screen: this is a review workflow, not an auto-trading promise.',
+      ],
+      talkingPoints: [
+        'The scanner was built to narrow attention, not to guarantee wins.',
+        'It checks Daily trend direction, short-term flow, premium/discount location, setup grade, confirmation status, and entry distance.',
+        'A Setup means trend and location line up and confirmation has started.',
+        'B Setup means the area is interesting but patience is needed.',
+        'C Setup means mixed context, counter-trend, or unclear location.',
+        'Journal tracking is the point: find out whether Tradeable status, grades, confirmation, and entry timing actually matter.',
+        'Limitations: data can lag, liquidity shifts, news can distort price, setups can fail, and entries still require discretion.',
+        'Future plan: collect 50-100 setups, compare results by grade and entry quality, then decide what deserves automation or filtering.',
+      ],
+      thumbnail: 'I Built My Own Forex Scanner',
+      description: 'A first look at my forex scanner workflow. This video explains why I built it, what it checks, how A/B/C setup grades work, how confirmation is tracked, and how I plan to use journal data to test whether the scanner is actually producing better trade candidates.',
+    };
+  }
+
+  function buildTradeBasedOutline(type, trades) {
+    const pairs = trades.map(videoSymbol).filter(Boolean).join(', ') || 'selected trades';
+    const primary = trades[0] || {};
+    const summaries = trades.map(tradeSummaryLine);
+    const mix = gradeMix(trades);
+    const titlesByType = {
+      'Weekly Scanner Report': [
+        `Weekly Forex Scanner Report: ${pairs}`,
+        'Best and Worst Forex Setups From This Week',
+        'What the Forex Scanner Found This Week',
+        `A/B/C Forex Setup Review: ${pairs}`,
+        "This Week's Forex Trade Candidates Reviewed",
+      ],
+      'Trade Breakdown': [
+        `${videoSymbol(primary) || 'Trade'} Breakdown: What the Scanner Saw`,
+        `Breaking Down a ${primary.setupGrade || ''} Setup on ${videoSymbol(primary) || 'This Trade'}`.trim(),
+        'Forex Trade Review: Trend, Location, Confirmation',
+        'Was This Entry Early or On Time?',
+        'Scout Card to Journal: Full Trade Breakdown',
+      ],
+      'Setup Grade Review': [
+        `A/B/C Setup Grade Review: ${pairs}`,
+        'Do Setup Grades Match Better Forex Trades?',
+        'Ranking Scout Setups by Quality',
+        'Confirmed vs Wait Setups: What Changed?',
+        'Setup Grade Review From the Journal',
+      ],
+      'Entry Timing Review': [
+        'Entry Timing Review: Early, Late, or Good?',
+        'Was the Scanner Right but the Entry Early?',
+        `Reviewing Entry Quality on ${pairs}`,
+        'Trend Was Right. Was Timing Right?',
+        'What These Trades Say About Pullback Timing',
+      ],
+      'Prop Firm Update': [
+        'Prop Firm Update: Forex Scanner Review',
+        'Trading Discipline Update With Scanner Data',
+        'What I Took, What I Skipped, What I Learned',
+        `Prop Firm Journal Review: ${pairs}`,
+        'Building Consistency With Scanner Rules',
+      ],
+    };
+    return {
+      titles: titlesByType[type] || titlesByType['Trade Breakdown'],
+      hook: 'Today I am using logged forex scanner trades to review whether setup quality, confirmation, and entry timing actually matched the outcome.',
+      structure: [
+        `Set context: ${type} using ${trades.length} selected trade${trades.length === 1 ? '' : 's'}.`,
+        'Review the scanner snapshot: trend, short-term flow, phase, location, setup grade, and entry status.',
+        'Compare confirmation status against the actual entry timing.',
+        'Walk through the outcome and journal notes without hindsight bias.',
+        'Summarize what should be repeated, avoided, or tested next.',
+      ],
+      scenes: [
+        'Opening dashboard shot with selected journal rows.',
+        `Trade list overlay: ${summaries.join(' | ')}`,
+        'Show Scout card or journal snapshot for grade, confirmation, and entry status.',
+        'Explain whether the trade was A, B, or C quality and why.',
+        'Close with one testing takeaway for the next scanner session.',
+      ],
+      talkingPoints: [
+        `Selected trades: ${summaries.join(' ')}`,
+        `Grade mix: ${mix}.`,
+        'Trend shows the larger direction; short-term flow shows what price was doing near the entry.',
+        'Location matters because longs in discount and shorts in premium should behave differently.',
+        'Confirmation is tracked separately so a good area is not confused with an entry trigger.',
+        'Entry quality labels help separate scanner direction from timing mistakes.',
+        'The goal is not to prove the scanner is perfect. The goal is to collect evidence and improve the workflow.',
+      ],
+      thumbnail: `${type}: ${pairs}`,
+      description: `A ${type.toLowerCase()} using logged forex scanner trades: ${pairs}. I review trend, short-term flow, location, setup grade, confirmation status, entry timing, and journal results to understand what the scanner is doing well and what still needs testing.`,
+    };
+  }
+
+  function getVideoScriptStyle() {
+    return document.getElementById('scriptStyle')?.value || 'Casual';
+  }
+
+  function generateVideoOutline() {
+    const type = document.getElementById('videoType')?.value || 'Scanner Intro';
+    const scriptStyle = getVideoScriptStyle();
+    const trades = selectedVideoTrades();
+    if (type !== 'Scanner Intro' && trades.length < 1) {
+      alert('Select at least 1 trade for this video type.');
+      return;
+    }
+    const outline = type === 'Scanner Intro' ? buildScannerIntroOutline() : buildTradeBasedOutline(type, trades.slice(0, 5));
+    currentVideoProject = {
+      id: Date.now(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      type,
+      trades: trades.slice(0, 5).map((entry, idx) => ({
+        id: videoTradeId(entry, idx),
+        pair: videoSymbol(entry),
+        direction: videoDirection(entry),
+        setupGrade: entry.setupGrade || entry.quality || '',
+        entryStatus: entry.entryStatus || '',
+        reviewResult: videoResult(entry),
+      })),
+      outline,
+      status: currentVideoProject?.status || 'Draft',
+      scriptStyle,
+      scenes: buildRecordingScenes(outline, type, trades.slice(0, 5), scriptStyle),
+    };
+    renderVideoOutput(outline);
+    renderRecordingAssistant(currentVideoProject.scenes);
+    renderShortsPack(null);
+    markVideoProjectDirty();
+    renderCreatorDashboard();
+  }
+
+  function renderVideoOutput(outline) {
+    const output = document.getElementById('videoOutput');
+    if (!output) return;
+    const sections = [
+      ['Title Ideas', (outline.titles || []).map((title, idx) => `${idx + 1}. ${title}`).join('\n')],
+      ['Hook', outline.hook || ''],
+      ['Video Structure', (outline.structure || []).map((item, idx) => `${idx + 1}. ${item}`).join('\n')],
+      ['Scene List', (outline.scenes || []).map((item, idx) => `${idx + 1}. ${item}`).join('\n')],
+      ['Talking Points', (outline.talkingPoints || []).map(item => `- ${item}`).join('\n')],
+      ['Thumbnail Text', outline.thumbnail || ''],
+      ['YouTube Description', outline.description || ''],
+    ];
+    output.innerHTML = sections.map(([title, body], idx) => `
+      <div class="studio-output">
+        <div class="studio-output-head">
+          <h3>${escapeHtml(title)}</h3>
+          <button class="studio-btn secondary small" onclick="copyVideoSection(${idx})">Copy</button>
+        </div>
+        <div class="studio-output-body" id="videoSection${idx}">${escapeHtml(body)}</div>
+      </div>
+    `).join('');
+  }
+
+  function scriptToneLead(style) {
+    if (style === 'Educational') return 'Let me break this down clearly.';
+    if (style === 'Documentary') return 'This is the part of the process where the data starts to tell a story.';
+    if (style === 'Transparent/Journey') return 'I am still testing this, so I want to be honest about what I know and what I do not know yet.';
+    return 'Here is what I am looking at.';
+  }
+
+  function suggestedAssetType(scene, idx) {
+    const text = String(scene || '').toLowerCase();
+    if (idx === 0 || text.includes('dashboard') || text.includes('scanner') || text.includes('scout')) return 'Scanner Screenshot';
+    if (text.includes('journal')) return 'Journal Screenshot';
+    if (text.includes('alert')) return 'Telegram Alert';
+    if (text.includes('chart')) return 'TradingView Chart';
+    if (text.includes('closing')) return 'No Asset Needed';
+    return 'Scanner Screenshot';
+  }
+
+  function suggestedAssetNotes(scene, trade) {
+    if (trade?.pair) return `Capture ${trade.pair} context for: ${scene}`;
+    return `Capture visual for: ${scene}`;
+  }
+
+  function suggestedAssetFilename(type, trade, idx) {
+    const prefix = String(type || 'video').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const pair = String(trade?.pair || `scene-${idx + 1}`).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    return `${prefix}-${String(idx + 1).padStart(2, '0')}-${pair}.png`;
+  }
+
+  function buildSceneScript(scene, type, trade, style, outline, idx) {
+    const pairText = trade?.pair ? `${trade.pair} ` : '';
+    const gradeText = trade?.setupGrade ? `${trade.setupGrade} setup` : 'setup';
+    const lead = scriptToneLead(style);
+    const context = scene.show || outline?.scenes?.[idx] || 'this part of the workflow';
+    const takeaway = outline?.talkingPoints?.[idx] || outline?.hook || 'The goal is to turn scanner information into cleaner review decisions.';
+    return {
+      shortVoiceover: `${lead} In this scene, I am showing ${context}. The key point is ${takeaway}`,
+      naturalTalking: `${lead} For ${pairText}${gradeText}, I would pause here and explain what the scanner is actually showing. I am not treating this as a guaranteed trade. I am looking at trend, location, confirmation, and whether the entry timing makes sense. ${takeaway}`,
+      bulletVersion: [`Show: ${context}`, `Explain: ${pairText || 'the'}${gradeText} context`, 'Call out trend, location, grade, and confirmation', 'Mention what still needs review before trusting the setup'].join('\n'),
+      onScreenText: trade?.pair ? `${trade.pair}: ${trade.setupGrade || 'Setup'} · ${trade.entryStatus || 'Review'}` : `${type}: ${style} Review`,
+    };
+  }
+
+  function buildRecordingScenes(outline, type, trades, scriptStyle = 'Casual') {
+    return (outline.scenes || []).map((scene, idx) => {
+      const trade = trades[idx % Math.max(trades.length, 1)] ? {
+        pair: videoSymbol(trades[idx % trades.length]),
+        setupGrade: trades[idx % trades.length].setupGrade || trades[idx % trades.length].quality || '',
+        entryStatus: trades[idx % trades.length].entryStatus || '',
+      } : {};
+      const talkingPoint = outline.talkingPoints?.[idx] || outline.hook;
+      const visual = idx === 0
+        ? 'Dashboard wide shot'
+        : String(scene).toLowerCase().includes('journal')
+          ? 'Journal table or selected trade row'
+          : String(scene).toLowerCase().includes('analytics')
+            ? 'Analytics panel or summary stats'
+            : 'Scout card close-up with grade, confirmation, and entry status';
+      const base = {
+        title: `Scene ${idx + 1}: ${String(scene).split(':')[0]}`,
+        show: scene,
+        say: trade.pair ? `${talkingPoint} Use ${trade.pair} as the example and explain the ${trade.setupGrade || 'ungraded'} setup context.` : talkingPoint,
+        visual,
+        assetType: suggestedAssetType(scene, idx),
+        assetNotes: suggestedAssetNotes(scene, trade),
+        assetFilename: suggestedAssetFilename(type, trade, idx),
+        assetStatus: idx === 0 ? 'Needed' : 'Missing',
+        screenshotNeeded: idx > 0,
+        completed: false,
+      };
+      base.script = buildSceneScript(base, type, trade, scriptStyle, outline, idx);
+      return base;
+    });
+  }
+
+  function ensureSceneScripts(project = currentVideoProject) {
+    if (!project?.scenes) return [];
+    const style = project.scriptStyle || getVideoScriptStyle();
+    project.scenes = project.scenes.map((scene, idx) => ({
+      ...scene,
+      script: scene.script || buildSceneScript(scene, project.type, project.trades?.[idx % Math.max(project.trades?.length || 1, 1)], style, project.outline, idx),
+    }));
+    return project.scenes;
+  }
+
+  function renderAssetChecklistSummary(scenes = []) {
+    const box = document.getElementById('assetChecklistSummary');
+    if (!box) return;
+    if (!scenes.length) { box.innerHTML = ''; return; }
+    const counts = assetChecklistCounts(scenes);
+    box.innerHTML = `
+      <div class="asset-summary">
+        <div class="asset-summary-card"><div class="asset-summary-label">Total assets needed</div><div class="asset-summary-value">${counts.total}</div></div>
+        <div class="asset-summary-card"><div class="asset-summary-label">Captured assets</div><div class="asset-summary-value">${counts.captured}</div></div>
+        <div class="asset-summary-card"><div class="asset-summary-label">Missing assets</div><div class="asset-summary-value">${counts.missing}</div></div>
+      </div>`;
+  }
+
+  function renderRecordingAssistant(scenes = []) {
+    const box = document.getElementById('recordingAssistant');
+    if (!box) return;
+    if (!scenes.length) {
+      renderAssetChecklistSummary([]);
+      box.innerHTML = '<div class="studio-empty">Generate an outline to create scene cards.</div>';
+      return;
+    }
+    if (currentVideoProject) scenes = ensureSceneScripts(currentVideoProject);
+    renderAssetChecklistSummary(scenes);
+    renderCreatorDashboard();
+    box.innerHTML = scenes.map((scene, idx) => `
+      <div class="scene-card">
+        <div class="scene-card-head">
+          <div class="scene-title">${escapeHtml(scene.title)}</div>
+          <div class="scene-checks">
+            <label><input type="checkbox" ${scene.screenshotNeeded ? 'checked' : ''} onchange="updateSceneFlag(${idx}, 'screenshotNeeded', this.checked)" /> Screenshot needed</label>
+            <label><input type="checkbox" ${scene.completed ? 'checked' : ''} onchange="updateSceneFlag(${idx}, 'completed', this.checked)" /> Completed</label>
+          </div>
+        </div>
+        <div class="scene-field"><div class="scene-label">What to show on screen</div><div class="scene-text">${escapeHtml(scene.show)}</div></div>
+        <div class="scene-field"><div class="scene-label">What to say</div><div class="scene-text">${escapeHtml(scene.say)}</div></div>
+        <div class="scene-field"><div class="scene-label">Suggested visual</div><div class="scene-text">${escapeHtml(scene.visual)}</div></div>
+        <div class="asset-builder">
+          <div class="scene-label">Asset Builder</div>
+          <div class="asset-grid">
+            <div class="studio-form-row">
+              <label>Asset Type</label>
+              <select class="studio-select" onchange="updateSceneFlag(${idx}, 'assetType', this.value)">
+                ${['Scanner Screenshot','Journal Screenshot','TradingView Chart','Telegram Alert','Manual Upload','No Asset Needed'].map(type => `<option value="${type}" ${scene.assetType === type ? 'selected' : ''}>${type}</option>`).join('')}
+              </select>
+            </div>
+            <div class="studio-form-row">
+              <label>Filename Suggestion</label>
+              <input class="studio-input" type="text" value="${escapeHtml(scene.assetFilename || '')}" oninput="updateSceneFlag(${idx}, 'assetFilename', this.value)" />
+            </div>
+            <div class="studio-form-row">
+              <label>Asset Status</label>
+              <select class="studio-select" onchange="updateSceneFlag(${idx}, 'assetStatus', this.value)">
+                ${['Needed','Captured','Missing'].map(status => `<option value="${status}" ${scene.assetStatus === status ? 'selected' : ''}>${status}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="studio-form-row" style="margin-bottom:0;">
+            <label>Asset Notes</label>
+            <textarea class="studio-textarea" oninput="updateSceneFlag(${idx}, 'assetNotes', this.value)">${escapeHtml(scene.assetNotes || '')}</textarea>
+          </div>
+        </div>
+        <div class="script-builder">
+          <div class="scene-label">Script Builder</div>
+          <div class="script-grid">
+            ${[
+              ['shortVoiceover', 'Short voiceover script'],
+              ['naturalTalking', 'Natural talking version'],
+              ['bulletVersion', 'Bullet version'],
+              ['onScreenText', 'On-screen text suggestion'],
+            ].map(([field, label]) => `
+              <div class="script-block">
+                <div class="script-copy-row"><div class="scene-label">${label}</div><button class="studio-btn secondary small" onclick="copySceneScript(${idx}, '${field}')">Copy</button></div>
+                <div class="scene-text" style="${field === 'bulletVersion' ? 'white-space:pre-wrap;' : ''}">${escapeHtml(scene.script?.[field] || '')}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function updateSceneFlag(idx, field, value) {
+    if (!currentVideoProject?.scenes?.[idx]) return;
+    currentVideoProject.scenes[idx][field] = value;
+    currentVideoProject.updatedAt = new Date().toISOString();
+    if (field === 'assetStatus' || field === 'assetType') renderAssetChecklistSummary(currentVideoProject.scenes);
+    markVideoProjectDirty();
+    renderCreatorDashboard();
+  }
+
+  function changeScriptStyle(style) {
+    if (!currentVideoProject) return;
+    currentVideoProject.scriptStyle = style;
+    currentVideoProject.updatedAt = new Date().toISOString();
+    currentVideoProject.scenes = currentVideoProject.scenes.map((scene, idx) => ({
+      ...scene,
+      script: buildSceneScript(scene, currentVideoProject.type, currentVideoProject.trades?.[idx % Math.max(currentVideoProject.trades?.length || 1, 1)], style, currentVideoProject.outline, idx),
+    }));
+    markVideoProjectDirty();
+    renderRecordingAssistant(currentVideoProject.scenes);
+    renderCreatorDashboard();
+  }
+
+  async function copyText(text, label = 'Copied') {
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    showVideoToast(label);
+  }
+
+  async function copyVideoSection(idx) {
+    await copyText(document.getElementById(`videoSection${idx}`)?.textContent || '', 'Copied section');
+  }
+
+  async function copySceneScript(idx, field) {
+    const scenes = ensureSceneScripts();
+    await copyText(scenes?.[idx]?.script?.[field] || '', 'Copied script section');
+  }
+
+  function fullScriptText(project = currentVideoProject) {
+    if (!project) return '';
+    ensureSceneScripts(project);
+    return (project.scenes || []).map((scene, idx) => [
+      `Scene ${idx + 1}: ${scene.title}`,
+      '',
+      scene.script?.naturalTalking || scene.say || '',
+      '',
+      `On-screen text: ${scene.script?.onScreenText || ''}`,
+    ].join('\n')).join('\n\n');
+  }
+
+  async function copyFullScript() {
+    if (!currentVideoProject) { alert('Generate or load a video project before copying the full script.'); return; }
+    await copyText(fullScriptText(currentVideoProject), 'Copied full script');
+  }
+
+  function persistCurrentVideoProject() {
+    if (!currentVideoProject?.id) return;
+    const projects = loadVideoProjects();
+    const idx = projects.findIndex(project => project.id === currentVideoProject.id);
+    const savedAt = new Date().toISOString();
+    currentVideoProject.lastSavedAt = savedAt;
+    currentVideoProject.title = projectTitle(currentVideoProject);
+    if (idx >= 0) projects[idx] = { ...projects[idx], ...currentVideoProject, updatedAt: savedAt, lastSavedAt: savedAt };
+    else projects.unshift({ ...currentVideoProject, updatedAt: savedAt, lastSavedAt: savedAt });
+    saveVideoProjects(projects.slice(0, 20));
+  }
+
+  function saveVideoProject() {
+    if (!currentVideoProject) { alert('Generate an outline before saving a video project.'); return; }
+    persistCurrentVideoProject();
+    markVideoProjectSaved();
+    showVideoToast('Video project saved');
+    loadSavedVideoProjects();
+    renderCreatorDashboard();
+  }
+
+  function duplicateVideoProject(project, titleSuffix = 'Copy') {
+    const now = new Date().toISOString();
+    return {
+      ...JSON.parse(JSON.stringify(project)),
+      id: Date.now(),
+      title: `${project.title || project.outline?.titles?.[0] || project.type || 'Video Project'} ${titleSuffix}`,
+      status: 'Draft',
+      createdAt: now,
+      updatedAt: now,
+      lastSavedAt: now,
+    };
+  }
+
+  function updateProjectStatus(status) {
+    if (!currentVideoProject) { alert('Generate or load a video project before changing project status.'); renderCreatorDashboard(); return; }
+    currentVideoProject.status = status;
+    currentVideoProject.updatedAt = new Date().toISOString();
+    persistCurrentVideoProject();
+    markVideoProjectSaved();
+    renderCreatorDashboard();
+  }
+
+  function renameCurrentProject() {
+    if (!currentVideoProject) { alert('Generate or load a video project before renaming it.'); return; }
+    const nextTitle = prompt('Project name', projectTitle());
+    if (!nextTitle || !nextTitle.trim()) return;
+    currentVideoProject.title = nextTitle.trim();
+    currentVideoProject.updatedAt = new Date().toISOString();
+    markVideoProjectDirty();
+    renderCreatorDashboard();
+    loadSavedVideoProjects();
+  }
+
+  function duplicateCurrentProject() {
+    if (!currentVideoProject) { alert('Generate or load a video project before duplicating it.'); return; }
+    const duplicate = duplicateVideoProject(currentVideoProject);
+    const projects = loadVideoProjects();
+    projects.unshift(duplicate);
+    saveVideoProjects(projects.slice(0, 20));
+    currentVideoProject = duplicate;
+    markVideoProjectSaved();
+    restoreVideoProject(duplicate.id);
+    loadSavedVideoProjects();
+    showVideoToast('Video project duplicated');
+  }
+
+  function clearCurrentProject() {
+    if (!currentVideoProject && !videoProjectDirty) return;
+    if (!confirmDiscardUnsaved()) return;
+    currentVideoProject = null;
+    videoProjectDirty = false;
+    const output = document.getElementById('videoOutput');
+    if (output) output.innerHTML = '<div class="studio-empty">Select 1-5 trades and generate an outline, or start a Scanner Intro project without journal rows.</div>';
+    renderRecordingAssistant([]);
+    renderShortsPack(null);
+    renderCreatorDashboard();
+    showVideoToast('Current video project cleared');
+  }
+
+  function startScannerIntroProject() {
+    if (!confirmDiscardUnsaved()) return;
+    const typeEl = document.getElementById('videoType');
+    if (typeEl) typeEl.value = 'Scanner Intro';
+    generateVideoOutline();
+    if (currentVideoProject) currentVideoProject.title = 'Forex Scanner Intro Project';
+    renderCreatorDashboard();
+  }
+
+  function loadSavedVideoProjects() {
+    const box = document.getElementById('savedVideoProjects');
+    if (!box) return;
+    const projects = loadVideoProjects();
+    if (!projects.length) {
+      box.innerHTML = '<div class="studio-subtitle" style="margin:8px 0 0;">No saved video projects yet.</div>';
+      renderCreatorDashboard();
+      return;
+    }
+    box.innerHTML = projects.map(project => `
+      <div class="project-row">
+        <div>
+          <div class="project-title">${escapeHtml(project.title || project.type || 'Video Project')}</div>
+          <div class="project-meta">
+            Type: ${escapeHtml(project.type || 'Outline')} · Status: ${escapeHtml(project.status || 'Draft')} · Trades: ${project.trades?.length || 0}<br>
+            Created: ${escapeHtml(formatProjectDate(project.createdAt))} · Updated: ${escapeHtml(formatProjectDate(project.updatedAt || project.lastSavedAt))}
+          </div>
+        </div>
+        <div class="project-actions">
+          <button class="studio-btn secondary small" onclick="restoreVideoProject(${project.id})">Load</button>
+          <button class="studio-btn secondary small" onclick="duplicateSavedVideoProject(${project.id})">Duplicate</button>
+          <button class="studio-btn danger small" onclick="deleteSavedVideoProject(${project.id})">Delete</button>
+        </div>
+      </div>
+    `).join('');
+    renderCreatorDashboard();
+  }
+
+  function restoreVideoProject(id) {
+    if (!confirmDiscardUnsaved()) return;
+    const project = loadVideoProjects().find(p => p.id === id);
+    if (!project) return;
+    project.status = project.status || 'Draft';
+    currentVideoProject = project;
+    videoProjectDirty = false;
+    if (document.getElementById('videoType')) document.getElementById('videoType').value = project.type || 'Scanner Intro';
+    if (document.getElementById('scriptStyle')) document.getElementById('scriptStyle').value = project.scriptStyle || 'Casual';
+    ensureSceneScripts(currentVideoProject);
+    renderVideoOutput(project.outline);
+    renderRecordingAssistant(project.scenes || buildRecordingScenes(project.outline, project.type, []));
+    renderShortsPack(project.shortsPack || null);
+    renderCreatorDashboard();
+    showVideoToast('Video project loaded');
+  }
+
+  function duplicateSavedVideoProject(id) {
+    const project = loadVideoProjects().find(p => p.id === id);
+    if (!project) return;
+    const projects = loadVideoProjects();
+    projects.unshift(duplicateVideoProject(project));
+    saveVideoProjects(projects.slice(0, 20));
+    loadSavedVideoProjects();
+    renderCreatorDashboard();
+    showVideoToast('Saved project duplicated');
+  }
+
+  function deleteSavedVideoProject(id) {
+    const projects = loadVideoProjects();
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+    if (!confirm(`Delete saved project "${project.title || project.type || 'Video Project'}"? This cannot be undone.`)) return;
+    saveVideoProjects(projects.filter(p => p.id !== id));
+    if (currentVideoProject?.id === id) {
+      currentVideoProject = null;
+      videoProjectDirty = false;
+      const output = document.getElementById('videoOutput');
+      if (output) output.innerHTML = '<div class="studio-empty">Select 1-5 trades and generate an outline.</div>';
+      renderRecordingAssistant([]);
+      renderShortsPack(null);
+    }
+    loadSavedVideoProjects();
+    renderCreatorDashboard();
+    showVideoToast('Saved project deleted');
+  }
+
+  function videoProjectMarkdown(project) {
+    const outline = project.outline || {};
+    const scenes = project.scenes || [];
+    return [
+      `# ${outline.titles?.[0] || project.title || 'Video Outline'}`,
+      '',
+      `Video Type: ${project.type || 'N/A'}`,
+      `Updated: ${project.updatedAt || new Date().toISOString()}`,
+      '',
+      '## Title Ideas',
+      ...(outline.titles || []).map((title, idx) => `${idx + 1}. ${title}`),
+      '',
+      '## Hook',
+      outline.hook || '',
+      '',
+      '## Video Structure',
+      ...(outline.structure || []).map((item, idx) => `${idx + 1}. ${item}`),
+      '',
+      '## Scene List',
+      ...(outline.scenes || []).map((item, idx) => `${idx + 1}. ${item}`),
+      '',
+      '## Talking Points',
+      ...(outline.talkingPoints || []).map(item => `- ${item}`),
+      '',
+      '## Recording Assistant',
+      ...scenes.flatMap((scene, idx) => [
+        `### ${idx + 1}. ${scene.title}`,
+        `- What to show: ${scene.show}`,
+        `- What to say: ${scene.say}`,
+        `- Suggested visual: ${scene.visual}`,
+        `- Short voiceover: ${scene.script?.shortVoiceover || ''}`,
+        `- Natural talking version: ${scene.script?.naturalTalking || ''}`,
+        `- Bullet version: ${(scene.script?.bulletVersion || '').replace(/\n/g, '; ')}`,
+        `- On-screen text: ${scene.script?.onScreenText || ''}`,
+        `- Asset type: ${scene.assetType || 'No Asset Needed'}`,
+        `- Asset notes: ${scene.assetNotes || ''}`,
+        `- Filename suggestion: ${scene.assetFilename || ''}`,
+        `- Asset status: ${scene.assetStatus || 'Needed'}`,
+        `- Screenshot needed: ${scene.screenshotNeeded ? 'Yes' : 'No'}`,
+        `- Completed: ${scene.completed ? 'Yes' : 'No'}`,
+        '',
+      ]),
+      '## Thumbnail Text',
+      outline.thumbnail || '',
+      '',
+      '## YouTube Description',
+      outline.description || '',
+    ].join('\n');
+  }
+
+  function scriptMarkdown(project) {
+    ensureSceneScripts(project);
+    return [
+      `# Script: ${project.outline?.titles?.[0] || project.title || 'Video Project'}`,
+      '',
+      `Video Type: ${project.type || 'N/A'}`,
+      `Script Style: ${project.scriptStyle || 'Casual'}`,
+      '',
+      '## Full Script',
+      fullScriptText(project),
+      '',
+      '## Scene Scripts',
+      ...(project.scenes || []).flatMap((scene, idx) => [
+        `### ${idx + 1}. ${scene.title}`,
+        '',
+        '#### Short Voiceover',
+        scene.script?.shortVoiceover || '',
+        '',
+        '#### Natural Talking Version',
+        scene.script?.naturalTalking || '',
+        '',
+        '#### Bullet Version',
+        scene.script?.bulletVersion || '',
+        '',
+        '#### On-Screen Text',
+        scene.script?.onScreenText || '',
+        '',
+      ]),
+    ].join('\n');
+  }
+
+  function assetChecklistMarkdown(project) {
+    const scenes = project.scenes || [];
+    const counts = assetChecklistCounts(scenes);
+    return [
+      `# Asset Checklist: ${project.outline?.titles?.[0] || project.title || 'Video Project'}`,
+      '',
+      `Video Type: ${project.type || 'N/A'}`,
+      `Total assets needed: ${counts.total}`,
+      `Captured assets: ${counts.captured}`,
+      `Missing assets: ${counts.missing}`,
+      '',
+      '## Assets',
+      ...scenes.flatMap((scene, idx) => [
+        `### ${idx + 1}. ${scene.title}`,
+        `- Asset type: ${scene.assetType || 'No Asset Needed'}`,
+        `- Asset status: ${scene.assetStatus || 'Needed'}`,
+        `- Filename suggestion: ${scene.assetFilename || ''}`,
+        `- Asset notes: ${scene.assetNotes || ''}`,
+        `- Screenshot needed: ${scene.screenshotNeeded ? 'Yes' : 'No'}`,
+        `- Scene visual: ${scene.visual || ''}`,
+        '',
+      ]),
+    ].join('\n');
+  }
+
+  function downloadMarkdown(markdown, fallbackName) {
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fallbackName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function safeProjectSlug(project, suffix) {
+    const base = (project?.outline?.titles?.[0] || project?.title || project?.type || 'video')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    return `${base || 'video'}-${suffix}.md`;
+  }
+
+  function exportVideoMarkdown() {
+    if (!currentVideoProject) { alert('Generate or load a video project before exporting.'); return; }
+    currentVideoProject.updatedAt = new Date().toISOString();
+    downloadMarkdown(videoProjectMarkdown(currentVideoProject), safeProjectSlug(currentVideoProject, 'outline'));
+  }
+
+  function exportScriptMarkdown() {
+    if (!currentVideoProject) { alert('Generate or load a video project before exporting a script.'); return; }
+    currentVideoProject.updatedAt = new Date().toISOString();
+    downloadMarkdown(scriptMarkdown(currentVideoProject), safeProjectSlug(currentVideoProject, 'script'));
+  }
+
+  function exportAssetChecklistMarkdown() {
+    if (!currentVideoProject) { alert('Generate or load a video project before exporting an asset checklist.'); return; }
+    currentVideoProject.updatedAt = new Date().toISOString();
+    downloadMarkdown(assetChecklistMarkdown(currentVideoProject), safeProjectSlug(currentVideoProject, 'asset-checklist'));
+  }
+
+  function buildShortsPack(project = currentVideoProject) {
+    if (!project) return null;
+    ensureSceneScripts(project);
+    const title = project.outline?.titles?.[0] || project.title || 'Forex Scanner Review';
+    const trade = project.trades?.[0] || {};
+    const pair = trade.pair || 'this setup';
+    const grade = trade.setupGrade ? `${trade.setupGrade} setup` : 'scanner setup';
+    const mainPoint = project.outline?.hook || 'The scanner is not here to predict perfectly. It is here to help me review cleaner setups.';
+    const takeaway = project.outline?.talkingPoints?.[0] || 'Trend, location, confirmation, and journal review matter more than random alerts.';
+    return {
+      ideas: [
+        `Why ${pair} was not just another scanner alert`,
+        `A/B/C forex setup grading explained in under 60 seconds`,
+        `The difference between a good area and a confirmed forex entry`,
+      ],
+      hook15: 'I used to treat every clean-looking forex setup like it was ready. Now I separate the area from the confirmation.',
+      script30: [`Here is the quick version of ${title}.`, `${pair} came through as a ${grade}, but the real question is not just whether it looked good.`, 'I want to know if trend, location, and confirmation were actually lined up.', 'That is why I am tracking every setup in the journal instead of trusting the scanner blindly.'].join(' '),
+      script60: [`This is how I am using the forex scanner in a more honest way. ${mainPoint}`, `For ${pair}, I am looking at the grade, the entry status, and whether confirmation started before the entry.`, 'An A setup means trend, location, and confirmation are working together. A B setup means the area may be good, but I still need to wait. A C setup means caution.', `${takeaway}`, 'The goal is not to make the scanner look perfect. The goal is to collect enough trades to see what actually works.'].join(' '),
+      caption: `Testing my forex scanner workflow with ${pair}. Setup grade, confirmation, and journal review matter more than chasing alerts.`,
+      beats: ['Good area does not always mean good entry', `Setup grade: ${trade.setupGrade || 'Review'}`, 'Trend + location + confirmation', 'Journal first, automation later'],
+      hashtags: ['#forexscanner', '#forextrading', '#tradingjournal', '#priceaction', '#tradereview', '#tradingworkflow'],
+      cta: 'Follow along while I collect the next 50-100 scanner setups and review what actually works.',
+      style: project.scriptStyle || getVideoScriptStyle(),
+    };
+  }
+
+  function renderShortsPack(pack) {
+    const box = document.getElementById('shortsOutput');
+    if (!box) return;
+    if (!pack) {
+      box.innerHTML = '<div class="studio-empty">Generate or load a video project, then create a shorts pack.</div>';
+      return;
+    }
+    box.innerHTML = `
+      <div class="shorts-grid">
+        <div class="shorts-block full"><div class="scene-label">3 Short-form video ideas</div><div class="scene-text">${pack.ideas.map((x, i) => `${i + 1}. ${escapeHtml(x)}`).join('<br>')}</div></div>
+        <div class="shorts-block"><div class="scene-label">15-second hook</div><div class="scene-text">${escapeHtml(pack.hook15)}</div></div>
+        <div class="shorts-block"><div class="scene-label">CTA</div><div class="scene-text">${escapeHtml(pack.cta)}</div></div>
+        <div class="shorts-block full"><div class="scene-label">30-second script</div><div class="scene-text">${escapeHtml(pack.script30)}</div></div>
+        <div class="shorts-block full"><div class="scene-label">60-second script</div><div class="scene-text">${escapeHtml(pack.script60)}</div></div>
+        <div class="shorts-block"><div class="scene-label">Caption text</div><div class="scene-text">${escapeHtml(pack.caption)}</div></div>
+        <div class="shorts-block"><div class="scene-label">Hashtag suggestions</div><div class="scene-text">${escapeHtml(pack.hashtags.join(' '))}</div></div>
+        <div class="shorts-block full"><div class="scene-label">On-screen text beats</div><div class="scene-text">${pack.beats.map((x, i) => `${i + 1}. ${escapeHtml(x)}`).join('<br>')}</div></div>
+      </div>`;
+  }
+
+  function generateShortsPack() {
+    if (!currentVideoProject) { alert('Generate or load a video project before creating a shorts pack.'); return; }
+    currentVideoProject.shortsPack = buildShortsPack(currentVideoProject);
+    currentVideoProject.updatedAt = new Date().toISOString();
+    markVideoProjectDirty();
+    renderShortsPack(currentVideoProject.shortsPack);
+    renderCreatorDashboard();
+  }
+
+  function shortsMarkdown(project = currentVideoProject) {
+    const pack = project?.shortsPack || buildShortsPack(project);
+    if (!pack) return '';
+    return [
+      `# Shorts/Reels Pack: ${project.outline?.titles?.[0] || project.title || 'Video Project'}`,
+      '',
+      `Style: ${pack.style || project.scriptStyle || 'Casual'}`,
+      '',
+      '## 3 Short-form Video Ideas',
+      ...pack.ideas.map((idea, idx) => `${idx + 1}. ${idea}`),
+      '',
+      '## 15-Second Hook',
+      pack.hook15,
+      '',
+      '## 30-Second Script',
+      pack.script30,
+      '',
+      '## 60-Second Script',
+      pack.script60,
+      '',
+      '## Caption Text',
+      pack.caption,
+      '',
+      '## On-Screen Text Beats',
+      ...pack.beats.map((beat, idx) => `${idx + 1}. ${beat}`),
+      '',
+      '## Hashtag Suggestions',
+      pack.hashtags.join(' '),
+      '',
+      '## CTA',
+      pack.cta,
+    ].join('\n');
+  }
+
+  async function copyShortScript() {
+    if (!currentVideoProject) { alert('Generate or load a video project before copying a short script.'); return; }
+    const pack = currentVideoProject.shortsPack || buildShortsPack(currentVideoProject);
+    currentVideoProject.shortsPack = pack;
+    currentVideoProject.updatedAt = new Date().toISOString();
+    markVideoProjectDirty();
+    renderShortsPack(pack);
+    renderCreatorDashboard();
+    await copyText([pack.hook15, '', pack.script30, '', pack.script60, '', pack.cta].join('\n'), 'Copied short script');
+  }
+
+  function exportShortsMarkdown() {
+    if (!currentVideoProject) { alert('Generate or load a video project before exporting a shorts pack.'); return; }
+    currentVideoProject.shortsPack = currentVideoProject.shortsPack || buildShortsPack(currentVideoProject);
+    currentVideoProject.updatedAt = new Date().toISOString();
+    downloadMarkdown(shortsMarkdown(currentVideoProject), safeProjectSlug(currentVideoProject, 'shorts-pack'));
   }
 
   async function sendToBot(btn, idx) {
