@@ -505,11 +505,13 @@
 <div class="filter-row">
   <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
   <select class="filter-select" id="entryStatusFilter" onchange="renderSetups()" aria-label="Entry status filter">
-    <option value="ALL">Entry Status: All Entry Statuses</option>
-    <option value="Tradeable">Entry Status: Tradeable</option>
-    <option value="Near Entry">Entry Status: Near Entry</option>
-    <option value="Waiting">Entry Status: Waiting</option>
-    <option value="Too Far">Entry Status: Too Far</option>
+    <option value="ALL">Actionability: All Setups</option>
+    <option value="EVAL">Actionability: Eval Eligible</option>
+    <option value="WATCH">Actionability: Watch Only</option>
+    <option value="Tradeable">Raw Entry: Tradeable</option>
+    <option value="Near Entry">Raw Entry: Near Entry</option>
+    <option value="Waiting">Raw Entry: Waiting</option>
+    <option value="Too Far">Raw Entry: Too Far</option>
   </select>
   <select class="filter-select" id="trendFilter" onchange="renderSetups()" aria-label="Trend filter">
     <option value="ALL">Trend: All Trends</option>
@@ -1578,7 +1580,9 @@
     const setupStatus = document.getElementById('setupStatusFilter')?.value || 'ALL';
     const location = document.getElementById('locationFilter')?.value || 'ALL';
     return allSetups.filter(x => {
-      if (entryStatus !== 'ALL' && x.entryStatus !== entryStatus) return false;
+      if (entryStatus === 'EVAL' && x.evalEligible !== true) return false;
+      if (entryStatus === 'WATCH' && x.evalEligible === true) return false;
+      if (!['ALL', 'EVAL', 'WATCH'].includes(entryStatus) && x.entryStatus !== entryStatus) return false;
       if (trend !== 'ALL' && displayTrendForReport(x) !== trend) return false;
       if (phase !== 'ALL' && displayPhaseForReport(x) !== phase) return false;
       if (setupStatus !== 'ALL' && displaySetupStatusForReport(x) !== setupStatus) return false;
