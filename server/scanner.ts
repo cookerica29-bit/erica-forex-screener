@@ -100,6 +100,8 @@ export interface Setup {
   reversalReason: string;
   setupGrade: SetupGrade;
   setupGradeReason: string;
+  evalEligible: boolean;
+  evalReason: string;
   trendDirection: TrendLabel;
   trendScore: number;
   trendReason: string;
@@ -938,6 +940,8 @@ export interface ScoutReport {
   reversalReason: string;
   setupGrade: SetupGrade;
   setupGradeReason: string;
+  evalEligible: boolean;
+  evalReason: string;
   trendDirection: TrendLabel;
   trendScore: number;
   trendReason: string;
@@ -1445,6 +1449,47 @@ function gradeScoutSetup(
   return {
     setupGrade: 'C' as SetupGrade,
     setupGradeReason: 'Trend/location alignment is incomplete.',
+  };
+}
+
+function evaluateScoutForEval(
+  tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
+  dailyTrendDirection: DirectionLabel,
+  zone: 'PREMIUM' | 'DISCOUNT' | 'FAIR VALUE',
+  setupGrade: SetupGrade,
+  setupStatus: string,
+  reversalConfirmed: boolean,
+  entryStatus: EntryStatus,
+  distanceFromEntryAtr: number | null,
+  entry: number | null,
+  sl: number | null,
+  tp1: number | null
+) {
+  const failures: string[] = [];
+  const tradeTrend = tradeDirection === 'LONG' ? 'Bullish' : tradeDirection === 'SHORT' ? 'Bearish' : 'Mixed';
+  const trendAligned = tradeTrend !== 'Mixed' && dailyTrendDirection === tradeTrend;
+  const locationAligned = (tradeDirection === 'LONG' && zone === 'DISCOUNT') || (tradeDirection === 'SHORT' && zone === 'PREMIUM');
+  const confirmationStarted = ['Early Confirmation', 'Strong Confirmation', 'Trend Resumption Confirmed'].includes(setupStatus);
+
+  if (setupGrade !== 'A') failures.push('setup is not A grade');
+  if (entryStatus !== 'Tradeable') failures.push('entry is not close enough');
+  if (!trendAligned) failures.push('Daily trend is not aligned with trade direction');
+  if (!locationAligned) failures.push('location is not aligned with trade direction');
+  if (!reversalConfirmed) failures.push('reversal is not confirmed yet');
+  if (!confirmationStarted) failures.push('confirmation has not started');
+  if (distanceFromEntryAtr === null || distanceFromEntryAtr > 0.25) failures.push('entry is outside Tradeable distance');
+  if (entry === null || sl === null || tp1 === null) failures.push('entry, SL, or TP1 is missing');
+
+  if (failures.length) {
+    return {
+      evalEligible: false,
+      evalReason: `Watch only: ${failures.join('; ')}.`,
+    };
+  }
+
+  return {
+    evalEligible: true,
+    evalReason: 'Eval eligible: A setup, trend/location aligned, reversal confirmed, confirmation started, and entry is Tradeable.',
   };
 }
 
@@ -2180,6 +2225,19 @@ export function scoutAnalyzeCandles(
     }
   }
   const entryDistance = classifyEntryDistance(price, entry, atr);
+  const evalEligibility = evaluateScoutForEval(
+    tradeDirection,
+    trendSetupPhase.dailyTrendDirection,
+    zone,
+    setupGrade.setupGrade,
+    setupStatusForGrade,
+    reversalConfirmation.reversalConfirmed,
+    entryDistance.entryStatus,
+    entryDistance.distanceFromEntryAtr,
+    entry,
+    sl,
+    tp1
+  );
 
   return {
     pair,
@@ -2207,6 +2265,7 @@ export function scoutAnalyzeCandles(
     ...trendConfirmation,
     ...reversalConfirmation,
     ...setupGrade,
+    ...evalEligibility,
     ...trendSetupPhase,
     ...entryDistance,
     entry,

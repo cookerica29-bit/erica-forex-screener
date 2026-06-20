@@ -361,6 +361,7 @@
     .scout-level-label { font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--slate-dim); margin-bottom:2px; }
     .scout-level-value { font-size:13px; font-weight:600; }
     .entry-status { display:inline-flex; align-items:center; justify-content:center; padding:5px 10px; border-radius:99px; border:1px solid rgba(148,163,184,0.24); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+    .entry-status.eval-eligible { color:var(--green); border-color:rgba(0,255,136,0.58); background:rgba(0,255,136,0.14); box-shadow:0 0 18px rgba(0,255,136,0.08); }
     .entry-status.tradeable { color:var(--green); border-color:rgba(0,255,136,0.4); background:rgba(0,255,136,0.08); }
     .entry-status.near-entry { color:var(--blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.08); }
     .entry-status.waiting { color:var(--gold); border-color:rgba(245,166,35,0.35); background:rgba(245,166,35,0.08); }
@@ -1722,9 +1723,10 @@
     const counts = rows.reduce((acc, row) => {
       const status = ['Tradeable', 'Near Entry', 'Waiting', 'Too Far'].includes(row.entryStatus) ? row.entryStatus : 'Unknown';
       acc[status] = (acc[status] || 0) + 1;
+      if (row.evalEligible === true) acc.EvalEligible = (acc.EvalEligible || 0) + 1;
       return acc;
     }, {});
-    return `Tradeable: ${counts.Tradeable || 0} | Near Entry: ${counts['Near Entry'] || 0} | Waiting: ${counts.Waiting || 0} | Too Far: ${counts['Too Far'] || 0}`;
+    return `Eval Eligible: ${counts.EvalEligible || 0} | Tradeable: ${counts.Tradeable || 0} | Near Entry: ${counts['Near Entry'] || 0} | Waiting: ${counts.Waiting || 0} | Too Far: ${counts['Too Far'] || 0}`;
   }
 
   function matchesLocationFilter(zone, filter) {
@@ -1850,7 +1852,14 @@
     const simpleSetupStatus = simpleSetupStatusForReport(r);
     const grade = r.setupGrade || 'C';
     const gradeColor = grade === 'A' ? 'var(--green)' : grade === 'B' ? 'var(--blue)' : 'var(--gold)';
-    const entryStatusDisplay = entryStatus === 'Tradeable' ? setupHeadline : entryStatus;
+    const evalEligible = r.evalEligible === true;
+    const evalLabel = evalEligible ? 'Eval Eligible' : 'Watch Only';
+    const evalColor = evalEligible ? 'var(--green)' : 'var(--gold)';
+    const evalReason = r.evalReason || (evalEligible
+      ? 'Confirmed A setup is eligible for eval consideration.'
+      : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
+    const entryStatusDisplay = evalEligible ? 'Eval Eligible' : entryStatus === 'Tradeable' ? setupHeadline : entryStatus;
+    const entryStatusDisplayCls = evalEligible ? 'eval-eligible' : entryStatusCls;
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
     const distancePct = Number.isFinite(Number(r.distanceFromEntryPercent)) ? Number(r.distanceFromEntryPercent) : null;
     const showTradeLevels = r.entry != null && distanceAtr != null && distanceAtr <= 0.5;
@@ -1879,7 +1888,7 @@
             </div>
           </div>
           <div style="text-align:right;flex-shrink:0;">
-            <div class="entry-status ${entryStatusCls}">${escapeHtml(entryStatusDisplay)}</div>
+            <div class="entry-status ${entryStatusDisplayCls}">${escapeHtml(entryStatusDisplay)}</div>
             <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Entry Status</div>
           </div>
         </div>
@@ -1917,6 +1926,10 @@
             <div class="context-value">${distanceAtr == null ? '—' : `${distanceAtr.toFixed(2)} ATR`}</div>
           </div>
           <div class="context-cell">
+            <div class="context-label">Eval</div>
+            <div class="context-value" style="color:${evalColor}">${escapeHtml(evalLabel)}</div>
+          </div>
+          <div class="context-cell">
             <div class="context-label">Reversal</div>
             <div class="context-value" style="color:${reversalConfirmed ? 'var(--green)' : 'var(--gold)'}">${reversalIcon} ${escapeHtml(reversalLabel)}</div>
           </div>
@@ -1925,6 +1938,7 @@
           <div class="setup-status-label">Setup</div>
           <div class="setup-status-value">${escapeHtml(setupHeadline)}</div>
           <div class="setup-status-reason">${escapeHtml(r.setupGradeReason || setupStatusReason)}</div>
+          <div class="setup-status-reason">Eval: ${escapeHtml(evalReason)}</div>
           <div class="setup-status-reason">Reversal: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Reversal has started.' : 'Waiting for reversal confirmation.'))}</div>
         </div>
         <div class="scout-levels">
@@ -1993,6 +2007,10 @@
               <div class="scout-level-box">
                 <div class="scout-level-label">Entry Status</div>
                 <div class="scout-level-value">${escapeHtml(entryStatusDisplay)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Eval</div>
+                <div class="scout-level-value" style="color:${evalColor}">${escapeHtml(evalLabel)}</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Reversal</div>
@@ -2188,6 +2206,8 @@
       `Grade Reason: ${report.setupGradeReason || ''}`,
       `Setup Status: ${simpleSetupStatusForReport(report)}`,
       `Entry Status: ${report.entryStatus || 'Waiting'}`,
+      `Eval Eligible: ${report.evalEligible ? 'Yes' : 'No'}`,
+      `Eval Reason: ${report.evalReason || ''}`,
       `Reversal: ${report.reversalConfirmed ? 'Confirmed' : 'Not Confirmed'}`,
       `Reversal Reason: ${report.reversalReason || ''}`,
       `Location: ${report.zone || 'FAIR VALUE'}`,

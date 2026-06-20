@@ -149,6 +149,7 @@ function isIndexSymbol(symbol: string) {
 
 function isTradeableScoutSignal(report: ScoutReport) {
   return !isIndexSymbol(report.pair) &&
+    report.evalEligible === true &&
     report.entryStatus === 'Tradeable' &&
     Boolean(report.trendDirection) &&
     Boolean(report.setupTimeframeDirection) &&
@@ -241,7 +242,7 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
   if (!tradeable.length) return;
 
   if (!isForexMarketOpen()) {
-    console.log(`[Telegram] ${source}: market closed; skipped ${tradeable.length} tradeable scout signal${tradeable.length === 1 ? '' : 's'}`);
+    console.log(`[Telegram] ${source}: market closed; skipped ${tradeable.length} eval-eligible scout signal${tradeable.length === 1 ? '' : 's'}`);
     return;
   }
 
@@ -259,14 +260,14 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const dataKey = tradeableSignalDataKey(report);
     const previousCandleTime = tradeableSignalCandleTimes.get(dataKey);
     if (previousCandleTime === report.candleTime) {
-      console.log(`[Telegram] Tradeable scout signal stale candle skipped for ${report.pair} ${report.timeframe} @ ${report.candleTime}`);
+      console.log(`[Telegram] Eval-eligible scout signal stale candle skipped for ${report.pair} ${report.timeframe} @ ${report.candleTime}`);
       continue;
     }
 
     const key = tradeableSignalAlertKey(report);
     const alertedAt = tradeableSignalAlerts.get(key);
     if (alertedAt && now - alertedAt < TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS) {
-      console.log(`[Telegram] Tradeable scout signal suppressed by cooldown for ${report.pair} ${report.timeframe}`);
+      console.log(`[Telegram] Eval-eligible scout signal suppressed by cooldown for ${report.pair} ${report.timeframe}`);
       continue;
     }
     tradeableSignalCandleTimes.set(dataKey, report.candleTime);
@@ -280,16 +281,16 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const phaseDisplay = displayScoutPhase(report);
     const setupStatus = simpleScoutStatus(report);
     const reversalText = report.reversalConfirmed ? '✅ Confirmed' : '❌ Not Confirmed';
-    const text = `✅ *TRADEABLE SCOUT SIGNAL — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nDirection: ${direction}\nTrend: ${trendDisplay}\nShort-term Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nReversal: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${report.setupGradeReason || 'New simplified Scout card is Tradeable'}\n→ https://erica-forex-screener-production.up.railway.app`;
+    const text = `✅ *EVAL ELIGIBLE SCOUT — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nEval Eligible: YES\nDirection: ${direction}\nTrend: ${trendDisplay}\nShort-term Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nReversal: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${report.evalReason || report.setupGradeReason || 'Confirmed A setup is eval eligible'}\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
       const data = await sendTelegram(text, 'Markdown');
       if (data.ok) {
         tradeableSignalAlerts.set(key, now);
-        console.log(`[Telegram] Tradeable scout signal sent for ${report.pair} ${report.timeframe}`);
+        console.log(`[Telegram] Eval-eligible scout signal sent for ${report.pair} ${report.timeframe}`);
       }
     } catch (e: any) {
-      console.error(`[Telegram] Tradeable scout signal failed for ${report.pair}:`, e.message);
+      console.error(`[Telegram] Eval-eligible scout signal failed for ${report.pair}:`, e.message);
     }
   }
 }
