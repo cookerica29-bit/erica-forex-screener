@@ -198,8 +198,19 @@ function displayScoutSetupStatus(report: ScoutReport) {
 }
 
 function simpleScoutStatus(report: ScoutReport) {
+  const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
   if (report.setupGrade === 'C') return 'Counter-trend';
   if (report.setupGrade === 'B') return 'Still Pulling Back';
+  if (report.entryTimingState === 'Area Reached') {
+    if (direction === 'LONG') return 'Approaching Demand';
+    if (direction === 'SHORT') return 'Approaching Supply';
+    return 'Approaching Zone';
+  }
+  if (report.entryTimingState === 'Reaction Started') {
+    if (direction === 'LONG') return 'Wait for Demand Tap';
+    if (direction === 'SHORT') return 'Wait for Supply Tap';
+    return 'Wait for Zone Tap';
+  }
   if (report.reversalConfirmed || report.confirmationConfirmed || Number(report.confirmationScore) >= 3) return 'Confirmation Started';
   return 'Still Pulling Back';
 }
@@ -259,8 +270,8 @@ function entryTimingDisplay(report: ScoutReport) {
     return 'Wait for Zone Tap';
   }
   if (state === 'Area Reached') {
-    if (direction === 'SHORT') return 'Supply Area Nearby';
-    if (direction === 'LONG') return 'Demand Area Nearby';
+    if (direction === 'SHORT') return 'Approaching Supply';
+    if (direction === 'LONG') return 'Approaching Demand';
     return 'Area Reached';
   }
   return state;
@@ -275,8 +286,8 @@ function entryTimingReasonDisplay(report: ScoutReport) {
     return 'Zone reaction is developing; wait for mitigation and confirmation before treating this as an entry.';
   }
   if (state === 'Area Reached') {
-    if (direction === 'SHORT') return 'Short idea is in the area, but wait for price to tap/reject supply before entry.';
-    if (direction === 'LONG') return 'Long idea is in the area, but wait for price to tap/reject demand before entry.';
+    if (direction === 'SHORT') return 'Price may be moving toward supply above; wait for a supply tap/rejection before entry.';
+    if (direction === 'LONG') return 'Price may be moving toward demand below; wait for a demand tap/rejection before entry.';
   }
   return report.entryTimingReason || report.evalReason || report.setupGradeReason || 'Scout timing update';
 }

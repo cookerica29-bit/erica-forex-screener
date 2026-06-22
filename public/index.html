@@ -1642,7 +1642,21 @@
 
   function setupHeadlineForReport(r) {
     const grade = r.setupGrade || 'C';
-    if (grade === 'A') return `A Setup — ${simpleSetupStatusForReport(r)}`;
+    const direction = tradeDirectionForReport(r);
+    const timingState = r.entryTimingState || 'Not Ready';
+    if (grade === 'A') {
+      if (timingState === 'Area Reached') {
+        if (direction === 'LONG') return 'A Setup — Approaching Demand';
+        if (direction === 'SHORT') return 'A Setup — Approaching Supply';
+        return 'A Setup — Approaching Zone';
+      }
+      if (timingState === 'Reaction Started') {
+        if (direction === 'LONG') return 'A Setup — Wait for Demand Tap';
+        if (direction === 'SHORT') return 'A Setup — Wait for Supply Tap';
+        return 'A Setup — Wait for Zone Tap';
+      }
+      return `A Setup — ${simpleSetupStatusForReport(r)}`;
+    }
     if (grade === 'B') return 'B Setup — Wait';
     return 'C Setup — Counter-trend';
   }
@@ -1664,8 +1678,8 @@
       return 'Wait for Zone Tap';
     }
     if (state === 'Area Reached') {
-      if (direction === 'SHORT') return 'Supply Area Nearby';
-      if (direction === 'LONG') return 'Demand Area Nearby';
+      if (direction === 'SHORT') return 'Approaching Supply';
+      if (direction === 'LONG') return 'Approaching Demand';
       return 'Area Reached';
     }
     return state;
@@ -1680,8 +1694,8 @@
       return 'Zone reaction is developing; wait for mitigation and confirmation before treating this as an entry.';
     }
     if (state === 'Area Reached') {
-      if (direction === 'SHORT') return 'Short idea is in the area, but wait for price to tap/reject supply before entry.';
-      if (direction === 'LONG') return 'Long idea is in the area, but wait for price to tap/reject demand before entry.';
+      if (direction === 'SHORT') return 'Price may be moving toward supply above; wait for a supply tap/rejection before entry.';
+      if (direction === 'LONG') return 'Price may be moving toward demand below; wait for a demand tap/rejection before entry.';
       return r.entryTimingReason || 'Area reached, but entry confirmation has not started.';
     }
     return r.entryTimingReason || 'Waiting for price to reach the area and show reaction evidence.';
