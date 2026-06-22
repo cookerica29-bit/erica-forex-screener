@@ -1419,20 +1419,22 @@ function gradeScoutSetup(
   const locationAligned = (tradeDirection === 'LONG' && zone === 'DISCOUNT') || (tradeDirection === 'SHORT' && zone === 'PREMIUM');
   const locationConflict = (tradeDirection === 'LONG' && zone === 'PREMIUM') || (tradeDirection === 'SHORT' && zone === 'DISCOUNT');
   const counterTrend = tradeTrend !== 'Mixed' && trendDisplay !== 'Mixed' && trendDisplay !== tradeTrend;
-  const mixedReversalContext = setupTimeframeDirection === 'Neutral' && setupStatus !== 'Pullback Active';
+  const confirmationStarted = reversalConfirmed ||
+    setupStatus === 'Early Confirmation' ||
+    setupStatus === 'Strong Confirmation' ||
+    setupStatus === 'Trend Resumption Confirmed';
+  const setupFlowAligned = tradeTrend !== 'Mixed' && setupTimeframeDirection === tradeTrend;
 
-  if (trendDisplay === 'Mixed' || counterTrend || locationConflict || mixedReversalContext) {
-    const reason = trendDisplay === 'Mixed'
-      ? 'Trend is mixed.'
+  if (tradeDirection === 'NEUTRAL' || counterTrend || locationConflict) {
+    const reason = tradeDirection === 'NEUTRAL'
+      ? 'Trade direction is neutral.'
       : locationConflict
       ? 'Location conflicts with trade direction.'
-      : mixedReversalContext
-      ? 'Short-term flow is mixed while reversal evidence is forming.'
       : 'Trade direction is counter-trend.';
     return { setupGrade: 'C' as SetupGrade, setupGradeReason: reason };
   }
 
-  if (trendAligned && locationAligned && (reversalConfirmed || setupStatus === 'Early Confirmation' || setupStatus === 'Strong Confirmation' || setupStatus === 'Trend Resumption Confirmed')) {
+  if (trendAligned && locationAligned && confirmationStarted) {
     return {
       setupGrade: 'A' as SetupGrade,
       setupGradeReason: reversalConfirmed ? 'Trend, location, and reversal confirmation align.' : 'Trend, location, and confirmation have started.',
@@ -1443,6 +1445,22 @@ function gradeScoutSetup(
     return {
       setupGrade: 'B' as SetupGrade,
       setupGradeReason: 'Trend and location align, but pullback/reversal is still developing.',
+    };
+  }
+
+  if (trendDisplay === 'Mixed' && locationAligned && (setupFlowAligned || confirmationStarted)) {
+    return {
+      setupGrade: 'B' as SetupGrade,
+      setupGradeReason: setupFlowAligned
+        ? 'Daily trend is mixed, but short-term flow and location align for review.'
+        : 'Daily trend is mixed, but location and reversal evidence are developing.',
+    };
+  }
+
+  if (trendDisplay === 'Mixed' && locationAligned) {
+    return {
+      setupGrade: 'B' as SetupGrade,
+      setupGradeReason: 'Daily trend is mixed, but location aligns; watch for confirmation.',
     };
   }
 
@@ -1468,12 +1486,13 @@ function evaluateScoutForEval(
   const failures: string[] = [];
   const tradeTrend = tradeDirection === 'LONG' ? 'Bullish' : tradeDirection === 'SHORT' ? 'Bearish' : 'Mixed';
   const trendAligned = tradeTrend !== 'Mixed' && dailyTrendDirection === tradeTrend;
+  const trendAcceptable = trendAligned || (tradeTrend !== 'Mixed' && dailyTrendDirection === 'Neutral');
   const locationAligned = (tradeDirection === 'LONG' && zone === 'DISCOUNT') || (tradeDirection === 'SHORT' && zone === 'PREMIUM');
   const confirmationStarted = ['Early Confirmation', 'Strong Confirmation', 'Trend Resumption Confirmed'].includes(setupStatus);
 
-  if (setupGrade !== 'A') failures.push('setup is not A grade');
+  if (!['A', 'B'].includes(setupGrade)) failures.push('setup is not A or B grade');
   if (entryStatus !== 'Tradeable') failures.push('entry is not close enough');
-  if (!trendAligned) failures.push('Daily trend is not aligned with trade direction');
+  if (!trendAcceptable) failures.push('Daily trend conflicts with trade direction');
   if (!locationAligned) failures.push('location is not aligned with trade direction');
   if (!reversalConfirmed) failures.push('reversal is not confirmed yet');
   if (!confirmationStarted) failures.push('confirmation has not started');
@@ -1489,7 +1508,7 @@ function evaluateScoutForEval(
 
   return {
     evalEligible: true,
-    evalReason: 'Eval eligible: A setup, trend/location aligned, reversal confirmed, confirmation started, and entry is Tradeable.',
+    evalReason: 'Eval eligible: A/B setup, trend is aligned or mixed without conflict, location aligns, reversal confirmed, confirmation started, and entry is Tradeable.',
   };
 }
 
