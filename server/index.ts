@@ -150,11 +150,23 @@ function isIndexSymbol(symbol: string) {
 function isTradeableScoutSignal(report: ScoutReport) {
   return !isIndexSymbol(report.pair) &&
     report.evalEligible === true &&
+    report.entryTimingState === 'Entry Triggered' &&
     report.entryStatus === 'Tradeable' &&
     Boolean(report.trendDirection) &&
     Boolean(report.setupTimeframeDirection) &&
     Boolean(displayScoutPhase(report)) &&
     Boolean(displayScoutSetupStatus(report)) &&
+    report.entry !== null &&
+    report.sl !== null &&
+    report.tp1 !== null;
+}
+
+function isWatchScoutSignal(report: ScoutReport) {
+  return !isIndexSymbol(report.pair) &&
+    report.evalEligible !== true &&
+    (report.setupGrade === 'A' || report.setupGrade === 'B') &&
+    report.entryTimingState === 'Reaction Started' &&
+    (report.entryStatus === 'Tradeable' || report.entryStatus === 'Near Entry') &&
     report.entry !== null &&
     report.sl !== null &&
     report.tp1 !== null;
@@ -192,8 +204,9 @@ function simpleScoutStatus(report: ScoutReport) {
   return 'Still Pulling Back';
 }
 
-function tradeableSignalAlertKey(report: ScoutReport) {
+function tradeableSignalAlertKey(report: ScoutReport, kind = 'entry') {
   return [
+    kind,
     report.pair,
     report.timeframe,
     report.candleTime,
@@ -203,8 +216,8 @@ function tradeableSignalAlertKey(report: ScoutReport) {
   ].join('|');
 }
 
-function tradeableSignalDataKey(report: ScoutReport) {
-  return [report.pair, report.timeframe].join('|');
+function tradeableSignalDataKey(report: ScoutReport, kind = 'entry') {
+  return [kind, report.pair, report.timeframe].join('|');
 }
 
 function getNewYorkMarketParts(now = new Date()) {
@@ -238,11 +251,14 @@ function formatScoutLevel(value: number | null) {
 }
 
 async function notifyTradeableScoutSignals(reports: ScoutReport[], source: string) {
-  const tradeable = reports.filter(isTradeableScoutSignal);
-  if (!tradeable.length) return;
+  const candidates = [
+    ...reports.filter(isTradeableScoutSignal).map(report => ({ report, kind: 'entry' as const })),
+    ...reports.filter(isWatchScoutSignal).map(report => ({ report, kind: 'watch' as const })),
+  ];
+  if (!candidates.length) return;
 
   if (!isForexMarketOpen()) {
-    console.log(`[Telegram] ${source}: market closed; skipped ${tradeable.length} eval-eligible scout signal${tradeable.length === 1 ? '' : 's'}`);
+    console.log(`[Telegram] ${source}: market closed; skipped ${candidates.length} scout timing alert${candidates.length === 1 ? '' : 's'}`);
     return;
   }
 
@@ -251,23 +267,23 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     if (now - alertedAt >= TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS) tradeableSignalAlerts.delete(key);
   }
 
-  for (const report of tradeable) {
+  for (const { report, kind } of candidates) {
     if (!report.candleTime) {
       console.warn(`[Telegram] ${source}: skipped ${report.pair} ${report.timeframe}; missing scout candle timestamp`);
       continue;
     }
 
-    const dataKey = tradeableSignalDataKey(report);
+    const dataKey = tradeableSignalDataKey(report, kind);
     const previousCandleTime = tradeableSignalCandleTimes.get(dataKey);
     if (previousCandleTime === report.candleTime) {
-      console.log(`[Telegram] Eval-eligible scout signal stale candle skipped for ${report.pair} ${report.timeframe} @ ${report.candleTime}`);
+      console.log(`[Telegram] ${kind} scout signal stale candle skipped for ${report.pair} ${report.timeframe} @ ${report.candleTime}`);
       continue;
     }
 
-    const key = tradeableSignalAlertKey(report);
+    const key = tradeableSignalAlertKey(report, kind);
     const alertedAt = tradeableSignalAlerts.get(key);
     if (alertedAt && now - alertedAt < TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS) {
-      console.log(`[Telegram] Eval-eligible scout signal suppressed by cooldown for ${report.pair} ${report.timeframe}`);
+      console.log(`[Telegram] ${kind} scout signal suppressed by cooldown for ${report.pair} ${report.timeframe}`);
       continue;
     }
     tradeableSignalCandleTimes.set(dataKey, report.candleTime);
@@ -281,16 +297,21 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const phaseDisplay = displayScoutPhase(report);
     const setupStatus = simpleScoutStatus(report);
     const reversalText = report.reversalConfirmed ? '✅ Confirmed' : '❌ Not Confirmed';
-    const text = `✅ *EVAL ELIGIBLE SCOUT — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nEval Eligible: YES\nDirection: ${direction}\nTrend: ${trendDisplay}\nShort-term Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nReversal: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${report.evalReason || report.setupGradeReason || 'Confirmed A/B setup is eval eligible'}\n→ https://erica-forex-screener-production.up.railway.app`;
+    const isEntryAlert = kind === 'entry';
+    const title = isEntryAlert ? '✅ *ENTRY TRIGGERED SCOUT' : '👀 *WATCH SCOUT — REACTION STARTED';
+    const actionLine = isEntryAlert
+      ? 'Action: Entry trigger started for review'
+      : 'Action: Watch only — good area, wait for entry trigger';
+    const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nTiming: ${report.entryTimingState || 'Not Ready'}\n${actionLine}\nEval Eligible: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nShort-term Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nReversal: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${report.entryTimingReason || report.evalReason || report.setupGradeReason || 'Scout timing update'}\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
       const data = await sendTelegram(text, 'Markdown');
       if (data.ok) {
         tradeableSignalAlerts.set(key, now);
-        console.log(`[Telegram] Eval-eligible scout signal sent for ${report.pair} ${report.timeframe}`);
+        console.log(`[Telegram] ${kind} scout signal sent for ${report.pair} ${report.timeframe}`);
       }
     } catch (e: any) {
-      console.error(`[Telegram] Eval-eligible scout signal failed for ${report.pair}:`, e.message);
+      console.error(`[Telegram] ${kind} scout signal failed for ${report.pair}:`, e.message);
     }
   }
 }

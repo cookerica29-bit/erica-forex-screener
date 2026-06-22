@@ -37,6 +37,7 @@ type TrendLabel = 'Bullish' | 'Bearish' | 'Bullish HTF Pullback' | 'Bearish HTF 
 type StructureLabel = 'HH/HL' | 'LH/LL' | 'Mixed';
 type EntryStatus = 'Waiting' | 'Near Entry' | 'Tradeable' | 'Too Far';
 type SetupGrade = 'A' | 'B' | 'C';
+type EntryTimingState = 'Not Ready' | 'Area Reached' | 'Reaction Started' | 'Entry Triggered';
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 type PullbackStatus =
   | 'Aggressive pullback / Not ready'
@@ -102,6 +103,8 @@ export interface Setup {
   setupGradeReason: string;
   evalEligible: boolean;
   evalReason: string;
+  entryTimingState: EntryTimingState;
+  entryTimingReason: string;
   trendDirection: TrendLabel;
   trendScore: number;
   trendReason: string;
@@ -942,6 +945,8 @@ export interface ScoutReport {
   setupGradeReason: string;
   evalEligible: boolean;
   evalReason: string;
+  entryTimingState: EntryTimingState;
+  entryTimingReason: string;
   trendDirection: TrendLabel;
   trendScore: number;
   trendReason: string;
@@ -1509,6 +1514,60 @@ function evaluateScoutForEval(
   return {
     evalEligible: true,
     evalReason: 'Eval eligible: A/B setup, trend is aligned or mixed without conflict, location aligns, reversal confirmed, confirmation started, and entry is Tradeable.',
+  };
+}
+
+function classifyEntryTiming(
+  tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
+  zone: 'PREMIUM' | 'DISCOUNT' | 'FAIR VALUE',
+  setupGrade: SetupGrade,
+  setupStatus: string,
+  reversalConfirmed: boolean,
+  entryStatus: EntryStatus,
+  confirmationScore: number,
+  pullbackCompleted: boolean,
+  pullbackScore: number,
+  entry: number | null,
+  sl: number | null,
+  tp1: number | null
+) {
+  const locationAligned = (tradeDirection === 'LONG' && zone === 'DISCOUNT') || (tradeDirection === 'SHORT' && zone === 'PREMIUM');
+  const entryNearby = entryStatus === 'Tradeable' || entryStatus === 'Near Entry';
+  const levelsReady = entry !== null && sl !== null && tp1 !== null;
+  const confirmationStarted = ['Early Confirmation', 'Strong Confirmation', 'Trend Resumption Confirmed'].includes(setupStatus) || confirmationScore >= 3;
+  const reactionStarted = reversalConfirmed || confirmationStarted || pullbackCompleted || pullbackScore >= 7;
+
+  if (!levelsReady || tradeDirection === 'NEUTRAL' || setupGrade === 'C' || !locationAligned) {
+    return {
+      entryTimingState: 'Not Ready' as EntryTimingState,
+      entryTimingReason: 'Not ready: trade direction, location, grade, or trade levels are not aligned.',
+    };
+  }
+
+  if (entryStatus === 'Tradeable' && reversalConfirmed && confirmationStarted) {
+    return {
+      entryTimingState: 'Entry Triggered' as EntryTimingState,
+      entryTimingReason: 'Entry trigger started: price is tradeable, reversal is confirmed, and confirmation has started.',
+    };
+  }
+
+  if (entryNearby && reactionStarted) {
+    return {
+      entryTimingState: 'Reaction Started' as EntryTimingState,
+      entryTimingReason: 'Reaction started: price is near the area and reversal/reaction evidence is developing. Wait for entry trigger.',
+    };
+  }
+
+  if (['Tradeable', 'Near Entry', 'Waiting'].includes(entryStatus)) {
+    return {
+      entryTimingState: 'Area Reached' as EntryTimingState,
+      entryTimingReason: 'Area reached: location is valid, but reaction/confirmation has not started yet.',
+    };
+  }
+
+  return {
+    entryTimingState: 'Not Ready' as EntryTimingState,
+    entryTimingReason: 'Not ready: price is too far from the actionable area.',
   };
 }
 
@@ -2244,6 +2303,20 @@ export function scoutAnalyzeCandles(
     }
   }
   const entryDistance = classifyEntryDistance(price, entry, atr);
+  const entryTiming = classifyEntryTiming(
+    tradeDirection,
+    zone,
+    setupGrade.setupGrade,
+    setupStatusForGrade,
+    reversalConfirmation.reversalConfirmed,
+    entryDistance.entryStatus,
+    trendConfirmation.confirmationScore,
+    pullbackCompletion.pullbackCompleted,
+    pullbackCompletion.pullbackScore,
+    entry,
+    sl,
+    tp1
+  );
   const evalEligibility = evaluateScoutForEval(
     tradeDirection,
     trendSetupPhase.dailyTrendDirection,
@@ -2285,6 +2358,7 @@ export function scoutAnalyzeCandles(
     ...reversalConfirmation,
     ...setupGrade,
     ...evalEligibility,
+    ...entryTiming,
     ...trendSetupPhase,
     ...entryDistance,
     entry,

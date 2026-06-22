@@ -1862,6 +1862,15 @@
     const evalReason = r.evalReason || (evalEligible
       ? 'Confirmed A setup is eligible for eval consideration.'
       : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
+    const entryTimingState = r.entryTimingState || 'Not Ready';
+    const entryTimingReason = r.entryTimingReason || 'Waiting for price to reach the area and show reaction evidence.';
+    const entryTimingColor = entryTimingState === 'Entry Triggered'
+      ? 'var(--green)'
+      : entryTimingState === 'Reaction Started'
+        ? 'var(--blue)'
+        : entryTimingState === 'Area Reached'
+          ? 'var(--gold)'
+          : 'var(--slate)';
     const entryStatusDisplay = evalEligible ? 'Eval Eligible' : entryStatus === 'Tradeable' ? setupHeadline : entryStatus;
     const entryStatusDisplayCls = evalEligible ? 'eval-eligible' : entryStatusCls;
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
@@ -1934,6 +1943,10 @@
             <div class="context-value" style="color:${evalColor}">${escapeHtml(evalLabel)}</div>
           </div>
           <div class="context-cell">
+            <div class="context-label">Timing</div>
+            <div class="context-value" style="color:${entryTimingColor}">${escapeHtml(entryTimingState)}</div>
+          </div>
+          <div class="context-cell">
             <div class="context-label">Reversal</div>
             <div class="context-value" style="color:${reversalConfirmed ? 'var(--green)' : 'var(--gold)'}">${reversalIcon} ${escapeHtml(reversalLabel)}</div>
           </div>
@@ -1942,6 +1955,7 @@
           <div class="setup-status-label">Setup</div>
           <div class="setup-status-value">${escapeHtml(setupHeadline)}</div>
           <div class="setup-status-reason">${escapeHtml(r.setupGradeReason || setupStatusReason)}</div>
+          <div class="setup-status-reason">Timing: ${escapeHtml(entryTimingReason)}</div>
           <div class="setup-status-reason">Eval: ${escapeHtml(evalReason)}</div>
           <div class="setup-status-reason">Reversal: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Reversal has started.' : 'Waiting for reversal confirmation.'))}</div>
         </div>
@@ -2015,6 +2029,10 @@
               <div class="scout-level-box">
                 <div class="scout-level-label">Eval</div>
                 <div class="scout-level-value" style="color:${evalColor}">${escapeHtml(evalLabel)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Timing</div>
+                <div class="scout-level-value" style="color:${entryTimingColor}">${escapeHtml(entryTimingState)}</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Reversal</div>
@@ -2210,6 +2228,8 @@
       `Grade Reason: ${report.setupGradeReason || ''}`,
       `Setup Status: ${simpleSetupStatusForReport(report)}`,
       `Entry Status: ${report.entryStatus || 'Waiting'}`,
+      `Entry Timing: ${report.entryTimingState || 'Not Ready'}`,
+      `Entry Timing Reason: ${report.entryTimingReason || ''}`,
       `Eval Eligible: ${report.evalEligible ? 'Yes' : 'No'}`,
       `Eval Reason: ${report.evalReason || ''}`,
       `Reversal: ${report.reversalConfirmed ? 'Confirmed' : 'Not Confirmed'}`,
