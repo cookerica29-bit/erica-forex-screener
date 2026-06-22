@@ -250,6 +250,37 @@ function formatScoutLevel(value: number | null) {
   return value >= 100 ? value.toFixed(3) : value.toFixed(5);
 }
 
+function entryTimingDisplay(report: ScoutReport) {
+  const state = report.entryTimingState || 'Not Ready';
+  const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
+  if (state === 'Reaction Started') {
+    if (direction === 'SHORT') return 'Wait for Supply Tap';
+    if (direction === 'LONG') return 'Wait for Demand Tap';
+    return 'Wait for Zone Tap';
+  }
+  if (state === 'Area Reached') {
+    if (direction === 'SHORT') return 'Supply Area Nearby';
+    if (direction === 'LONG') return 'Demand Area Nearby';
+    return 'Area Reached';
+  }
+  return state;
+}
+
+function entryTimingReasonDisplay(report: ScoutReport) {
+  const state = report.entryTimingState || 'Not Ready';
+  const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
+  if (state === 'Reaction Started') {
+    if (direction === 'SHORT') return 'Bearish supply may still be above price; wait for supply mitigation and rejection before treating this as an entry.';
+    if (direction === 'LONG') return 'Bullish demand may still be below price; wait for demand mitigation and rejection before treating this as an entry.';
+    return 'Zone reaction is developing; wait for mitigation and confirmation before treating this as an entry.';
+  }
+  if (state === 'Area Reached') {
+    if (direction === 'SHORT') return 'Short idea is in the area, but wait for price to tap/reject supply before entry.';
+    if (direction === 'LONG') return 'Long idea is in the area, but wait for price to tap/reject demand before entry.';
+  }
+  return report.entryTimingReason || report.evalReason || report.setupGradeReason || 'Scout timing update';
+}
+
 async function notifyTradeableScoutSignals(reports: ScoutReport[], source: string) {
   const candidates = [
     ...reports.filter(isTradeableScoutSignal).map(report => ({ report, kind: 'entry' as const })),
@@ -298,11 +329,16 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const setupStatus = simpleScoutStatus(report);
     const reversalText = report.reversalConfirmed ? '✅ Confirmed' : '❌ Not Confirmed';
     const isEntryAlert = kind === 'entry';
-    const title = isEntryAlert ? '✅ *ENTRY TRIGGERED SCOUT' : '👀 *WATCH SCOUT — REACTION STARTED';
+    const timingDisplay = entryTimingDisplay(report);
+    const title = isEntryAlert ? '✅ *ENTRY TRIGGERED SCOUT' : `👀 *WATCH SCOUT — ${timingDisplay.toUpperCase()}`;
     const actionLine = isEntryAlert
       ? 'Action: Entry trigger started for review'
-      : 'Action: Watch only — good area, wait for entry trigger';
-    const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nTiming: ${report.entryTimingState || 'Not Ready'}\n${actionLine}\nEval Eligible: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nShort-term Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nReversal: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${report.entryTimingReason || report.evalReason || report.setupGradeReason || 'Scout timing update'}\n→ https://erica-forex-screener-production.up.railway.app`;
+      : report.tradeDirection === 'SHORT'
+        ? 'Action: Watch only — wait for supply tap/rejection before entry'
+        : report.tradeDirection === 'LONG'
+          ? 'Action: Watch only — wait for demand tap/rejection before entry'
+          : 'Action: Watch only — wait for zone tap/rejection before entry';
+    const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nTiming: ${timingDisplay}\n${actionLine}\nEval Eligible: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nShort-term Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nReversal: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${entryTimingReasonDisplay(report)}\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
       const data = await sendTelegram(text, 'Markdown');

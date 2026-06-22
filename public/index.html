@@ -1655,6 +1655,38 @@
     return 'NEUTRAL';
   }
 
+  function entryTimingDisplayForReport(r) {
+    const state = r.entryTimingState || 'Not Ready';
+    const direction = tradeDirectionForReport(r);
+    if (state === 'Reaction Started') {
+      if (direction === 'SHORT') return 'Wait for Supply Tap';
+      if (direction === 'LONG') return 'Wait for Demand Tap';
+      return 'Wait for Zone Tap';
+    }
+    if (state === 'Area Reached') {
+      if (direction === 'SHORT') return 'Supply Area Nearby';
+      if (direction === 'LONG') return 'Demand Area Nearby';
+      return 'Area Reached';
+    }
+    return state;
+  }
+
+  function entryTimingReasonForReport(r) {
+    const state = r.entryTimingState || 'Not Ready';
+    const direction = tradeDirectionForReport(r);
+    if (state === 'Reaction Started') {
+      if (direction === 'SHORT') return 'Bearish supply may still be above price; wait for supply mitigation and rejection before treating this as an entry.';
+      if (direction === 'LONG') return 'Bullish demand may still be below price; wait for demand mitigation and rejection before treating this as an entry.';
+      return 'Zone reaction is developing; wait for mitigation and confirmation before treating this as an entry.';
+    }
+    if (state === 'Area Reached') {
+      if (direction === 'SHORT') return 'Short idea is in the area, but wait for price to tap/reject supply before entry.';
+      if (direction === 'LONG') return 'Long idea is in the area, but wait for price to tap/reject demand before entry.';
+      return r.entryTimingReason || 'Area reached, but entry confirmation has not started.';
+    }
+    return r.entryTimingReason || 'Waiting for price to reach the area and show reaction evidence.';
+  }
+
   function scoutDirectionForReport(r) {
     const direction = String(r.scoutDirection || '').toUpperCase();
     if (direction === 'LONG' || direction === 'SHORT') return direction;
@@ -1864,13 +1896,14 @@
     const evalReason = r.evalReason || (evalEligible
       ? 'Confirmed A setup is eligible for eval consideration.'
       : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
-    const entryTimingState = r.entryTimingState || 'Not Ready';
-    const entryTimingReason = r.entryTimingReason || 'Waiting for price to reach the area and show reaction evidence.';
-    const entryTimingColor = entryTimingState === 'Entry Triggered'
+    const rawEntryTimingState = r.entryTimingState || 'Not Ready';
+    const entryTimingState = entryTimingDisplayForReport(r);
+    const entryTimingReason = entryTimingReasonForReport(r);
+    const entryTimingColor = rawEntryTimingState === 'Entry Triggered'
       ? 'var(--green)'
-      : entryTimingState === 'Reaction Started'
+      : rawEntryTimingState === 'Reaction Started'
         ? 'var(--blue)'
-        : entryTimingState === 'Area Reached'
+        : rawEntryTimingState === 'Area Reached'
           ? 'var(--gold)'
           : 'var(--slate)';
     const entryStatusDisplay = evalEligible ? 'Eval Eligible' : entryStatus === 'Tradeable' ? setupHeadline : entryStatus;
@@ -2230,8 +2263,8 @@
       `Grade Reason: ${report.setupGradeReason || ''}`,
       `Setup Status: ${simpleSetupStatusForReport(report)}`,
       `Entry Status: ${report.entryStatus || 'Waiting'}`,
-      `Entry Timing: ${report.entryTimingState || 'Not Ready'}`,
-      `Entry Timing Reason: ${report.entryTimingReason || ''}`,
+      `Entry Timing: ${entryTimingDisplayForReport(report)}`,
+      `Entry Timing Reason: ${entryTimingReasonForReport(report)}`,
       `Eval Eligible: ${report.evalEligible ? 'Yes' : 'No'}`,
       `Eval Reason: ${report.evalReason || ''}`,
       `Reversal: ${report.reversalConfirmed ? 'Confirmed' : 'Not Confirmed'}`,
