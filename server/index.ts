@@ -553,7 +553,18 @@ function normalizeTradingViewScoutSymbol(value: unknown) {
 function normalizeTimeframe(value: unknown) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) return '';
-  if (/^\d+$/.test(normalized)) return `${normalized}M`;
+  const tradingViewMinutes: Record<string, string> = {
+    '1': 'M1',
+    '5': 'M5',
+    '15': 'M15',
+    '30': 'M30',
+    '60': 'H1',
+    '120': 'H2',
+    '240': 'H4',
+    '360': 'H6',
+    '720': 'H12',
+  };
+  if (tradingViewMinutes[normalized]) return tradingViewMinutes[normalized];
   return normalized;
 }
 
