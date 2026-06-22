@@ -1442,7 +1442,7 @@ function gradeScoutSetup(
   if (trendAligned && locationAligned && confirmationStarted) {
     return {
       setupGrade: 'A' as SetupGrade,
-      setupGradeReason: reversalConfirmed ? 'Trend, location, and reversal confirmation align.' : 'Trend, location, and confirmation have started.',
+      setupGradeReason: reversalConfirmed ? 'Trend and location align; structure shift detected.' : 'Trend and location align; confirmation has started.',
     };
   }
 
