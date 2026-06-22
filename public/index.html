@@ -1917,6 +1917,9 @@
     const reversalConfirmed = Boolean(r.reversalConfirmed);
     const reversalLabel = reversalConfirmed ? 'Detected' : 'Not Detected';
     const reversalIcon = reversalConfirmed ? '✅' : '❌';
+    const pineConfirmation = r.pineConfirmation || null;
+    const pineConfirmed = Boolean(pineConfirmation && pineConfirmation.matched !== false);
+    const pineLabel = pineConfirmed ? '✅ Confirmed' : 'Waiting';
     const setupHeadline = setupHeadlineForReport(r);
     const simpleSetupStatus = simpleSetupStatusForReport(r);
     const grade = r.setupGrade || 'C';
@@ -2020,6 +2023,10 @@
             <div class="context-label">Structure Shift</div>
             <div class="context-value" style="color:${reversalConfirmed ? 'var(--green)' : 'var(--gold)'}">${reversalIcon} ${escapeHtml(reversalLabel)}</div>
           </div>
+          <div class="context-cell">
+            <div class="context-label">Pine Rejection</div>
+            <div class="context-value" style="color:${pineConfirmed ? 'var(--green)' : 'var(--slate)'}">${escapeHtml(pineLabel)}</div>
+          </div>
         </div>
         <div class="setup-status-box ${setupStatusCls}">
           <div class="setup-status-label">Setup</div>
@@ -2029,6 +2036,7 @@
           <div class="setup-status-reason">Action: ${escapeHtml(entryAction)}</div>
           <div class="setup-status-reason">Eval: ${escapeHtml(evalReason)}</div>
           <div class="setup-status-reason">Structure Shift: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Structure shift detected.' : 'Waiting for structure shift.'))}</div>
+          ${pineConfirmed ? `<div class="setup-status-reason">Pine: ${escapeHtml(pineConfirmation.message || pineConfirmation.rejectionType || 'Supply/demand rejection confirmed.')}</div>` : ''}
         </div>
         <div class="scout-levels">
           <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
@@ -2306,6 +2314,8 @@
       `Eval Reason: ${report.evalReason || ''}`,
       `Structure Shift: ${report.reversalConfirmed ? 'Detected' : 'Not Detected'}`,
       `Structure Shift Reason: ${report.reversalReason || ''}`,
+      `Pine Rejection: ${report.pineConfirmation ? 'Confirmed' : 'Waiting'}`,
+      `Pine Reason: ${report.pineConfirmation?.message || report.pineConfirmation?.rejectionType || ''}`,
       `Location: ${report.zone || 'FAIR VALUE'}`,
     ].join(' | ');
     const fullNotes = [notes, scoutSnapshot].filter(Boolean).join('\n');

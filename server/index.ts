@@ -32,6 +32,28 @@ let pendingApprovals: (Setup & { id: string })[] = [];
 const tradeableSignalAlerts = new Map<string, number>();
 const tradeableSignalCandleTimes = new Map<string, string>();
 const TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+const pineConfirmations = new Map<string, PineConfirmation>();
+const pineConfirmationAlerts = new Map<string, number>();
+const PINE_CONFIRMATION_TTL_MS = 12 * 60 * 60 * 1000;
+const PINE_CONFIRMATION_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+
+interface PineConfirmation {
+  symbol: string;
+  displaySymbol: string;
+  timeframe: string;
+  direction: 'LONG' | 'SHORT';
+  zoneType: 'DEMAND' | 'SUPPLY' | 'UNKNOWN';
+  rejectionType: string;
+  price?: number;
+  zoneHigh?: number;
+  zoneLow?: number;
+  message: string;
+  receivedAt: string;
+  sourceTime?: string;
+  matched: boolean;
+  matchReason: string;
+  scoutKey?: string;
+}
 
 // Priority pairs — pushed by Claude after each forex scan via POST /api/priority-pairs
 // When set, the scanner and frontend only scan these pairs instead of the full 16-pair list.
@@ -170,6 +192,49 @@ function isWatchScoutSignal(report: ScoutReport) {
     report.entry !== null &&
     report.sl !== null &&
     report.tp1 !== null;
+}
+
+function scoutKey(pair: string, timeframe: string) {
+  return `${pair}|${String(timeframe || '').toUpperCase()}`;
+}
+
+function pineConfirmationKey(symbol: string, timeframe: string, direction: 'LONG' | 'SHORT') {
+  return `${scoutKey(symbol, timeframe)}|${direction}`;
+}
+
+function cleanupPineConfirmations(now = Date.now()) {
+  for (const [key, confirmation] of pineConfirmations) {
+    if (now - Date.parse(confirmation.receivedAt) > PINE_CONFIRMATION_TTL_MS) pineConfirmations.delete(key);
+  }
+  for (const [key, alertedAt] of pineConfirmationAlerts) {
+    if (now - alertedAt > PINE_CONFIRMATION_ALERT_COOLDOWN_MS) pineConfirmationAlerts.delete(key);
+  }
+}
+
+function enrichScoutReports(reports: ScoutReport[]) {
+  cleanupPineConfirmations();
+  return reports.map(report => {
+    const direction = report.tradeDirection === 'LONG' || report.tradeDirection === 'SHORT' ? report.tradeDirection : null;
+    if (!direction) return report;
+    const confirmation = pineConfirmations.get(pineConfirmationKey(report.pair, report.timeframe, direction));
+    return confirmation ? { ...report, pineConfirmation: confirmation } : report;
+  });
+}
+
+function isValidScoutForPineConfirmation(report: ScoutReport, direction: 'LONG' | 'SHORT') {
+  return report.tradeDirection === direction &&
+    (report.setupGrade === 'A' || report.setupGrade === 'B') &&
+    report.entry !== null &&
+    report.sl !== null &&
+    report.tp1 !== null;
+}
+
+function findScoutForPineConfirmation(symbol: string, timeframe: string, direction: 'LONG' | 'SHORT') {
+  return latestScoutResults.find(report =>
+    report.pair === symbol &&
+    String(report.timeframe || '').toUpperCase() === String(timeframe || '').toUpperCase() &&
+    isValidScoutForPineConfirmation(report, direction)
+  );
 }
 
 function displayScoutTrend(report: ScoutReport) {
@@ -465,6 +530,40 @@ function normalizeSymbol(value: unknown) {
   return { symbol: compact, displaySymbol: raw.replace('_', '/') };
 }
 
+function normalizeTradingViewScoutSymbol(value: unknown) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!raw) return { symbol: '', displaySymbol: '' };
+  const stripped = raw.replace(/^[^:]+:/, '').replace(/[^A-Z0-9_]/g, '');
+  if (stripped.includes('_')) return { symbol: stripped, displaySymbol: stripped.replace('_', '/') };
+
+  const special: Record<string, string> = {
+    XAUUSD: 'XAU_USD',
+    XAGUSD: 'XAG_USD',
+    US30USD: 'US30_USD',
+    NAS100USD: 'NAS100_USD',
+  };
+  if (special[stripped]) return { symbol: special[stripped], displaySymbol: special[stripped].replace('_', '/') };
+  if (stripped.length === 6) {
+    const symbol = `${stripped.slice(0, 3)}_${stripped.slice(3)}`;
+    return { symbol, displaySymbol: symbol.replace('_', '/') };
+  }
+  return { symbol: stripped, displaySymbol: stripped.replace('_', '/') };
+}
+
+function normalizeTimeframe(value: unknown) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return '';
+  if (/^\d+$/.test(normalized)) return `${normalized}M`;
+  return normalized;
+}
+
+function normalizeZoneType(value: unknown): PineConfirmation['zoneType'] {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized.includes('DEMAND') || normalized === 'DISCOUNT' || normalized === 'SUPPORT') return 'DEMAND';
+  if (normalized.includes('SUPPLY') || normalized === 'PREMIUM' || normalized === 'RESISTANCE') return 'SUPPLY';
+  return 'UNKNOWN';
+}
+
 function parseTradingViewBody(body: any): any {
   if (typeof body !== 'string') return body || {};
   try {
@@ -576,7 +675,8 @@ app.post('/api/scan', async (req, res) => {
 
 // ── Scout API ──────────────────────────────────────────────────────────────────
 app.get('/api/scout', (_req, res) => {
-  res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
+  const reports = enrichScoutReports(latestScoutResults);
+  res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()) });
 });
 
 app.post('/api/scout', async (req, res) => {
@@ -589,7 +689,8 @@ app.post('/api/scout', async (req, res) => {
     latestScoutResults = await runScoutScan(tf);
     await notifyTradeableScoutSignals(latestScoutResults, 'manual scout scan');
     lastScanTime = new Date().toISOString();
-    res.json({ reports: latestScoutResults, lastScanTime, count: latestScoutResults.length });
+    const reports = enrichScoutReports(latestScoutResults);
+    res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()) });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -824,6 +925,105 @@ app.delete('/api/journal', async (_req, res) => {
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to clear journal' });
+  }
+});
+
+async function notifyPineConfirmation(confirmation: PineConfirmation, report: ScoutReport) {
+  if (!isForexMarketOpen()) {
+    console.log(`[TradingView] Pine confirmation stored without Telegram alert; market closed for ${confirmation.symbol} ${confirmation.timeframe}`);
+    return { ok: false, skipped: true, reason: 'market_closed' };
+  }
+
+  const alertKey = `${pineConfirmationKey(confirmation.symbol, confirmation.timeframe, confirmation.direction)}|${report.candleTime}|${confirmation.sourceTime || confirmation.receivedAt}`;
+  const now = Date.now();
+  const alertedAt = pineConfirmationAlerts.get(alertKey);
+  if (alertedAt && now - alertedAt < PINE_CONFIRMATION_ALERT_COOLDOWN_MS) {
+    console.log(`[TradingView] Pine confirmation suppressed by cooldown for ${confirmation.symbol} ${confirmation.timeframe}`);
+    return { ok: false, skipped: true, reason: 'cooldown' };
+  }
+
+  const direction = confirmation.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
+  const text = `✅ *ENTRY TRIGGER — Pine Rejection Confirmed*\nPair: ${confirmation.displaySymbol}\nDirection: ${direction}\nTimeframe: ${confirmation.timeframe}\nGrade: ${report.setupGrade} Setup\nTrend: ${displayScoutTrend(report)}\nShort-term Flow: ${report.setupTimeframeDirection}\nPhase: ${displayScoutPhase(report)}\nLocation: ${report.zone}\nTiming: ${entryTimingDisplay(report)}\nPine Zone: ${confirmation.zoneType}\nRejection: ${confirmation.rejectionType || 'Confirmed'}\nPrice: ${confirmation.price !== undefined ? formatScoutLevel(confirmation.price) : 'N/A'}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nReason: Scanner setup matched Pine supply/demand rejection.\nMessage: ${confirmation.message || 'Pine rejection confirmed'}\n→ https://erica-forex-screener-production.up.railway.app`;
+
+  const data = await sendTelegram(text, 'Markdown');
+  if (data.ok) pineConfirmationAlerts.set(alertKey, now);
+  return data;
+}
+
+// ─── TRADINGVIEW SCOUT CONFIRMATION LAYER ────────────────────────────────────
+app.post('/api/tradingview-confirmation', async (req, res) => {
+  try {
+    const configuredSecret = process.env.TRADINGVIEW_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET;
+    if (!configuredSecret) {
+      return res.status(500).json({ error: 'TradingView confirmations disabled: missing TRADINGVIEW_WEBHOOK_SECRET' });
+    }
+
+    const body = parseTradingViewBody(req.body);
+    if (body.secret !== configuredSecret) {
+      return res.status(401).json({ error: 'Invalid TradingView alert secret' });
+    }
+
+    const { symbol, displaySymbol } = normalizeTradingViewScoutSymbol(body.symbol || body.ticker || body.pair);
+    const direction = normalizeDirection(body.direction || body.action || body.side);
+    const timeframe = normalizeTimeframe(body.timeframe || body.interval);
+    const zoneType = normalizeZoneType(body.zoneType || body.zone_type || body.zone || body.location);
+    const price = toNumber(body.price || body.close);
+    const zoneHigh = toNumber(body.zoneHigh || body.zone_high || body.supplyHigh || body.demandHigh);
+    const zoneLow = toNumber(body.zoneLow || body.zone_low || body.supplyLow || body.demandLow);
+    const rejectionType = String(body.rejectionType || body.rejection_type || body.event || 'Supply/Demand rejection').trim();
+    const message = String(body.message || body.note || `${zoneType} rejection confirmed`).slice(0, 300);
+    const sourceTime = body.time || body.timestamp ? String(body.time || body.timestamp) : undefined;
+
+    if (!symbol || !direction || !timeframe || zoneType === 'UNKNOWN') {
+      return res.status(400).json({
+        error: 'TradingView confirmation must include symbol, timeframe, direction, and zoneType supply/demand',
+        received: {
+          symbol: Boolean(symbol),
+          timeframe: Boolean(timeframe),
+          direction: Boolean(direction),
+          zoneType,
+        },
+      });
+    }
+
+    cleanupPineConfirmations();
+    const report = findScoutForPineConfirmation(symbol, timeframe, direction);
+    const confirmation: PineConfirmation = {
+      symbol,
+      displaySymbol,
+      timeframe,
+      direction,
+      zoneType,
+      rejectionType,
+      price,
+      zoneHigh,
+      zoneLow,
+      message,
+      receivedAt: new Date().toISOString(),
+      sourceTime,
+      matched: Boolean(report),
+      matchReason: report
+        ? `${report.setupGrade} Scout setup matched by symbol, timeframe, and direction.`
+        : 'No current A/B Scout setup matched symbol, timeframe, and direction.',
+      scoutKey: report ? scoutKey(report.pair, report.timeframe) : undefined,
+    };
+    pineConfirmations.set(pineConfirmationKey(symbol, timeframe, direction), confirmation);
+
+    let telegram: any = { ok: false, skipped: true, reason: 'no_matching_scout' };
+    if (report) {
+      telegram = await notifyPineConfirmation(confirmation, report);
+    }
+
+    return res.json({
+      success: true,
+      matched: Boolean(report),
+      matchReason: confirmation.matchReason,
+      telegram,
+      confirmation,
+    });
+  } catch (e: any) {
+    console.error('[TradingView] Confirmation failed:', e.message);
+    return res.status(500).json({ error: 'Failed to process TradingView confirmation' });
   }
 });
 
