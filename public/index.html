@@ -513,6 +513,12 @@
     <option value="Waiting">Raw Entry: Waiting</option>
     <option value="Too Far">Raw Entry: Too Far</option>
   </select>
+  <select class="filter-select" id="gradeFilter" onchange="renderSetups()" aria-label="Setup grade filter">
+    <option value="ALL">Grade: All Grades</option>
+    <option value="A">Grade: A Setup</option>
+    <option value="B">Grade: B Setup</option>
+    <option value="C">Grade: C Setup</option>
+  </select>
   <select class="filter-select" id="trendFilter" onchange="renderSetups()" aria-label="Trend filter">
     <option value="ALL">Trend: All Trends</option>
     <option value="Bullish">Trend: Bullish</option>
@@ -1575,6 +1581,7 @@
   function getFiltered() {
     const s = document.getElementById('searchBox').value.toLowerCase();
     const entryStatus = document.getElementById('entryStatusFilter')?.value || 'ALL';
+    const grade = document.getElementById('gradeFilter')?.value || 'ALL';
     const trend = document.getElementById('trendFilter')?.value || 'ALL';
     const phase = document.getElementById('phaseFilter')?.value || 'ALL';
     const setupStatus = document.getElementById('setupStatusFilter')?.value || 'ALL';
@@ -1583,6 +1590,7 @@
       if (entryStatus === 'EVAL' && x.evalEligible !== true) return false;
       if (entryStatus === 'WATCH' && x.evalEligible === true) return false;
       if (!['ALL', 'EVAL', 'WATCH'].includes(entryStatus) && x.entryStatus !== entryStatus) return false;
+      if (grade !== 'ALL' && (x.setupGrade || 'C') !== grade) return false;
       if (trend !== 'ALL' && displayTrendForReport(x) !== trend) return false;
       if (phase !== 'ALL' && displayPhaseForReport(x) !== phase) return false;
       if (setupStatus !== 'ALL' && displaySetupStatusForReport(x) !== setupStatus) return false;
@@ -1714,13 +1722,7 @@
   }
 
   function sortScoutCardsForDisplay(rows) {
-    return rows.slice().sort((a, b) => {
-      const entryDiff = entryStatusRank(a.entryStatus) - entryStatusRank(b.entryStatus);
-      if (entryDiff) return entryDiff;
-      const phaseDiff = phaseRank(displayPhaseForReport(a)) - phaseRank(displayPhaseForReport(b));
-      if (phaseDiff) return phaseDiff;
-      return displaySymbolForSort(a).localeCompare(displaySymbolForSort(b));
-    });
+    return rows.slice().sort((a, b) => displaySymbolForSort(a).localeCompare(displaySymbolForSort(b)));
   }
 
   function entryStatusSummary(rows) {
