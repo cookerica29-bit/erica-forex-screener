@@ -1946,6 +1946,9 @@
     const entryDistanceText = distanceAtr == null
       ? 'No nearby actionable entry zone identified.'
       : `${distanceAtr.toFixed(2)} ATR · ${distancePct != null ? distancePct.toFixed(2) + '%' : '—'} from suggested entry`;
+    const levelPlanNote = evalEligible
+      ? 'Execution levels — entry trigger is active for review.'
+      : 'Planning levels only — wait for rejection before entry.';
     const contextLabel = contextLabelForReport(r);
     const mixedContextWarning = isDirectionalDisagreement(r)
       ? '<div class="entry-note" style="margin:8px 0 0;">Mixed context — trade direction differs from trend/setup.</div>'
@@ -2038,6 +2041,7 @@
           </div>
         </div>
         ${showTradeLevels ? `
+        <div class="entry-note">${escapeHtml(levelPlanNote)}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin:8px 0;">
           <div class="scout-level-box" style="border-color:rgba(96,165,250,0.2);border-left:3px solid rgba(96,165,250,0.5);">
             <div class="scout-level-label" style="color:rgba(96,165,250,0.7);">Entry</div>
