@@ -1651,9 +1651,9 @@
         return 'A Setup — Approaching Zone';
       }
       if (timingState === 'Reaction Started') {
-        if (direction === 'LONG') return 'A Setup — Wait for Demand Tap';
-        if (direction === 'SHORT') return 'A Setup — Wait for Supply Tap';
-        return 'A Setup — Wait for Zone Tap';
+        if (direction === 'LONG') return 'A Setup — Wait for Bullish Rejection';
+        if (direction === 'SHORT') return 'A Setup — Wait for Bearish Rejection';
+        return 'A Setup — Wait for Rejection';
       }
       return `A Setup — ${simpleSetupStatusForReport(r)}`;
     }
@@ -1673,9 +1673,9 @@
     const state = r.entryTimingState || 'Not Ready';
     const direction = tradeDirectionForReport(r);
     if (state === 'Reaction Started') {
-      if (direction === 'SHORT') return 'Wait for Supply Tap';
-      if (direction === 'LONG') return 'Wait for Demand Tap';
-      return 'Wait for Zone Tap';
+      if (direction === 'SHORT') return 'Testing Supply';
+      if (direction === 'LONG') return 'Testing Demand';
+      return 'Testing Zone';
     }
     if (state === 'Area Reached') {
       if (direction === 'SHORT') return 'Approaching Supply';
@@ -1689,9 +1689,9 @@
     const state = r.entryTimingState || 'Not Ready';
     const direction = tradeDirectionForReport(r);
     if (state === 'Reaction Started') {
-      if (direction === 'SHORT') return 'Bearish supply may still be above price; wait for supply mitigation and rejection before treating this as an entry.';
-      if (direction === 'LONG') return 'Bullish demand may still be below price; wait for demand mitigation and rejection before treating this as an entry.';
-      return 'Zone reaction is developing; wait for mitigation and confirmation before treating this as an entry.';
+      if (direction === 'SHORT') return 'Price is testing supply; wait for bearish rejection before treating this as an entry.';
+      if (direction === 'LONG') return 'Price is testing demand; wait for bullish rejection before treating this as an entry.';
+      return 'Price is testing the zone; wait for rejection before treating this as an entry.';
     }
     if (state === 'Area Reached') {
       if (direction === 'SHORT') return 'Price may be moving toward supply above; wait for a supply tap/rejection before entry.';
@@ -1699,6 +1699,23 @@
       return r.entryTimingReason || 'Area reached, but entry confirmation has not started.';
     }
     return r.entryTimingReason || 'Waiting for price to reach the area and show reaction evidence.';
+  }
+
+  function entryActionForReport(r) {
+    const state = r.entryTimingState || 'Not Ready';
+    const direction = tradeDirectionForReport(r);
+    if (state === 'Entry Triggered') return 'Entry trigger active';
+    if (state === 'Reaction Started') {
+      if (direction === 'SHORT') return 'Wait for Bearish Rejection';
+      if (direction === 'LONG') return 'Wait for Bullish Rejection';
+      return 'Wait for Rejection';
+    }
+    if (state === 'Area Reached') {
+      if (direction === 'SHORT') return 'Watch Supply';
+      if (direction === 'LONG') return 'Watch Demand';
+      return 'Watch Zone';
+    }
+    return 'Wait';
   }
 
   function scoutDirectionForReport(r) {
@@ -1898,7 +1915,7 @@
     const entryStatus = r.entryStatus || 'Waiting';
     const entryStatusCls = String(entryStatus).toLowerCase().replace(/\s+/g, '-');
     const reversalConfirmed = Boolean(r.reversalConfirmed);
-    const reversalLabel = reversalConfirmed ? 'Confirmed' : 'Not Confirmed';
+    const reversalLabel = reversalConfirmed ? 'Detected' : 'Not Detected';
     const reversalIcon = reversalConfirmed ? '✅' : '❌';
     const setupHeadline = setupHeadlineForReport(r);
     const simpleSetupStatus = simpleSetupStatusForReport(r);
@@ -1913,6 +1930,7 @@
     const rawEntryTimingState = r.entryTimingState || 'Not Ready';
     const entryTimingState = entryTimingDisplayForReport(r);
     const entryTimingReason = entryTimingReasonForReport(r);
+    const entryAction = entryActionForReport(r);
     const entryTimingColor = rawEntryTimingState === 'Entry Triggered'
       ? 'var(--green)'
       : rawEntryTimingState === 'Reaction Started'
@@ -1996,7 +2014,7 @@
             <div class="context-value" style="color:${entryTimingColor}">${escapeHtml(entryTimingState)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Reversal</div>
+            <div class="context-label">Structure Shift</div>
             <div class="context-value" style="color:${reversalConfirmed ? 'var(--green)' : 'var(--gold)'}">${reversalIcon} ${escapeHtml(reversalLabel)}</div>
           </div>
         </div>
@@ -2005,8 +2023,9 @@
           <div class="setup-status-value">${escapeHtml(setupHeadline)}</div>
           <div class="setup-status-reason">${escapeHtml(r.setupGradeReason || setupStatusReason)}</div>
           <div class="setup-status-reason">Timing: ${escapeHtml(entryTimingReason)}</div>
+          <div class="setup-status-reason">Action: ${escapeHtml(entryAction)}</div>
           <div class="setup-status-reason">Eval: ${escapeHtml(evalReason)}</div>
-          <div class="setup-status-reason">Reversal: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Reversal has started.' : 'Waiting for reversal confirmation.'))}</div>
+          <div class="setup-status-reason">Structure Shift: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Structure shift detected.' : 'Waiting for structure shift.'))}</div>
         </div>
         <div class="scout-levels">
           <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
@@ -2084,7 +2103,7 @@
                 <div class="scout-level-value" style="color:${entryTimingColor}">${escapeHtml(entryTimingState)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Reversal</div>
+                <div class="scout-level-label">Structure Shift</div>
                 <div class="scout-level-value" style="color:${reversalConfirmed ? 'var(--green)' : 'var(--gold)'}">${reversalIcon} ${escapeHtml(reversalLabel)}</div>
               </div>
               <div class="scout-level-box">
@@ -2281,8 +2300,8 @@
       `Entry Timing Reason: ${entryTimingReasonForReport(report)}`,
       `Eval Eligible: ${report.evalEligible ? 'Yes' : 'No'}`,
       `Eval Reason: ${report.evalReason || ''}`,
-      `Reversal: ${report.reversalConfirmed ? 'Confirmed' : 'Not Confirmed'}`,
-      `Reversal Reason: ${report.reversalReason || ''}`,
+      `Structure Shift: ${report.reversalConfirmed ? 'Detected' : 'Not Detected'}`,
+      `Structure Shift Reason: ${report.reversalReason || ''}`,
       `Location: ${report.zone || 'FAIR VALUE'}`,
     ].join(' | ');
     const fullNotes = [notes, scoutSnapshot].filter(Boolean).join('\n');
@@ -3081,7 +3100,7 @@
   function exportJournalCSV() {
     const entries = _journalEntries || [];
     if (!entries.length) return;
-    const headers = ['Date','Pair','Direction','Quality','Setup Grade','Setup Grade Reason','Pattern','Timeframe','Session','Entry','SL','TP1','RR','Reversal Confirmed','Reversal Reason','Result','Direction Correct?','Entry Quality','PnL','Type','Notes','Review Notes'];
+    const headers = ['Date','Pair','Direction','Quality','Setup Grade','Setup Grade Reason','Pattern','Timeframe','Session','Entry','SL','TP1','RR','Structure Shift','Structure Shift Reason','Result','Direction Correct?','Entry Quality','PnL','Type','Notes','Review Notes'];
     const rows = entries.map(e => [
       new Date(e.createdAt || e.pushedAt).toLocaleDateString(),
       e.displaySymbol || e.pair || e.symbol,
@@ -3189,7 +3208,7 @@
               <span class="badge tf">${e.timeframe}</span>
               <span class="badge ${(e.quality || '').toLowerCase()}">${e.quality}</span>
               <span class="badge ${setupGrade === 'A' ? 'long' : setupGrade === 'B' ? 'tf' : 'short'}">${setupGrade} Setup</span>
-              <span class="badge ${reversalConfirmed ? 'long' : 'tf'}">Reversal ${reversalConfirmed ? 'Confirmed' : 'Not Confirmed'}</span>
+              <span class="badge ${reversalConfirmed ? 'long' : 'tf'}">Structure Shift ${reversalConfirmed ? 'Detected' : 'Not Detected'}</span>
               ${e.newsRisk ? `<span class="news-risk-pill">⚠️ NEWS RISK</span>` : ''}
             </div>
             <div class="pattern-name">${e.pattern}</div>
