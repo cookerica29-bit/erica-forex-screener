@@ -37,7 +37,7 @@
     .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .spin { animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .stats-bar { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+    .stats-bar { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
     .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; border-top: 2px solid rgba(96,165,250,0.3); border-radius: 0 0 8px 8px; }
     .stat-value { font-size: 24px; font-weight: 800; }
     .stat-label { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; margin-top: 2px; letter-spacing: 0.5px; }
@@ -366,6 +366,11 @@
     .entry-status.near-entry { color:var(--blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.08); }
     .entry-status.waiting { color:var(--gold); border-color:rgba(245,166,35,0.35); background:rgba(245,166,35,0.08); }
     .entry-status.too-far { color:var(--slate-dim); border-color:rgba(148,163,184,0.22); background:rgba(148,163,184,0.04); }
+    .action-badge { display:inline-flex; align-items:center; justify-content:center; padding:5px 10px; border-radius:99px; border:1px solid rgba(148,163,184,0.24); font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; margin-bottom:5px; }
+    .action-badge.review-now { color:var(--green); border-color:rgba(0,255,136,0.5); background:rgba(0,255,136,0.12); }
+    .action-badge.watch { color:var(--gold); border-color:rgba(245,166,35,0.42); background:rgba(245,166,35,0.1); }
+    .action-badge.monitor { color:var(--blue); border-color:rgba(96,165,250,0.42); background:rgba(96,165,250,0.1); }
+    .action-badge.low-priority { color:var(--slate-dim); border-color:rgba(148,163,184,0.22); background:rgba(148,163,184,0.04); }
     .entry-note { font-size:10px; color:var(--slate-dim); line-height:1.35; padding:7px 9px; border:1px solid rgba(148,163,184,0.08); border-radius:8px; background:rgba(148,163,184,0.035); margin-top:8px; }
     .setup-status-box { margin:10px 0; padding:9px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.1); background:rgba(148,163,184,0.035); }
     .setup-status-box.active { border-color:rgba(245,166,35,0.28); background:rgba(245,166,35,0.055); }
@@ -500,10 +505,21 @@
   <div class="stat-box"><div class="stat-value" id="s-bullish" style="color:var(--green)">—</div><div class="stat-label">Bullish</div></div>
   <div class="stat-box"><div class="stat-value" id="s-bearish" style="color:var(--red)">—</div><div class="stat-label">Bearish</div></div>
   <div class="stat-box"><div class="stat-value" id="s-mixed" style="color:var(--slate)">—</div><div class="stat-label">Mixed</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-review-now" style="color:var(--green)">—</div><div class="stat-label">Review Now</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-action-watch" style="color:var(--gold)">—</div><div class="stat-label">Watch</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-monitor" style="color:var(--blue)">—</div><div class="stat-label">Monitor</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-low-priority" style="color:var(--slate)">—</div><div class="stat-label">Low Priority</div></div>
 </div>
 
 <div class="filter-row">
   <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
+  <select class="filter-select" id="actionFilter" onchange="renderSetups()" aria-label="Action filter">
+    <option value="ALL">Action: All</option>
+    <option value="Review Now">Action: Review Now</option>
+    <option value="Watch">Action: Watch</option>
+    <option value="Monitor">Action: Monitor</option>
+    <option value="Low Priority">Action: Low Priority</option>
+  </select>
   <select class="filter-select" id="entryStatusFilter" onchange="renderSetups()" aria-label="Entry status filter">
     <option value="ALL">Actionability: All Setups</option>
     <option value="EVAL">Actionability: Eval Eligible</option>
@@ -1580,6 +1596,7 @@
 
   function getFiltered() {
     const s = document.getElementById('searchBox').value.toLowerCase();
+    const action = document.getElementById('actionFilter')?.value || 'ALL';
     const entryStatus = document.getElementById('entryStatusFilter')?.value || 'ALL';
     const grade = document.getElementById('gradeFilter')?.value || 'ALL';
     const trend = document.getElementById('trendFilter')?.value || 'ALL';
@@ -1587,6 +1604,7 @@
     const setupStatus = document.getElementById('setupStatusFilter')?.value || 'ALL';
     const location = document.getElementById('locationFilter')?.value || 'ALL';
     return allSetups.filter(x => {
+      if (action !== 'ALL' && actionPriorityForReport(x).value !== action) return false;
       if (entryStatus === 'EVAL' && x.evalEligible !== true) return false;
       if (entryStatus === 'WATCH' && x.evalEligible === true) return false;
       if (!['ALL', 'EVAL', 'WATCH'].includes(entryStatus) && x.entryStatus !== entryStatus) return false;
@@ -1638,6 +1656,21 @@
     if (grade === 'B') return 'Still Pulling Back';
     if (r.reversalConfirmed || r.confirmationConfirmed || Number(r.confirmationScore) >= 3) return 'Confirmation Started';
     return 'Still Pulling Back';
+  }
+
+  function actionPriorityForReport(r) {
+    const grade = r.setupGrade || 'C';
+    const timing = r.entryTimingState || 'Not Ready';
+    if (grade === 'A' && timing === 'Entry Triggered') {
+      return { value: 'Review Now', label: '🟢 REVIEW NOW', className: 'review-now' };
+    }
+    if (grade === 'A' && (timing === 'Reaction Started' || timing === 'Area Reached')) {
+      return { value: 'Watch', label: '🟡 WATCH', className: 'watch' };
+    }
+    if (grade === 'B' && (timing === 'Entry Triggered' || timing === 'Reaction Started' || timing === 'Area Reached')) {
+      return { value: 'Monitor', label: '🔵 MONITOR', className: 'monitor' };
+    }
+    return { value: 'Low Priority', label: '⚪ LOW PRIORITY', className: 'low-priority' };
   }
 
   function setupHeadlineForReport(r) {
@@ -1818,6 +1851,10 @@
     document.getElementById('s-bullish').textContent = all.filter(s => displayTrendForReport(s) === 'Bullish').length || '—';
     document.getElementById('s-bearish').textContent = all.filter(s => displayTrendForReport(s) === 'Bearish').length || '—';
     document.getElementById('s-mixed').textContent = all.filter(s => displayTrendForReport(s) === 'Mixed').length || '—';
+    document.getElementById('s-review-now').textContent = all.filter(s => actionPriorityForReport(s).value === 'Review Now').length;
+    document.getElementById('s-action-watch').textContent = all.filter(s => actionPriorityForReport(s).value === 'Watch').length;
+    document.getElementById('s-monitor').textContent = all.filter(s => actionPriorityForReport(s).value === 'Monitor').length;
+    document.getElementById('s-low-priority').textContent = all.filter(s => actionPriorityForReport(s).value === 'Low Priority').length;
     const main = document.getElementById('mainContent');
     if (!all.length) {
       const scanLabel = priorityPairsActive ? `${currentScanLabel()}: ${PAIRS.map(makePairLabel).join(', ')}` : currentScanLabel();
@@ -1932,6 +1969,7 @@
       : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
     const rawEntryTimingState = r.entryTimingState || 'Not Ready';
     const entryTimingState = entryTimingDisplayForReport(r);
+    const actionPriority = actionPriorityForReport(r);
     const entryTimingReason = entryTimingReasonForReport(r);
     const entryAction = entryActionForReport(r);
     const entryTimingColor = rawEntryTimingState === 'Entry Triggered'
@@ -1974,6 +2012,7 @@
             </div>
           </div>
           <div style="text-align:right;flex-shrink:0;">
+            <div class="action-badge ${actionPriority.className}">${escapeHtml(actionPriority.label)}</div>
             <div class="entry-status ${entryStatusDisplayCls}">${escapeHtml(entryStatusDisplay)}</div>
             <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Entry Status</div>
           </div>
@@ -2050,7 +2089,7 @@
         </div>
         ${showTradeLevels ? `
         <div class="entry-note">${escapeHtml(levelPlanNote)}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin:8px 0;">
+        <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:8px 0;">
           <div class="scout-level-box" style="border-color:rgba(96,165,250,0.2);border-left:3px solid rgba(96,165,250,0.5);">
             <div class="scout-level-label" style="color:rgba(96,165,250,0.7);">Entry</div>
             <div class="scout-level-value" style="color:var(--blue);font-size:12px;">${f(r.entry)}</div>
@@ -2060,8 +2099,12 @@
             <div class="scout-level-value" style="color:var(--red);font-size:12px;">${f(r.sl)}</div>
           </div>
           <div class="scout-level-box" style="border-color:rgba(0,255,136,0.2);border-left:3px solid rgba(0,255,136,0.5);">
-            <div class="scout-level-label" style="color:rgba(0,255,136,0.7);">TP1</div>
+            <div class="scout-level-label" style="color:rgba(0,255,136,0.7);">TP1 · First Target</div>
             <div class="scout-level-value" style="color:var(--green);font-size:12px;">${f(r.tp1)}</div>
+          </div>
+          <div class="scout-level-box" style="border-color:rgba(0,255,136,0.12);border-left:3px solid rgba(0,255,136,0.28);">
+            <div class="scout-level-label" style="color:rgba(0,255,136,0.55);">TP2 · Extended</div>
+            <div class="scout-level-value" style="color:rgba(0,255,136,0.78);font-size:12px;">${f(r.tp2)}</div>
           </div>
           <div class="scout-level-box">
             <div class="scout-level-label">R:R</div>

@@ -2251,8 +2251,8 @@ export function scoutAnalyzeCandles(
   // Entry: nearest active demand/supply or recent pullback structure first;
   // EMA20 is only a fallback when it is still close to current price action.
   // SL: 1×ATR beyond the nearest swing low/high
-  // TP1: nearest structural target beyond entry + 1×ATR (skip minor structure)
-  // TP2: second structural level
+  // TP1: nearest opposing swing/resistance/support between entry and the extended target, if present.
+  // TP2: current extended structural target beyond the minimum threshold.
   let entry: number | null = null;
   let sl: number | null = null;
   let tp1: number | null = null;
@@ -2267,32 +2267,50 @@ export function scoutAnalyzeCandles(
       const slBase = nearestSupport ?? (entry - 2 * atr);
       sl = roundPrice(Math.min(slBase, entry - atr) - 0.3 * atr);
       const risk = Math.abs(entry - sl);
-      // TP: first swing high giving >= 2R (skip minor structure)
+      // Extended target: first swing high giving >= 2R (current TP behavior).
       const minTp = entry + Math.max(atr, 2 * risk);
       console.log(`[scout-v2] ${pair} LONG risk=${risk.toFixed(5)} minTp=${minTp.toFixed(5)}`);
-      const tpCandidates = swingHighs
+      const firstOpposingTarget = swingHighs
+        .filter(s => s.price > entry && s.price <= minTp)
+        .sort((a, b) => a.price - b.price)[0]?.price;
+      const extendedTpCandidates = swingHighs
         .filter(s => s.price > minTp)
         .sort((a, b) => a.price - b.price);
-      tp1 = tpCandidates[0]
-        ? roundPrice(tpCandidates[0].price)
+      const extendedTp1 = extendedTpCandidates[0]?.price;
+      const extendedTp2 = extendedTpCandidates[1]?.price;
+      tp1 = firstOpposingTarget
+        ? roundPrice(firstOpposingTarget)
+        : extendedTp1
+        ? roundPrice(extendedTp1)
         : roundPrice(entry + 2 * risk);
-      tp2 = tpCandidates[1]
-        ? roundPrice(tpCandidates[1].price)
+      tp2 = firstOpposingTarget && extendedTp1
+        ? roundPrice(extendedTp1)
+        : extendedTp2
+        ? roundPrice(extendedTp2)
         : roundPrice(entry + 3 * risk);
     } else {
       const slBase = nearestResistance ?? (entry + 2 * atr);
       sl = roundPrice(Math.max(slBase, entry + atr) + 0.3 * atr);
       const risk = Math.abs(entry - sl);
-      // TP: first swing low giving >= 2R (skip minor structure)
+      // Extended target: first swing low giving >= 2R (current TP behavior).
       const minTp = entry - Math.max(atr, 2 * risk);
-      const tpCandidates = swingLows
+      const firstOpposingTarget = swingLows
+        .filter(s => s.price < entry && s.price >= minTp)
+        .sort((a, b) => b.price - a.price)[0]?.price;
+      const extendedTpCandidates = swingLows
         .filter(s => s.price < minTp)
         .sort((a, b) => b.price - a.price);
-      tp1 = tpCandidates[0]
-        ? roundPrice(tpCandidates[0].price)
+      const extendedTp1 = extendedTpCandidates[0]?.price;
+      const extendedTp2 = extendedTpCandidates[1]?.price;
+      tp1 = firstOpposingTarget
+        ? roundPrice(firstOpposingTarget)
+        : extendedTp1
+        ? roundPrice(extendedTp1)
         : roundPrice(entry - 2 * risk);
-      tp2 = tpCandidates[1]
-        ? roundPrice(tpCandidates[1].price)
+      tp2 = firstOpposingTarget && extendedTp1
+        ? roundPrice(extendedTp1)
+        : extendedTp2
+        ? roundPrice(extendedTp2)
         : roundPrice(entry - 3 * risk);
     }
 

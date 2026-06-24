@@ -172,8 +172,6 @@ function isIndexSymbol(symbol: string) {
 function isTradeableScoutSignal(report: ScoutReport) {
   return !isIndexSymbol(report.pair) &&
     report.evalEligible === true &&
-    report.entryTimingState === 'Entry Triggered' &&
-    report.entryStatus === 'Tradeable' &&
     Boolean(report.trendDirection) &&
     Boolean(report.setupTimeframeDirection) &&
     Boolean(displayScoutPhase(report)) &&
@@ -183,12 +181,32 @@ function isTradeableScoutSignal(report: ScoutReport) {
     report.tp1 !== null;
 }
 
+function scoutTradeDirection(report: ScoutReport) {
+  if (report.tradeDirection === 'LONG' || report.tradeDirection === 'SHORT') return report.tradeDirection;
+  if (report.bias === 'BULLISH') return 'LONG';
+  if (report.bias === 'BEARISH') return 'SHORT';
+  return 'NEUTRAL';
+}
+
+function isLocationAlignedForTrade(report: ScoutReport) {
+  const direction = scoutTradeDirection(report);
+  return (direction === 'LONG' && report.zone === 'DISCOUNT') ||
+    (direction === 'SHORT' && report.zone === 'PREMIUM');
+}
+
+function hasClearDailyOrH4Trend(report: ScoutReport) {
+  return ['Bullish', 'Bearish'].includes(report.dailyTrendDirection || '') ||
+    ['Bullish', 'Bearish'].includes(report.h4TrendDirection || '');
+}
+
 function isWatchScoutSignal(report: ScoutReport) {
   return !isIndexSymbol(report.pair) &&
     report.evalEligible !== true &&
     (report.setupGrade === 'A' || report.setupGrade === 'B') &&
-    report.entryTimingState === 'Reaction Started' &&
-    (report.entryStatus === 'Tradeable' || report.entryStatus === 'Near Entry') &&
+    hasClearDailyOrH4Trend(report) &&
+    isLocationAlignedForTrade(report) &&
+    (report.entryTimingState === 'Reaction Started' || report.entryTimingState === 'Area Reached') &&
+    (report.entryStatus === 'Tradeable' || report.entryStatus === 'Near Entry' || report.entryStatus === 'Waiting') &&
     report.entry !== null &&
     report.sl !== null &&
     report.tp1 !== null;
@@ -423,10 +441,10 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const reversalText = report.reversalConfirmed ? '✅ Detected' : '❌ Not Detected';
     const isEntryAlert = kind === 'entry';
     const timingDisplay = entryTimingDisplay(report);
-    const title = isEntryAlert ? '✅ *ENTRY TRIGGERED SCOUT' : `👀 *WATCH SCOUT — ${timingDisplay.toUpperCase()}`;
+    const title = isEntryAlert ? '✅ *ENTRY TRIGGERED SCOUT' : `👀 *WATCHLIST — CLEAN TREND OPPORTUNITY`;
     const actionLine = isEntryAlert
       ? 'Action: Entry trigger started for review'
-      : `Action: ${entryActionDisplay(report)}`;
+      : `Action: ${entryActionDisplay(report)} on your entry chart`;
     const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nTiming: ${timingDisplay}\n${actionLine}\nEval Eligible: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nShort-term Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nStructure Shift: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${entryTimingReasonDisplay(report)}\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
@@ -645,7 +663,8 @@ async function scheduledScan(forceTf?: string) {
     // Keep this independent from priority setup queueing so LOW-interest
     // and non-priority pairs still render in scout mode.
     try {
-      latestScoutResults = await runScoutScan(forceTf || 'H4');
+      const scoutTimeframes = forceTf ? [forceTf] : ['H4', 'H1'];
+      latestScoutResults = (await Promise.all(scoutTimeframes.map(tf => runScoutScan(tf)))).flat();
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
       await notifyTradeableScoutSignals(latestScoutResults, 'scheduled scout scan');
     } catch (e: any) {
