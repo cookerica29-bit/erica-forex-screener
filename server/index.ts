@@ -36,6 +36,7 @@ const pineConfirmations = new Map<string, PineConfirmation>();
 const pineConfirmationAlerts = new Map<string, number>();
 const PINE_CONFIRMATION_TTL_MS = 12 * 60 * 60 * 1000;
 const PINE_CONFIRMATION_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+const MIN_SCOUT_ALERT_RR = 1.5;
 
 interface PineConfirmation {
   symbol: string;
@@ -172,6 +173,8 @@ function isIndexSymbol(symbol: string) {
 function isTradeableScoutSignal(report: ScoutReport) {
   return !isIndexSymbol(report.pair) &&
     report.evalEligible === true &&
+    report.rrRatio !== null &&
+    report.rrRatio >= MIN_SCOUT_ALERT_RR &&
     Boolean(report.trendDirection) &&
     Boolean(report.setupTimeframeDirection) &&
     Boolean(displayScoutPhase(report)) &&
@@ -203,6 +206,8 @@ function isWatchScoutSignal(report: ScoutReport) {
   return !isIndexSymbol(report.pair) &&
     report.evalEligible !== true &&
     (report.setupGrade === 'A' || report.setupGrade === 'B') &&
+    report.rrRatio !== null &&
+    report.rrRatio >= MIN_SCOUT_ALERT_RR &&
     hasClearDailyOrH4Trend(report) &&
     isLocationAlignedForTrade(report) &&
     (report.entryTimingState === 'Reaction Started' || report.entryTimingState === 'Area Reached') &&
@@ -242,6 +247,8 @@ function enrichScoutReports(reports: ScoutReport[]) {
 function isValidScoutForPineConfirmation(report: ScoutReport, direction: 'LONG' | 'SHORT') {
   return report.tradeDirection === direction &&
     (report.setupGrade === 'A' || report.setupGrade === 'B') &&
+    report.rrRatio !== null &&
+    report.rrRatio >= MIN_SCOUT_ALERT_RR &&
     report.entry !== null &&
     report.sl !== null &&
     report.tp1 !== null;

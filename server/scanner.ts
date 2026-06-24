@@ -38,6 +38,7 @@ type StructureLabel = 'HH/HL' | 'LH/LL' | 'Mixed';
 type EntryStatus = 'Waiting' | 'Near Entry' | 'Tradeable' | 'Too Far';
 type SetupGrade = 'A' | 'B' | 'C';
 type EntryTimingState = 'Not Ready' | 'Area Reached' | 'Reaction Started' | 'Entry Triggered';
+const MIN_EVAL_RR = 1.5;
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 type PullbackStatus =
   | 'Aggressive pullback / Not ready'
@@ -1486,7 +1487,8 @@ function evaluateScoutForEval(
   distanceFromEntryAtr: number | null,
   entry: number | null,
   sl: number | null,
-  tp1: number | null
+  tp1: number | null,
+  rrRatio: number | null
 ) {
   const failures: string[] = [];
   const tradeTrend = tradeDirection === 'LONG' ? 'Bullish' : tradeDirection === 'SHORT' ? 'Bearish' : 'Mixed';
@@ -1503,6 +1505,7 @@ function evaluateScoutForEval(
   if (!confirmationStarted) failures.push('confirmation has not started');
   if (distanceFromEntryAtr === null || distanceFromEntryAtr > 0.25) failures.push('entry is outside Tradeable distance');
   if (entry === null || sl === null || tp1 === null) failures.push('entry, SL, or TP1 is missing');
+  if (rrRatio === null || rrRatio < MIN_EVAL_RR) failures.push(`R:R is below ${MIN_EVAL_RR.toFixed(1)}`);
 
   if (failures.length) {
     return {
@@ -1513,7 +1516,7 @@ function evaluateScoutForEval(
 
   return {
     evalEligible: true,
-    evalReason: 'Eval eligible: A/B setup, trend is aligned or mixed without conflict, location aligns, reversal confirmed, confirmation started, and entry is Tradeable.',
+    evalReason: `Eval eligible: A/B setup, trend is aligned or mixed without conflict, location aligns, reversal confirmed, confirmation started, entry is Tradeable, and R:R is at least ${MIN_EVAL_RR.toFixed(1)}.`,
   };
 }
 
@@ -2346,7 +2349,8 @@ export function scoutAnalyzeCandles(
     entryDistance.distanceFromEntryAtr,
     entry,
     sl,
-    tp1
+    tp1,
+    rrRatio
   );
 
   return {

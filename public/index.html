@@ -366,6 +366,7 @@
     .entry-status.near-entry { color:var(--blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.08); }
     .entry-status.waiting { color:var(--gold); border-color:rgba(245,166,35,0.35); background:rgba(245,166,35,0.08); }
     .entry-status.too-far { color:var(--slate-dim); border-color:rgba(148,163,184,0.22); background:rgba(148,163,184,0.04); }
+    .entry-status.low-rr { color:var(--red); border-color:rgba(255,59,92,0.42); background:rgba(255,59,92,0.08); }
     .action-badge { display:inline-flex; align-items:center; justify-content:center; padding:5px 10px; border-radius:99px; border:1px solid rgba(148,163,184,0.24); font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; margin-bottom:5px; }
     .action-badge.review-now { color:var(--green); border-color:rgba(0,255,136,0.5); background:rgba(0,255,136,0.12); }
     .action-badge.watch { color:var(--gold); border-color:rgba(245,166,35,0.42); background:rgba(245,166,35,0.1); }
@@ -1658,9 +1659,16 @@
     return 'Still Pulling Back';
   }
 
+  function meetsMinScoutRr(r) {
+    return Number.isFinite(Number(r.rrRatio)) && Number(r.rrRatio) >= 1.5;
+  }
+
   function actionPriorityForReport(r) {
     const grade = r.setupGrade || 'C';
     const timing = r.entryTimingState || 'Not Ready';
+    if (!meetsMinScoutRr(r)) {
+      return { value: 'Low Priority', label: '⚪ LOW PRIORITY', className: 'low-priority' };
+    }
     if (grade === 'A' && timing === 'Entry Triggered') {
       return { value: 'Review Now', label: '🟢 REVIEW NOW', className: 'review-now' };
     }
@@ -1962,11 +1970,14 @@
     const grade = r.setupGrade || 'C';
     const gradeColor = grade === 'A' ? 'var(--green)' : grade === 'B' ? 'var(--blue)' : 'var(--gold)';
     const evalEligible = r.evalEligible === true;
+    const lowRr = !meetsMinScoutRr(r);
     const evalLabel = evalEligible ? 'Eval Eligible' : 'Watch Only';
     const evalColor = evalEligible ? 'var(--green)' : 'var(--gold)';
     const evalReason = r.evalReason || (evalEligible
       ? 'Confirmed A setup is eligible for eval consideration.'
-      : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
+      : lowRr
+        ? 'Watch only: R:R is below 1.5.'
+        : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
     const rawEntryTimingState = r.entryTimingState || 'Not Ready';
     const entryTimingState = entryTimingDisplayForReport(r);
     const actionPriority = actionPriorityForReport(r);
@@ -1979,8 +1990,8 @@
         : rawEntryTimingState === 'Area Reached'
           ? 'var(--gold)'
           : 'var(--slate)';
-    const entryStatusDisplay = evalEligible ? 'Eval Eligible' : entryStatus === 'Tradeable' ? setupHeadline : entryStatus;
-    const entryStatusDisplayCls = evalEligible ? 'eval-eligible' : entryStatusCls;
+    const entryStatusDisplay = evalEligible ? 'Eval Eligible' : lowRr ? 'Low R:R' : entryStatus === 'Tradeable' ? setupHeadline : entryStatus;
+    const entryStatusDisplayCls = evalEligible ? 'eval-eligible' : lowRr ? 'low-rr' : entryStatusCls;
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
     const distancePct = Number.isFinite(Number(r.distanceFromEntryPercent)) ? Number(r.distanceFromEntryPercent) : null;
     const showTradeLevels = r.entry != null && distanceAtr != null && distanceAtr <= 0.5;
