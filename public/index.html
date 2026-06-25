@@ -166,6 +166,25 @@
     .trend-reasons { margin-top:8px; display:flex; flex-direction:column; gap:5px; }
     .trend-reason { font-size:11px; color:var(--slate); line-height:1.35; }
     .trend-empty { color:var(--slate-dim); border:1px dashed rgba(148,163,184,.18); border-radius:10px; padding:24px; text-align:center; font-size:12px; }
+    .scalp-page { padding:18px 24px 28px; }
+    .scalp-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:16px; }
+    .scalp-heading { font-size:18px; font-weight:900; letter-spacing:.02em; color:var(--text); }
+    .scalp-sub { font-size:11px; color:var(--slate-dim); margin-top:5px; max-width:760px; line-height:1.5; }
+    .scalp-stats { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; margin-bottom:14px; }
+    .scalp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:12px; }
+    .scalp-card { background:rgba(15,23,42,.58); border:1px solid rgba(148,163,184,.14); border-radius:12px; padding:14px; box-shadow:0 12px 26px rgba(0,0,0,.14); }
+    .scalp-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+    .scalp-symbol { font-size:22px; font-weight:900; color:var(--text); }
+    .scalp-status { display:inline-flex; align-items:center; justify-content:center; border-radius:99px; border:1px solid rgba(148,163,184,.22); padding:5px 10px; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+    .scalp-status.ready { color:var(--green); border-color:rgba(0,255,136,.5); background:rgba(0,255,136,.12); }
+    .scalp-status.watch { color:var(--gold); border-color:rgba(245,166,35,.42); background:rgba(245,166,35,.1); }
+    .scalp-status.momentum { color:var(--blue); border-color:rgba(96,165,250,.42); background:rgba(96,165,250,.1); }
+    .scalp-status.closed, .scalp-status.choppy, .scalp-status.late { color:var(--slate-dim); border-color:rgba(148,163,184,.18); background:rgba(148,163,184,.04); }
+    .scalp-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+    .scalp-field { background:rgba(255,255,255,.035); border:1px solid rgba(148,163,184,.09); border-radius:8px; padding:8px 9px; min-height:58px; }
+    .scalp-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+    .scalp-value { font-size:13px; color:var(--slate); font-weight:800; overflow-wrap:anywhere; }
+    .scalp-note { margin-top:10px; padding:9px 10px; border-radius:8px; border:1px solid rgba(148,163,184,.09); background:rgba(2,6,23,.25); color:var(--slate-dim); font-size:11px; line-height:1.4; }
     .video-studio-page { padding:18px 24px 28px; max-width:1400px; margin:0 auto; }
     .studio-layout { display:grid; gap:16px; grid-template-columns:minmax(320px,420px) minmax(0,1fr); }
     .studio-card, .creator-dashboard { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; }
@@ -233,7 +252,8 @@
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
       .setup-grid { grid-template-columns: 1fr; padding: 10px; }
-      .trend-grid { grid-template-columns:1fr; }
+      .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
+      .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
       .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid { grid-template-columns:1fr; }
       .shorts-block.full { grid-column:auto; }
@@ -487,6 +507,7 @@
 
 <div class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
+  <button class="tab-btn" onclick="switchTab('scalping')" id="tab-scalping">⚡ Scalping</button>
   <button class="tab-btn" onclick="switchTab('trending')" id="tab-trending">🔥 Trending</button>
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
   <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
@@ -579,6 +600,50 @@
 
 <div id="nearMissContent"></div>
 
+</div>
+
+<div id="content-scalping" class="tab-content">
+  <div class="scalp-page">
+    <div class="scalp-hero">
+      <div>
+        <div class="scalp-heading">⚡ Scalping</div>
+        <div class="scalp-sub">Separate intraday workflow for London, NY, and London+NY overlap. Uses H1/M30 context, M15 zones, and M5 reaction timing. This does not change Scout logic, swing alerts, journal, or bot execution.</div>
+      </div>
+      <div class="trend-actions">
+        <span id="scalpLastScan" style="font-size:11px;color:var(--slate-dim);">Not scanned yet</span>
+        <button class="scan-btn" onclick="runScalpScan()" id="scalpScanBtn"><span id="scalpScanIcon">↻</span> Scan Scalps</button>
+      </div>
+    </div>
+    <div class="scalp-stats">
+      <div class="stat-box"><div class="stat-value" id="scalp-total" style="color:var(--text)">—</div><div class="stat-label">Scanned</div></div>
+      <div class="stat-box"><div class="stat-value" id="scalp-ready" style="color:var(--green)">—</div><div class="stat-label">Scalp Ready</div></div>
+      <div class="stat-box"><div class="stat-value" id="scalp-watch" style="color:var(--gold)">—</div><div class="stat-label">Watch Pullback</div></div>
+      <div class="stat-box"><div class="stat-value" id="scalp-momentum" style="color:var(--blue)">—</div><div class="stat-label">Momentum Only</div></div>
+      <div class="stat-box"><div class="stat-value" id="scalp-late" style="color:var(--slate)">—</div><div class="stat-label">Too Late</div></div>
+      <div class="stat-box"><div class="stat-value" id="scalp-closed" style="color:var(--slate)">—</div><div class="stat-label">Closed/Choppy</div></div>
+    </div>
+    <div class="filter-row" style="padding:0 0 12px;">
+      <select class="filter-select" id="scalpStatusFilter" onchange="renderScalpResults()" aria-label="Scalp status filter">
+        <option value="ALL">Status: All</option>
+        <option value="Scalp Ready">Status: Scalp Ready</option>
+        <option value="Watch Pullback">Status: Watch Pullback</option>
+        <option value="Momentum Only">Status: Momentum Only</option>
+        <option value="Too Late">Status: Too Late</option>
+        <option value="Too Choppy">Status: Too Choppy</option>
+        <option value="Session Closed">Status: Session Closed</option>
+      </select>
+      <select class="filter-select" id="scalpBiasFilter" onchange="renderScalpResults()" aria-label="Scalp bias filter">
+        <option value="ALL">Bias: All</option>
+        <option value="Long">Bias: Long</option>
+        <option value="Short">Bias: Short</option>
+        <option value="Mixed">Bias: Mixed</option>
+      </select>
+      <span id="scalpResultCount" class="result-count"></span>
+    </div>
+    <div id="scalpContent" class="scalp-grid">
+      <div class="trend-empty">Run a scalp scan during London or NY to find short-term opportunities.</div>
+    </div>
+  </div>
 </div>
 
 <div id="content-trending" class="tab-content">
@@ -947,6 +1012,8 @@
   let nearMissOpen = false;
   let priorityPairsPayload = null;
   let priorityWatchlistRows = [];
+  let scalpReports = [];
+  let scalpLoaded = false;
   const VIDEO_PROJECTS_KEY = 'forex_scanner_video_projects';
   let currentVideoProject = null;
   let videoProjectDirty = false;
@@ -1546,6 +1613,112 @@
       renderTrending(data);
     } catch(e) {
       document.getElementById('trendLastScan').textContent = `Trend scan failed: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+      icon.classList.remove('spin');
+    }
+  }
+
+  function scalpStatusClass(status) {
+    if (status === 'Scalp Ready') return 'ready';
+    if (status === 'Watch Pullback') return 'watch';
+    if (status === 'Momentum Only') return 'momentum';
+    if (status === 'Too Late') return 'late';
+    if (status === 'Session Closed') return 'closed';
+    return 'choppy';
+  }
+
+  function renderScalpCard(row) {
+    const biasColor = row.scalpBias === 'Long' ? 'var(--green)' : row.scalpBias === 'Short' ? 'var(--red)' : 'var(--slate)';
+    return `
+      <div class="scalp-card">
+        <div class="scalp-top">
+          <div>
+            <div class="scalp-symbol">${escapeHtml(row.displaySymbol || row.pair)}</div>
+            <div class="badges">
+              <span class="badge tf">${escapeHtml(row.timeframe || 'M15')} / ${escapeHtml(row.entryTimeframe || 'M5')}</span>
+              <span class="badge session">${escapeHtml(row.session || '—')}</span>
+              ${row.newsRisk ? '<span class="news-risk-pill">⚠️ NEWS RISK</span>' : ''}
+            </div>
+          </div>
+          <span class="scalp-status ${scalpStatusClass(row.status)}">${escapeHtml(row.status || 'Too Choppy')}</span>
+        </div>
+        <div class="scalp-fields">
+          <div class="scalp-field"><div class="scalp-label">Scalp Bias</div><div class="scalp-value" style="color:${biasColor};">${escapeHtml(row.scalpBias || 'Mixed')}</div></div>
+          <div class="scalp-field"><div class="scalp-label">Intraday Flow</div><div class="scalp-value">${escapeHtml(row.intradayFlow || '—')}</div></div>
+          <div class="scalp-field"><div class="scalp-label">Location</div><div class="scalp-value">${escapeHtml(row.location || '—')}</div></div>
+          <div class="scalp-field"><div class="scalp-label">Momentum</div><div class="scalp-value">${escapeHtml(row.momentum || '—')}</div></div>
+          <div class="scalp-field"><div class="scalp-label">Entry Trigger</div><div class="scalp-value">${escapeHtml(row.entryTrigger || 'None')}</div></div>
+          <div class="scalp-field"><div class="scalp-label">R:R</div><div class="scalp-value" style="color:${Number(row.rrRatio || 0) >= 1.5 ? 'var(--green)' : 'var(--slate)'};">${row.rrRatio != null ? Number(row.rrRatio).toFixed(2) + 'R' : '—'}</div></div>
+          <div class="scalp-field"><div class="scalp-label">Current Price</div><div class="scalp-value" style="color:var(--blue);">${fmt(row.price, row.pair)}</div></div>
+          <div class="scalp-field"><div class="scalp-label">Nearest Demand</div><div class="scalp-value" style="color:var(--green);">${fmt(row.nearestDemand, row.pair)}</div></div>
+          <div class="scalp-field"><div class="scalp-label">Nearest Supply</div><div class="scalp-value" style="color:var(--red);">${fmt(row.nearestSupply, row.pair)}</div></div>
+          <div class="scalp-field"><div class="scalp-label">Entry</div><div class="scalp-value" style="color:var(--blue);">${fmt(row.entry, row.pair)}</div></div>
+          <div class="scalp-field"><div class="scalp-label">SL</div><div class="scalp-value" style="color:var(--red);">${fmt(row.sl, row.pair)}</div></div>
+          <div class="scalp-field"><div class="scalp-label">First Target</div><div class="scalp-value" style="color:var(--green);">${fmt(row.firstTarget, row.pair)}</div></div>
+        </div>
+        <div class="scalp-note">${escapeHtml(row.reason || 'No scalp read yet.')}</div>
+      </div>`;
+  }
+
+  function updateScalpStats(rows) {
+    const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    set('scalp-total', rows.length || '—');
+    set('scalp-ready', rows.filter(r => r.status === 'Scalp Ready').length);
+    set('scalp-watch', rows.filter(r => r.status === 'Watch Pullback').length);
+    set('scalp-momentum', rows.filter(r => r.status === 'Momentum Only').length);
+    set('scalp-late', rows.filter(r => r.status === 'Too Late').length);
+    set('scalp-closed', rows.filter(r => r.status === 'Session Closed' || r.status === 'Too Choppy').length);
+  }
+
+  function renderScalpResults() {
+    const status = document.getElementById('scalpStatusFilter')?.value || 'ALL';
+    const bias = document.getElementById('scalpBiasFilter')?.value || 'ALL';
+    const rows = scalpReports.filter(row => {
+      if (status !== 'ALL' && row.status !== status) return false;
+      if (bias !== 'ALL' && row.scalpBias !== bias) return false;
+      return true;
+    });
+    updateScalpStats(scalpReports);
+    const count = document.getElementById('scalpResultCount');
+    if (count) count.innerHTML = `Showing <span>${rows.length}</span> of ${scalpReports.length} scalp reads`;
+    const content = document.getElementById('scalpContent');
+    if (!content) return;
+    content.innerHTML = rows.length
+      ? rows.map(renderScalpCard).join('')
+      : '<div class="trend-empty">No scalp reads match the selected filters.</div>';
+  }
+
+  async function loadScalpResults() {
+    try {
+      const res = await fetch('/api/scalp');
+      if (!res.ok) return;
+      const data = await res.json();
+      scalpReports = data.reports || [];
+      if (data.lastScanTime) document.getElementById('scalpLastScan').textContent = `Last scalp scan: ${new Date(data.lastScanTime).toLocaleString()}`;
+      scalpLoaded = Boolean(scalpReports.length || data.lastScanTime);
+      renderScalpResults();
+    } catch(e) {
+      console.warn('Could not load scalp scan:', e.message);
+    }
+  }
+
+  async function runScalpScan() {
+    const btn = document.getElementById('scalpScanBtn');
+    const icon = document.getElementById('scalpScanIcon');
+    btn.disabled = true;
+    icon.classList.add('spin');
+    document.getElementById('scalpLastScan').textContent = 'Scanning M15/M5 scalping conditions...';
+    try {
+      const res = await fetch('/api/scalp', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Scalp scan failed');
+      scalpReports = data.reports || [];
+      scalpLoaded = true;
+      document.getElementById('scalpLastScan').textContent = `Last scalp scan: ${new Date(data.lastScanTime || Date.now()).toLocaleString()}`;
+      renderScalpResults();
+    } catch(e) {
+      document.getElementById('scalpLastScan').textContent = `Scalp scan failed: ${e.message}`;
     } finally {
       btn.disabled = false;
       icon.classList.remove('spin');
@@ -2846,6 +3019,7 @@
     if (tab === 'analytics') await loadAnalytics();
     if (tab === 'calculator') { document.getElementById('calc-account').value = '25308'; calcPosition(); }
     if (tab === 'trending') await loadTrending();
+    if (tab === 'scalping') await loadScalpResults();
     if (tab === 'video') { await loadJournal(); renderVideoStudio(); }
     clearInterval(autoRefreshTimer);
     if (tab === 'scanner') {

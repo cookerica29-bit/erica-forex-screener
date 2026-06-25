@@ -974,6 +974,37 @@ export interface ScoutReport {
   rrRatio: number | null;
 }
 
+export type ScalpStatus = 'Scalp Ready' | 'Watch Pullback' | 'Momentum Only' | 'Too Choppy' | 'Too Late' | 'Session Closed';
+
+export interface ScalpReport {
+  pair: string;
+  displaySymbol: string;
+  timeframe: string;
+  entryTimeframe: string;
+  session: string;
+  sessionActive: boolean;
+  price: number;
+  scalpBias: 'Long' | 'Short' | 'Mixed';
+  intradayFlow: DirectionLabel;
+  backgroundTrend: DirectionLabel;
+  location: 'Demand' | 'Supply' | 'Mid';
+  momentum: 'Bullish' | 'Bearish' | 'Mixed';
+  entryTrigger: 'Bullish Reaction' | 'Bearish Reaction' | 'None';
+  firstTarget: number | null;
+  entry: number | null;
+  sl: number | null;
+  rrRatio: number | null;
+  spreadWarning: boolean;
+  newsRisk?: boolean;
+  status: ScalpStatus;
+  reason: string;
+  distanceToZoneAtr: number | null;
+  nearestDemand: number | null;
+  nearestSupply: number | null;
+  scannedAt: string;
+  candleTime: string;
+}
+
 function momentumLabel(score: number): MomentumLabel {
   if (score >= 7) return 'Strong Bullish';
   if (score >= 3) return 'Bullish';
@@ -2415,4 +2446,198 @@ export async function runScoutScan(granularity = 'H1', pairsOverride?: string[])
   const ord: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
   results.sort((a, b) => ord[a.interestLevel] - ord[b.interestLevel]);
   return results;
+}
+
+function isScalpSessionActive(session: string) {
+  return session === 'London' || session === 'London+NY overlap' || session === 'NY';
+}
+
+function zoneMid(zone: { obHigh: number; obLow: number }) {
+  return (zone.obHigh + zone.obLow) / 2;
+}
+
+function lastCandleMomentum(candles: Candle[]) {
+  const recent = candles.slice(-5);
+  const signed = recent.reduce((sum, c) => sum + (c.c - c.o), 0);
+  const atr = Math.max(calcATR(candles.slice(-30)), 0.00001);
+  if (signed > 0.45 * atr) return 'Bullish' as const;
+  if (signed < -0.45 * atr) return 'Bearish' as const;
+  return 'Mixed' as const;
+}
+
+function bullishZoneReaction(candle: Candle, zone: { obHigh: number; obLow: number } | null) {
+  if (!zone) return false;
+  const body = Math.abs(candle.c - candle.o);
+  const lowerWick = Math.min(candle.c, candle.o) - candle.l;
+  const tapped = candle.l <= zone.obHigh && candle.h >= zone.obLow;
+  return tapped && candle.c > zone.obLow && (candle.c > candle.o || lowerWick > body * 1.2);
+}
+
+function bearishZoneReaction(candle: Candle, zone: { obHigh: number; obLow: number } | null) {
+  if (!zone) return false;
+  const body = Math.abs(candle.c - candle.o);
+  const upperWick = candle.h - Math.max(candle.c, candle.o);
+  const tapped = candle.h >= zone.obLow && candle.l <= zone.obHigh;
+  return tapped && candle.c < zone.obHigh && (candle.c < candle.o || upperWick > body * 1.2);
+}
+
+export function scalpAnalyzeCandles(
+  m15Candles: Candle[],
+  m5Candles: Candle[],
+  m30Candles: Candle[],
+  h1Candles: Candle[],
+  pair: string
+): ScalpReport | null {
+  if (m15Candles.length < 60 || m5Candles.length < 40 || m30Candles.length < 60 || h1Candles.length < 60) return null;
+  const session = getSessionLabel(pair);
+  const sessionActive = isScalpSessionActive(session);
+  const price = m5Candles.at(-1)!.c;
+  const candleTime = m5Candles.at(-1)!.t;
+  const atr = Math.max(calcATR(m15Candles.slice(-50)), Math.abs(price) * 0.0001, 0.00001);
+  const h1Frame = analyzeDirectionalFrame(h1Candles, 'H1');
+  const m30Frame = analyzeDirectionalFrame(m30Candles, 'M30');
+  const m15Frame = analyzeDirectionalFrame(m15Candles, 'M15');
+  const backgroundTrend = dominantFrameDirection(h1Frame);
+  const intradayFlow = dominantFrameDirection(m30Frame) !== 'Neutral'
+    ? dominantFrameDirection(m30Frame)
+    : m15Frame.direction;
+  const structures = computeStructures(m15Candles.slice(-120), 4);
+  const demands = structures.demandZones
+    .filter(z => zoneMid(z) <= price + 0.2 * atr)
+    .sort((a, b) => Math.abs(price - zoneMid(a)) - Math.abs(price - zoneMid(b)));
+  const supplies = structures.supplyZones
+    .filter(z => zoneMid(z) >= price - 0.2 * atr)
+    .sort((a, b) => Math.abs(price - zoneMid(a)) - Math.abs(price - zoneMid(b)));
+  const demand = demands[0] ?? null;
+  const supply = supplies[0] ?? null;
+  const nearestDemand = demand ? roundPrice(zoneMid(demand)) : null;
+  const nearestSupply = supply ? roundPrice(zoneMid(supply)) : null;
+  const demandDistance = demand ? Math.abs(price - zoneMid(demand)) / atr : Infinity;
+  const supplyDistance = supply ? Math.abs(price - zoneMid(supply)) / atr : Infinity;
+  const location: ScalpReport['location'] = demandDistance <= 0.8
+    ? 'Demand'
+    : supplyDistance <= 0.8
+    ? 'Supply'
+    : 'Mid';
+  const momentum = lastCandleMomentum(m5Candles);
+  const last = m5Candles.at(-1)!;
+  const bullishReaction = bullishZoneReaction(last, demand);
+  const bearishReaction = bearishZoneReaction(last, supply);
+  const entryTrigger: ScalpReport['entryTrigger'] = bullishReaction
+    ? 'Bullish Reaction'
+    : bearishReaction
+    ? 'Bearish Reaction'
+    : 'None';
+  let scalpBias: ScalpReport['scalpBias'] = 'Mixed';
+  if ((intradayFlow === 'Bullish' || backgroundTrend === 'Bullish') && momentum !== 'Bearish') scalpBias = 'Long';
+  if ((intradayFlow === 'Bearish' || backgroundTrend === 'Bearish') && momentum !== 'Bullish') scalpBias = 'Short';
+
+  const isLong = scalpBias === 'Long';
+  const isShort = scalpBias === 'Short';
+  let entry: number | null = null;
+  let sl: number | null = null;
+  let firstTarget: number | null = null;
+  let rrRatio: number | null = null;
+  if (isLong && demand) {
+    entry = roundPrice(price);
+    sl = roundPrice(demand.obLow - 0.25 * atr);
+    const swingTarget = findSwings(m15Candles.slice(-80), 3).filter(s => s.type === 'high' && s.price > price).sort((a, b) => a.price - b.price)[0]?.price;
+    firstTarget = roundPrice((supply && zoneMid(supply) > price ? zoneMid(supply) : swingTarget) ?? price + 1.5 * Math.abs(price - sl));
+  } else if (isShort && supply) {
+    entry = roundPrice(price);
+    sl = roundPrice(supply.obHigh + 0.25 * atr);
+    const swingTarget = findSwings(m15Candles.slice(-80), 3).filter(s => s.type === 'low' && s.price < price).sort((a, b) => b.price - a.price)[0]?.price;
+    firstTarget = roundPrice((demand && zoneMid(demand) < price ? zoneMid(demand) : swingTarget) ?? price - 1.5 * Math.abs(price - sl));
+  }
+  if (entry !== null && sl !== null && firstTarget !== null) {
+    const risk = Math.abs(entry - sl);
+    if (risk > 0) rrRatio = Math.round((Math.abs(firstTarget - entry) / risk) * 100) / 100;
+  }
+
+  const hasAlignedTrigger = (isLong && entryTrigger === 'Bullish Reaction') || (isShort && entryTrigger === 'Bearish Reaction');
+  const hasAlignedLocation = (isLong && location === 'Demand') || (isShort && location === 'Supply');
+  const distanceToZoneAtr = Number.isFinite(Math.min(demandDistance, supplyDistance))
+    ? Math.round(Math.min(demandDistance, supplyDistance) * 100) / 100
+    : null;
+  let status: ScalpStatus = 'Too Choppy';
+  let reason = 'Intraday flow and momentum are mixed.';
+  if (!sessionActive) {
+    status = 'Session Closed';
+    reason = 'Scalping mode is only active during London, NY, or London+NY overlap.';
+  } else if (hasAlignedTrigger && hasAlignedLocation && rrRatio !== null && rrRatio >= 1.5) {
+    status = 'Scalp Ready';
+    reason = `${entryTrigger} from ${location.toLowerCase()} with at least 1.5R to first target.`;
+  } else if (hasAlignedLocation && momentum !== 'Mixed') {
+    status = 'Watch Pullback';
+    reason = `Price is at ${location.toLowerCase()}; wait for a clean ${isLong ? 'bullish' : 'bearish'} M5 reaction.`;
+  } else if ((isLong && momentum === 'Bullish') || (isShort && momentum === 'Bearish')) {
+    status = 'Momentum Only';
+    reason = 'Momentum is moving, but price is not reacting from a clean zone yet.';
+  } else if (distanceToZoneAtr !== null && distanceToZoneAtr > 1.5) {
+    status = 'Too Late';
+    reason = 'Price is extended away from the nearest active scalping zone.';
+  }
+
+  return {
+    pair,
+    displaySymbol: pair.replace('_', '/'),
+    timeframe: 'M15',
+    entryTimeframe: 'M5',
+    session,
+    sessionActive,
+    price: roundPrice(price),
+    scalpBias,
+    intradayFlow,
+    backgroundTrend,
+    location,
+    momentum,
+    entryTrigger,
+    firstTarget,
+    entry,
+    sl,
+    rrRatio,
+    spreadWarning: false,
+    status,
+    reason,
+    distanceToZoneAtr,
+    nearestDemand,
+    nearestSupply,
+    scannedAt: new Date().toISOString(),
+    candleTime,
+  };
+}
+
+export async function runScalpScan(pairsOverride?: string[]): Promise<ScalpReport[]> {
+  const pairsToScan = pairsOverride?.length ? pairsOverride : PAIRS;
+  const results: ScalpReport[] = [];
+  for (const pair of pairsToScan) {
+    try {
+      const [m15Candles, m5Candles, m30Candles, h1Candles] = await Promise.all([
+        fetchCandles(pair, 'M15', 180),
+        fetchCandles(pair, 'M5', 180),
+        fetchCandles(pair, 'M30', 160),
+        fetchCandles(pair, 'H1', 160),
+      ]);
+      const report = scalpAnalyzeCandles(m15Candles, m5Candles, m30Candles, h1Candles, pair);
+      if (report) {
+        report.newsRisk = await checkNewsRisk(pair);
+        results.push(report);
+      }
+    } catch (e: any) {
+      console.error(`Scalp skip ${pair}:`, e.message);
+    }
+  }
+  const statusRank: Record<ScalpStatus, number> = {
+    'Scalp Ready': 0,
+    'Watch Pullback': 1,
+    'Momentum Only': 2,
+    'Too Late': 3,
+    'Too Choppy': 4,
+    'Session Closed': 5,
+  };
+  return results.sort((a, b) =>
+    statusRank[a.status] - statusRank[b.status] ||
+    (b.rrRatio ?? 0) - (a.rrRatio ?? 0) ||
+    a.displaySymbol.localeCompare(b.displaySymbol)
+  );
 }
