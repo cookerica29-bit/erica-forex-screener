@@ -38,7 +38,7 @@ type StructureLabel = 'HH/HL' | 'LH/LL' | 'Mixed';
 type EntryStatus = 'Waiting' | 'Near Entry' | 'Tradeable' | 'Too Far';
 type SetupGrade = 'A' | 'B' | 'C';
 type EntryTimingState = 'Not Ready' | 'Area Reached' | 'Reaction Started' | 'Entry Triggered';
-const MIN_EVAL_RR = 1.5;
+const MIN_EVAL_RR = 2.0;
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 type PullbackStatus =
   | 'Aggressive pullback / Not ready'

@@ -37,7 +37,7 @@ const pineConfirmations = new Map<string, PineConfirmation>();
 const pineConfirmationAlerts = new Map<string, number>();
 const PINE_CONFIRMATION_TTL_MS = 12 * 60 * 60 * 1000;
 const PINE_CONFIRMATION_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
-const MIN_SCOUT_ALERT_RR = 1.5;
+const MIN_SCOUT_ALERT_RR = 2.0;
 
 interface PineConfirmation {
   symbol: string;

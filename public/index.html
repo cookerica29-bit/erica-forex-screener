@@ -1833,7 +1833,7 @@
   }
 
   function meetsMinScoutRr(r) {
-    return Number.isFinite(Number(r.rrRatio)) && Number(r.rrRatio) >= 1.5;
+    return Number.isFinite(Number(r.rrRatio)) && Number(r.rrRatio) >= 2.0;
   }
 
   function actionPriorityForReport(r) {
@@ -2149,7 +2149,7 @@
     const evalReason = r.evalReason || (evalEligible
       ? 'Confirmed A setup is eligible for eval consideration.'
       : lowRr
-        ? 'Watch only: R:R is below 1.5.'
+        ? 'Watch only: Scout R:R is below 2.0.'
         : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
     const rawEntryTimingState = r.entryTimingState || 'Not Ready';
     const entryTimingState = entryTimingDisplayForReport(r);
@@ -2292,7 +2292,7 @@
           </div>
           <div class="scout-level-box">
             <div class="scout-level-label">R:R</div>
-            <div class="scout-level-value" style="color:${r.rrRatio != null && r.rrRatio >= 1.5 ? 'var(--green)' : 'var(--slate)'};font-size:12px;">${r.rrRatio != null ? r.rrRatio.toFixed(2) + 'R' : '—'}</div>
+            <div class="scout-level-value" style="color:${r.rrRatio != null && r.rrRatio >= 2.0 ? 'var(--green)' : 'var(--slate)'};font-size:12px;">${r.rrRatio != null ? r.rrRatio.toFixed(2) + 'R' : '—'}</div>
           </div>
         </div>` : `<div class="entry-note">${escapeHtml(entryDistanceText)} Suggested Entry / SL / TP hidden until price is within 0.5 ATR.</div>`}
         <details class="diagnostics">
