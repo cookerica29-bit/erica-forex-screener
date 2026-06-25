@@ -937,17 +937,16 @@
     </div>
     <div class="studio-layout">
       <div class="studio-card">
-        <div class="studio-title">Video Studio</div>
-        <div class="studio-subtitle">Template-based content outlines from forex journal rows. Select up to 5 trades.</div>
+        <div class="studio-title">Project Setup</div>
+        <div class="studio-subtitle">Step 1: choose the video format. Scanner Intro can be generated with no selected trades; trade videos can use 1-5 journal rows.</div>
         <div class="studio-form-row">
           <label>Video Type</label>
           <select id="videoType" class="studio-select">
             <option value="Scanner Intro">Scanner Intro</option>
-            <option value="Weekly Scanner Report">Weekly Scanner Report</option>
             <option value="Trade Breakdown">Trade Breakdown</option>
-            <option value="Setup Grade Review">Setup Grade Review</option>
-            <option value="Entry Timing Review">Entry Timing Review</option>
-            <option value="Prop Firm Update">Prop Firm Update</option>
+            <option value="Weekly Recap">Weekly Recap</option>
+            <option value="Feature Update">Feature Update</option>
+            <option value="Educational Lesson">Educational Lesson</option>
           </select>
         </div>
         <div class="studio-form-row">
@@ -955,24 +954,42 @@
           <select id="scriptStyle" class="studio-select" onchange="changeScriptStyle(this.value)">
             <option value="Casual">Casual</option>
             <option value="Educational">Educational</option>
-            <option value="Documentary">Documentary</option>
-            <option value="Transparent/Journey">Transparent/Journey</option>
+            <option value="Storytelling">Storytelling</option>
+            <option value="Beginner Friendly">Beginner Friendly</option>
+            <option value="Technical">Technical</option>
           </select>
         </div>
-        <div class="studio-subtitle" id="videoTradeCount">0 trades selected</div>
+        <div class="studio-form-row">
+          <label>Video Length</label>
+          <select id="videoLength" class="studio-select">
+            <option value="Short 2-4 min">Short 2-4 min</option>
+            <option value="Medium 5-8 min">Medium 5-8 min</option>
+            <option value="Long 10-20 min">Long 10-20 min</option>
+          </select>
+        </div>
+        <div class="studio-form-row">
+          <label>Target Platforms</label>
+          <div class="scene-checks" id="targetPlatforms">
+            <label><input type="checkbox" class="video-platform-check" value="YouTube" checked /> YouTube</label>
+            <label><input type="checkbox" class="video-platform-check" value="Shorts" /> Shorts</label>
+            <label><input type="checkbox" class="video-platform-check" value="Instagram" /> Instagram</label>
+            <label><input type="checkbox" class="video-platform-check" value="TikTok" /> TikTok</label>
+            <label><input type="checkbox" class="video-platform-check" value="Blog" /> Blog</label>
+            <label><input type="checkbox" class="video-platform-check" value="Newsletter" /> Newsletter</label>
+          </div>
+        </div>
+        <div class="studio-subtitle" id="videoTradeCount">Step 2: 0 trades selected</div>
         <div id="videoTradeList" class="trade-select-list"></div>
         <div class="studio-actions">
-          <button class="studio-btn" onclick="generateVideoOutline()">Generate Video Outline</button>
+          <button class="studio-btn" onclick="generateVideoOutline()">Generate Project</button>
           <button class="studio-btn secondary" onclick="renderVideoStudio()">Refresh Trades</button>
           <button class="studio-btn secondary" onclick="saveVideoProject()">Save Video Project</button>
           <button class="studio-btn secondary" onclick="loadSavedVideoProjects()">Load Saved Projects</button>
-          <button class="studio-btn secondary" onclick="exportVideoMarkdown()">Export Outline as Markdown</button>
-          <button class="studio-btn secondary" onclick="exportAssetChecklistMarkdown()">Export Asset Checklist as Markdown</button>
+          <button class="studio-btn secondary" onclick="exportVideoMarkdown()">Export Full Project as Markdown</button>
           <button class="studio-btn secondary" onclick="copyFullScript()">Copy Full Script</button>
-          <button class="studio-btn secondary" onclick="exportScriptMarkdown()">Export Script as Markdown</button>
-          <button class="studio-btn secondary" onclick="generateShortsPack()">Generate Shorts/Reels Pack</button>
-          <button class="studio-btn secondary" onclick="copyShortScript()">Copy Short Script</button>
-          <button class="studio-btn secondary" onclick="exportShortsMarkdown()">Export Shorts Pack as Markdown</button>
+          <button class="studio-btn secondary" onclick="exportAssetChecklistMarkdown()">Export Asset Checklist</button>
+          <button class="studio-btn secondary" onclick="copyYouTubeDescription()">Copy YouTube Description</button>
+          <button class="studio-btn secondary" onclick="copyShortScript()">Copy Shorts Script</button>
           <button class="studio-btn secondary" onclick="startScannerIntroProject()">Start Scanner Intro Project</button>
           <button class="studio-btn secondary" onclick="renameCurrentProject()">Rename Current Project</button>
           <button class="studio-btn secondary" onclick="duplicateCurrentProject()">Duplicate Current Project</button>
@@ -981,14 +998,15 @@
         <div id="savedVideoProjects" class="project-list"></div>
       </div>
       <div class="studio-card">
-        <div class="studio-title">Generated Outline</div>
-        <div class="studio-subtitle">Client-side template output. No AI API calls are used.</div>
+        <div class="studio-title">Production Workflow</div>
+        <div class="studio-subtitle">Step 3: follow the checklist. Client-side templates only; no AI API calls are used.</div>
         <div id="videoOutput" class="studio-output-grid">
-          <div class="studio-empty">Select 1-5 trades and generate an outline, or start a Scanner Intro project without journal rows.</div>
+          <div class="studio-empty">Choose project settings, then Generate Project. Scanner Intro works without selected trades.</div>
         </div>
         <div class="recording-assistant">
           <div class="studio-title" style="margin-top:18px;">Recording Assistant</div>
           <div class="studio-subtitle">Scene cards for planning screenshots, visuals, scripts, and recording progress.</div>
+          <div id="recordingAssistantSummary"></div>
           <div id="assetChecklistSummary"></div>
           <div id="recordingAssistant" class="studio-output-grid">
             <div class="studio-empty">Generate an outline to create scene cards.</div>
@@ -3695,15 +3713,24 @@
 
   function sceneCompletionCounts(project = currentVideoProject) {
     const scenes = project?.scenes || [];
-    return { total: scenes.length, completed: scenes.filter(scene => scene.completed).length };
+    return {
+      total: scenes.length,
+      completed: scenes.filter(scene => scene.status === 'Complete' || scene.completed).length,
+      recorded: scenes.filter(scene => ['Recorded','Needs Edit','Complete'].includes(scene.status) || scene.completed).length,
+    };
   }
 
-  function assetChecklistCounts(scenes = []) {
-    return scenes.reduce((acc, scene) => {
-      const needed = scene.assetType !== 'No Asset Needed';
+  function assetChecklistCounts(scenes = [], assets = currentVideoProject?.assets || []) {
+    const base = assets.length ? assets : scenes.map(scene => ({
+      assetType: scene.assetType,
+      status: scene.assetStatus,
+    }));
+    return base.reduce((acc, item) => {
+      const assetType = item.assetType || item.name;
+      const needed = assetType !== 'No Asset Needed';
       if (needed) acc.total += 1;
-      if (needed && scene.assetStatus === 'Captured') acc.captured += 1;
-      if (needed && scene.assetStatus === 'Missing') acc.missing += 1;
+      if (needed && item.status === 'Captured') acc.captured += 1;
+      if (needed && (item.status === 'Missing' || item.status === 'Needed')) acc.missing += 1;
       return acc;
     }, { total: 0, captured: 0, missing: 0 });
   }
@@ -3722,7 +3749,7 @@
     const projects = loadVideoProjects();
     const status = currentVideoProject?.status || 'Draft';
     const scenes = sceneCompletionCounts();
-    const assets = assetChecklistCounts(currentVideoProject?.scenes || []);
+    const assets = assetChecklistCounts(currentVideoProject?.scenes || [], currentVideoProject?.assets || []);
     const selected = document.querySelectorAll('.video-trade-check:checked').length;
     setVideoText('creatorSavedCount', String(projects.length));
     setVideoText('creatorCurrentTitle', projectTitle());
@@ -3744,6 +3771,41 @@
     if (select && select.value !== status) select.value = status;
   }
 
+  function nextRecommendedVideoTask(project = currentVideoProject) {
+    if (!project) return 'Create a project from the setup wizard.';
+    const scenes = project.scenes || [];
+    const nextScene = scenes.find(scene => !scene.status || scene.status === 'Not Started');
+    if (nextScene) return `Record Scene ${nextScene.sceneNumber || scenes.indexOf(nextScene) + 1}: ${nextScene.title}`;
+    const editScene = scenes.find(scene => scene.status === 'Needs Edit');
+    if (editScene) return `Edit Scene ${editScene.sceneNumber || scenes.indexOf(editScene) + 1}: ${editScene.title}`;
+    const missingAsset = (project.assets || []).find(asset => asset.status !== 'Captured' && asset.assetType !== 'No Asset Needed');
+    if (missingAsset) return `Capture asset: ${missingAsset.name || missingAsset.assetType}`;
+    return 'Export the project or mark it Ready to Edit.';
+  }
+
+  function renderRecordingAssistantSummary(project = currentVideoProject) {
+    const box = document.getElementById('recordingAssistantSummary');
+    if (!box) return;
+    if (!project?.scenes?.length) {
+      box.innerHTML = '';
+      return;
+    }
+    const scenes = sceneCompletionCounts(project);
+    const assets = assetChecklistCounts(project.scenes || [], project.assets || []);
+    const pct = scenes.total ? Math.round(((scenes.completed + assets.captured) / Math.max(scenes.total + assets.total, 1)) * 100) : 0;
+    box.innerHTML = `
+      <div class="asset-summary">
+        <div class="asset-summary-card"><div class="asset-summary-label">Total scenes</div><div class="asset-summary-value">${scenes.total}</div></div>
+        <div class="asset-summary-card"><div class="asset-summary-label">Scenes recorded</div><div class="asset-summary-value">${scenes.recorded}</div></div>
+        <div class="asset-summary-card"><div class="asset-summary-label">Assets captured</div><div class="asset-summary-value">${assets.captured} / ${assets.total}</div></div>
+        <div class="asset-summary-card"><div class="asset-summary-label">Completion</div><div class="asset-summary-value">${pct}%</div></div>
+      </div>
+      <div class="studio-output" style="margin-bottom:12px;">
+        <div class="scene-label">Next recommended task</div>
+        <div class="scene-text">${escapeHtml(nextRecommendedVideoTask(project))}</div>
+      </div>`;
+  }
+
   function renderVideoStudio() {
     const list = document.getElementById('videoTradeList');
     const count = document.getElementById('videoTradeCount');
@@ -3755,7 +3817,7 @@
       .slice(0, 80);
 
     if (!videoTradeRows.length) {
-      count.textContent = '0 trades selected';
+      count.textContent = 'Step 2: 0 trades selected';
       list.innerHTML = '<div class="studio-empty" style="padding:24px 0;">No journal trades yet. Log trades from Scanner cards to build trade-based videos, or use Start Scanner Intro Project to create an intro without journal rows.</div>';
       renderCreatorDashboard();
       return;
@@ -3785,7 +3847,7 @@
   function updateVideoTradeCount() {
     const selected = document.querySelectorAll('.video-trade-check:checked').length;
     const count = document.getElementById('videoTradeCount');
-    if (count) count.textContent = `${selected} trade${selected === 1 ? '' : 's'} selected`;
+    if (count) count.textContent = `Step 2: ${selected} trade${selected === 1 ? '' : 's'} selected`;
     renderCreatorDashboard();
   }
 
@@ -3808,8 +3870,10 @@
     return Object.entries(counts).map(([grade, count]) => `${grade}: ${count}`).join(' · ') || 'No graded trades';
   }
 
-  function buildScannerIntroOutline() {
+  function buildScannerIntroOutline(setup = {}) {
+    const runtime = estimatedRuntimeForLength(setup.videoLength || 'Short 2-4 min', 6);
     return {
+      estimatedRuntime: runtime,
       titles: [
         'Why I Built My Forex Scanner',
         'Inside My Forex Scanner: Trend, Location, Confirmation',
@@ -3819,6 +3883,7 @@
       ],
       hook: 'I built this scanner because I needed a calmer way to find forex trade candidates without pretending every alert is a perfect signal.',
       structure: [
+        `Format: ${setup.videoLength || 'Short 2-4 min'} for ${(setup.platforms || ['YouTube']).join(', ')}.`,
         'Introduce the problem: too many pairs, too much noise, and inconsistent review.',
         'Explain the scanner framework: Daily trend, short-term flow, premium/discount location, entry status, setup grade, and confirmation.',
         'Show how A/B/C grades separate confirmed pullbacks, wait setups, and caution setups.',
@@ -3847,13 +3912,13 @@
     };
   }
 
-  function buildTradeBasedOutline(type, trades) {
+  function buildTradeBasedOutline(type, trades, setup = {}) {
     const pairs = trades.map(videoSymbol).filter(Boolean).join(', ') || 'selected trades';
     const primary = trades[0] || {};
     const summaries = trades.map(tradeSummaryLine);
     const mix = gradeMix(trades);
     const titlesByType = {
-      'Weekly Scanner Report': [
+      'Weekly Recap': [
         `Weekly Forex Scanner Report: ${pairs}`,
         'Best and Worst Forex Setups From This Week',
         'What the Forex Scanner Found This Week',
@@ -3867,48 +3932,49 @@
         'Was This Entry Early or On Time?',
         'Scout Card to Journal: Full Trade Breakdown',
       ],
-      'Setup Grade Review': [
-        `A/B/C Setup Grade Review: ${pairs}`,
-        'Do Setup Grades Match Better Forex Trades?',
-        'Ranking Scout Setups by Quality',
-        'Confirmed vs Wait Setups: What Changed?',
-        'Setup Grade Review From the Journal',
+      'Feature Update': [
+        'New Forex Scanner Feature Update',
+        'How I Changed the Scanner Workflow This Week',
+        'Scout vs Scalping: New Workflow Update',
+        'Building a Better Scanner Without Overfitting',
+        'Forex Scanner Development Update',
       ],
-      'Entry Timing Review': [
-        'Entry Timing Review: Early, Late, or Good?',
-        'Was the Scanner Right but the Entry Early?',
-        `Reviewing Entry Quality on ${pairs}`,
-        'Trend Was Right. Was Timing Right?',
-        'What These Trades Say About Pullback Timing',
-      ],
-      'Prop Firm Update': [
-        'Prop Firm Update: Forex Scanner Review',
-        'Trading Discipline Update With Scanner Data',
-        'What I Took, What I Skipped, What I Learned',
-        `Prop Firm Journal Review: ${pairs}`,
-        'Building Consistency With Scanner Rules',
+      'Educational Lesson': [
+        'How to Separate Trend, Location, and Entry Timing',
+        'Why Good Forex Areas Still Need Confirmation',
+        'A Simple Way to Review Scanner Setups',
+        'How I Use A/B/C Grades Before Taking Trades',
+        'Forex Scanner Lesson: Area vs Entry Trigger',
       ],
     };
     return {
+      estimatedRuntime: estimatedRuntimeForLength(setup.videoLength || 'Short 2-4 min', trades.length ? 5 : 6),
       titles: titlesByType[type] || titlesByType['Trade Breakdown'],
       hook: 'Today I am using logged forex scanner trades to review whether setup quality, confirmation, and entry timing actually matched the outcome.',
       structure: [
+        `Format: ${setup.videoLength || 'Short 2-4 min'} for ${(setup.platforms || ['YouTube']).join(', ')}.`,
         `Set context: ${type} using ${trades.length} selected trade${trades.length === 1 ? '' : 's'}.`,
         'Review the scanner snapshot: trend, short-term flow, phase, location, setup grade, and entry status.',
         'Compare confirmation status against the actual entry timing.',
         'Walk through the outcome and journal notes without hindsight bias.',
         'Summarize what should be repeated, avoided, or tested next.',
       ],
-      scenes: [
+      scenes: trades.length ? [
         'Opening dashboard shot with selected journal rows.',
         `Trade list overlay: ${summaries.join(' | ')}`,
         'Show Scout card or journal snapshot for grade, confirmation, and entry status.',
         'Explain whether the trade was A, B, or C quality and why.',
         'Close with one testing takeaway for the next scanner session.',
+      ] : [
+        'Opening dashboard shot with the scanner workflow visible.',
+        `Explain the purpose of this ${type.toLowerCase()} and what changed.`,
+        'Show the relevant scanner area, tab, or feature being discussed.',
+        'Walk through how a trader should use this workflow without treating it as a signal.',
+        'Close with the next testing step and what data will be collected.',
       ],
       talkingPoints: [
-        `Selected trades: ${summaries.join(' ')}`,
-        `Grade mix: ${mix}.`,
+        trades.length ? `Selected trades: ${summaries.join(' ')}` : `This ${type.toLowerCase()} is a workflow explanation, not a trade call.`,
+        trades.length ? `Grade mix: ${mix}.` : 'The goal is to make the scanner easier to use without making the rules messy.',
         'Trend shows the larger direction; short-term flow shows what price was doing near the entry.',
         'Location matters because longs in discount and shorts in premium should behave differently.',
         'Confirmation is tracked separately so a good area is not confused with an entry trigger.',
@@ -3924,20 +3990,65 @@
     return document.getElementById('scriptStyle')?.value || 'Casual';
   }
 
+  function getVideoSetupSelections() {
+    return {
+      type: document.getElementById('videoType')?.value || 'Scanner Intro',
+      scriptStyle: document.getElementById('scriptStyle')?.value || 'Casual',
+      videoLength: document.getElementById('videoLength')?.value || 'Short 2-4 min',
+      platforms: Array.from(document.querySelectorAll('.video-platform-check:checked')).map(el => el.value),
+    };
+  }
+
+  function estimatedRuntimeForLength(length, sceneCount = 5) {
+    if (length === 'Long 10-20 min') return `${Math.max(10, sceneCount * 2)}-${Math.max(14, sceneCount * 3)} min`;
+    if (length === 'Medium 5-8 min') return '5-8 min';
+    return '2-4 min';
+  }
+
+  function sceneLengthForVideo(length, idx) {
+    if (length === 'Long 10-20 min') return idx === 0 ? '60-90 sec' : '90-150 sec';
+    if (length === 'Medium 5-8 min') return idx === 0 ? '30-45 sec' : '45-75 sec';
+    return idx === 0 ? '15-25 sec' : '25-45 sec';
+  }
+
+  function defaultScannerIntroAssets(hasJournalRows = false) {
+    return [
+      'Dashboard screenshot',
+      'Trade Finder screenshot',
+      'Scout/Grades screenshot',
+      'Example chart screenshot',
+      ...(hasJournalRows ? ['Journal screenshot'] : []),
+      'Thumbnail image',
+      'Outro/CTA screen',
+    ].map((name, idx) => ({
+      name,
+      assetType: name.includes('chart') ? 'TradingView Chart' : name.includes('Journal') ? 'Journal Screenshot' : 'Scanner Screenshot',
+      status: 'Needed',
+      notes: `Capture ${name.toLowerCase()} for the video project.`,
+      filename: `scanner-intro-asset-${String(idx + 1).padStart(2, '0')}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`,
+    }));
+  }
+
   function generateVideoOutline() {
-    const type = document.getElementById('videoType')?.value || 'Scanner Intro';
-    const scriptStyle = getVideoScriptStyle();
+    const setup = getVideoSetupSelections();
+    const type = setup.type;
+    const scriptStyle = setup.scriptStyle;
     const trades = selectedVideoTrades();
-    if (type !== 'Scanner Intro' && trades.length < 1) {
+    const needsTrades = type === 'Trade Breakdown' || type === 'Weekly Recap';
+    if (needsTrades && trades.length < 1) {
       alert('Select at least 1 trade for this video type.');
       return;
     }
-    const outline = type === 'Scanner Intro' ? buildScannerIntroOutline() : buildTradeBasedOutline(type, trades.slice(0, 5));
+    const outline = type === 'Scanner Intro' ? buildScannerIntroOutline(setup) : buildTradeBasedOutline(type, trades.slice(0, 5), setup);
+    const scenes = buildRecordingScenes(outline, type, trades.slice(0, 5), scriptStyle, setup);
     currentVideoProject = {
       id: Date.now(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       type,
+      setupSelections: setup,
+      videoLength: setup.videoLength,
+      platforms: setup.platforms,
       trades: trades.slice(0, 5).map((entry, idx) => ({
         id: videoTradeId(entry, idx),
         pair: videoSymbol(entry),
@@ -3949,11 +4060,19 @@
       outline,
       status: currentVideoProject?.status || 'Draft',
       scriptStyle,
-      scenes: buildRecordingScenes(outline, type, trades.slice(0, 5), scriptStyle),
+      scenes,
+      assets: type === 'Scanner Intro' ? defaultScannerIntroAssets(videoTradeRows.length > 0) : scenes.map(scene => ({
+        name: scene.assetsNeeded || scene.assetType || scene.title,
+        assetType: scene.assetType,
+        status: scene.assetStatus || 'Needed',
+        notes: scene.assetNotes || '',
+        filename: scene.assetFilename || '',
+      })),
     };
+    currentVideoProject.shortsPack = buildShortsPack(currentVideoProject);
     renderVideoOutput(outline);
     renderRecordingAssistant(currentVideoProject.scenes);
-    renderShortsPack(null);
+    renderShortsPack(currentVideoProject.shortsPack);
     markVideoProjectDirty();
     renderCreatorDashboard();
   }
@@ -3963,6 +4082,7 @@
     if (!output) return;
     const sections = [
       ['Title Ideas', (outline.titles || []).map((title, idx) => `${idx + 1}. ${title}`).join('\n')],
+      ['Estimated Runtime', outline.estimatedRuntime || '2-4 min'],
       ['Hook', outline.hook || ''],
       ['Video Structure', (outline.structure || []).map((item, idx) => `${idx + 1}. ${item}`).join('\n')],
       ['Scene List', (outline.scenes || []).map((item, idx) => `${idx + 1}. ${item}`).join('\n')],
@@ -3983,8 +4103,9 @@
 
   function scriptToneLead(style) {
     if (style === 'Educational') return 'Let me break this down clearly.';
-    if (style === 'Documentary') return 'This is the part of the process where the data starts to tell a story.';
-    if (style === 'Transparent/Journey') return 'I am still testing this, so I want to be honest about what I know and what I do not know yet.';
+    if (style === 'Storytelling') return 'Here is the story behind this part of the workflow.';
+    if (style === 'Beginner Friendly') return 'If you are newer to this, here is the simple way to think about it.';
+    if (style === 'Technical') return 'Technically, this is the part of the process that matters.';
     return 'Here is what I am looking at.';
   }
 
@@ -4023,7 +4144,7 @@
     };
   }
 
-  function buildRecordingScenes(outline, type, trades, scriptStyle = 'Casual') {
+  function buildRecordingScenes(outline, type, trades, scriptStyle = 'Casual', setup = {}) {
     return (outline.scenes || []).map((scene, idx) => {
       const trade = trades[idx % Math.max(trades.length, 1)] ? {
         pair: videoSymbol(trades[idx % trades.length]),
@@ -4039,16 +4160,21 @@
             ? 'Analytics panel or summary stats'
             : 'Scout card close-up with grade, confirmation, and entry status';
       const base = {
-        title: `Scene ${idx + 1}: ${String(scene).split(':')[0]}`,
+        sceneNumber: idx + 1,
+        title: String(scene).split(':')[0],
+        goal: outline.structure?.[idx] || outline.talkingPoints?.[idx] || 'Move the viewer to the next part of the workflow.',
         show: scene,
         say: trade.pair ? `${talkingPoint} Use ${trade.pair} as the example and explain the ${trade.setupGrade || 'ungraded'} setup context.` : talkingPoint,
         visual,
+        estimatedLength: sceneLengthForVideo(setup.videoLength || 'Short 2-4 min', idx),
+        assetsNeeded: suggestedAssetType(scene, idx),
         assetType: suggestedAssetType(scene, idx),
         assetNotes: suggestedAssetNotes(scene, trade),
         assetFilename: suggestedAssetFilename(type, trade, idx),
         assetStatus: idx === 0 ? 'Needed' : 'Missing',
         screenshotNeeded: idx > 0,
         completed: false,
+        status: 'Not Started',
       };
       base.script = buildSceneScript(base, type, trade, scriptStyle, outline, idx);
       return base;
@@ -4068,14 +4194,44 @@
   function renderAssetChecklistSummary(scenes = []) {
     const box = document.getElementById('assetChecklistSummary');
     if (!box) return;
-    if (!scenes.length) { box.innerHTML = ''; return; }
-    const counts = assetChecklistCounts(scenes);
+    const assets = currentVideoProject?.assets || [];
+    if (!scenes.length && !assets.length) { box.innerHTML = ''; return; }
+    const counts = assetChecklistCounts(scenes, assets);
     box.innerHTML = `
       <div class="asset-summary">
         <div class="asset-summary-card"><div class="asset-summary-label">Total assets needed</div><div class="asset-summary-value">${counts.total}</div></div>
         <div class="asset-summary-card"><div class="asset-summary-label">Captured assets</div><div class="asset-summary-value">${counts.captured}</div></div>
         <div class="asset-summary-card"><div class="asset-summary-label">Missing assets</div><div class="asset-summary-value">${counts.missing}</div></div>
+      </div>
+      <div class="studio-output" style="margin-bottom:12px;">
+        <div class="studio-output-head"><h3>Asset Checklist</h3></div>
+        <div class="asset-grid">
+          ${(assets.length ? assets : scenes.map(scene => ({
+            name: scene.assetsNeeded || scene.assetType || scene.title,
+            assetType: scene.assetType,
+            status: scene.assetStatus,
+            notes: scene.assetNotes,
+            filename: scene.assetFilename,
+          }))).map((asset, idx) => `
+            <div class="script-block">
+              <div class="scene-label">${escapeHtml(asset.name || asset.assetType || `Asset ${idx + 1}`)}</div>
+              <select class="studio-select" onchange="updateProjectAsset(${idx}, 'status', this.value)">
+                ${['Needed','Captured','Missing'].map(status => `<option value="${status}" ${asset.status === status ? 'selected' : ''}>${status}</option>`).join('')}
+              </select>
+              <div class="scene-text" style="margin-top:6px;">${escapeHtml(asset.filename || '')}</div>
+            </div>`).join('')}
+        </div>
       </div>`;
+  }
+
+  function updateProjectAsset(idx, field, value) {
+    if (!currentVideoProject?.assets?.[idx]) return;
+    currentVideoProject.assets[idx][field] = value;
+    currentVideoProject.updatedAt = new Date().toISOString();
+    markVideoProjectDirty();
+    renderAssetChecklistSummary(currentVideoProject.scenes || []);
+    renderRecordingAssistantSummary();
+    renderCreatorDashboard();
   }
 
   function renderRecordingAssistant(scenes = []) {
@@ -4087,20 +4243,26 @@
       return;
     }
     if (currentVideoProject) scenes = ensureSceneScripts(currentVideoProject);
+    renderRecordingAssistantSummary(currentVideoProject);
     renderAssetChecklistSummary(scenes);
     renderCreatorDashboard();
     box.innerHTML = scenes.map((scene, idx) => `
       <div class="scene-card">
         <div class="scene-card-head">
-          <div class="scene-title">${escapeHtml(scene.title)}</div>
+          <div>
+            <div class="scene-title">Scene ${scene.sceneNumber || idx + 1}: ${escapeHtml(scene.title)}</div>
+            <div class="project-meta">Estimated length: ${escapeHtml(scene.estimatedLength || '30-60 sec')}</div>
+          </div>
           <div class="scene-checks">
-            <label><input type="checkbox" ${scene.screenshotNeeded ? 'checked' : ''} onchange="updateSceneFlag(${idx}, 'screenshotNeeded', this.checked)" /> Screenshot needed</label>
-            <label><input type="checkbox" ${scene.completed ? 'checked' : ''} onchange="updateSceneFlag(${idx}, 'completed', this.checked)" /> Completed</label>
+            <select class="studio-select" onchange="updateSceneFlag(${idx}, 'status', this.value)">
+              ${['Not Started','Recorded','Needs Edit','Complete'].map(status => `<option value="${status}" ${scene.status === status ? 'selected' : ''}>${status}</option>`).join('')}
+            </select>
           </div>
         </div>
-        <div class="scene-field"><div class="scene-label">What to show on screen</div><div class="scene-text">${escapeHtml(scene.show)}</div></div>
-        <div class="scene-field"><div class="scene-label">What to say</div><div class="scene-text">${escapeHtml(scene.say)}</div></div>
-        <div class="scene-field"><div class="scene-label">Suggested visual</div><div class="scene-text">${escapeHtml(scene.visual)}</div></div>
+        <div class="scene-field"><div class="scene-label">Goal</div><div class="scene-text">${escapeHtml(scene.goal || '')}</div></div>
+        <div class="scene-field"><div class="scene-label">Narration / Script</div><div class="scene-text">${escapeHtml(scene.say)}</div></div>
+        <div class="scene-field"><div class="scene-label">Visual Direction</div><div class="scene-text">${escapeHtml(scene.visual)}</div></div>
+        <div class="scene-field"><div class="scene-label">Assets Needed</div><div class="scene-text">${escapeHtml(scene.assetsNeeded || scene.assetType || 'No Asset Needed')}</div></div>
         <div class="asset-builder">
           <div class="scene-label">Asset Builder</div>
           <div class="asset-grid">
@@ -4148,8 +4310,10 @@
   function updateSceneFlag(idx, field, value) {
     if (!currentVideoProject?.scenes?.[idx]) return;
     currentVideoProject.scenes[idx][field] = value;
+    if (field === 'status') currentVideoProject.scenes[idx].completed = value === 'Complete';
     currentVideoProject.updatedAt = new Date().toISOString();
     if (field === 'assetStatus' || field === 'assetType') renderAssetChecklistSummary(currentVideoProject.scenes);
+    renderRecordingAssistantSummary();
     markVideoProjectDirty();
     renderCreatorDashboard();
   }
@@ -4197,6 +4361,11 @@
   async function copyFullScript() {
     if (!currentVideoProject) { alert('Generate or load a video project before copying the full script.'); return; }
     await copyText(fullScriptText(currentVideoProject), 'Copied full script');
+  }
+
+  async function copyYouTubeDescription() {
+    if (!currentVideoProject) { alert('Generate or load a video project before copying the YouTube description.'); return; }
+    await copyText(currentVideoProject.outline?.description || '', 'Copied YouTube description');
   }
 
   function persistCurrentVideoProject() {
@@ -4325,6 +4494,11 @@
     videoProjectDirty = false;
     if (document.getElementById('videoType')) document.getElementById('videoType').value = project.type || 'Scanner Intro';
     if (document.getElementById('scriptStyle')) document.getElementById('scriptStyle').value = project.scriptStyle || 'Casual';
+    if (document.getElementById('videoLength')) document.getElementById('videoLength').value = project.videoLength || project.setupSelections?.videoLength || 'Short 2-4 min';
+    document.querySelectorAll('.video-platform-check').forEach(box => {
+      const platforms = project.platforms || project.setupSelections?.platforms || ['YouTube'];
+      box.checked = platforms.includes(box.value);
+    });
     ensureSceneScripts(currentVideoProject);
     renderVideoOutput(project.outline);
     renderRecordingAssistant(project.scenes || buildRecordingScenes(project.outline, project.type, []));
@@ -4370,6 +4544,10 @@
       `# ${outline.titles?.[0] || project.title || 'Video Outline'}`,
       '',
       `Video Type: ${project.type || 'N/A'}`,
+      `Script Style: ${project.scriptStyle || 'Casual'}`,
+      `Video Length: ${project.videoLength || project.setupSelections?.videoLength || 'N/A'}`,
+      `Target Platforms: ${(project.platforms || project.setupSelections?.platforms || []).join(', ') || 'N/A'}`,
+      `Estimated Runtime: ${outline.estimatedRuntime || 'N/A'}`,
       `Updated: ${project.updatedAt || new Date().toISOString()}`,
       '',
       '## Title Ideas',
@@ -4389,10 +4567,13 @@
       '',
       '## Recording Assistant',
       ...scenes.flatMap((scene, idx) => [
-        `### ${idx + 1}. ${scene.title}`,
-        `- What to show: ${scene.show}`,
-        `- What to say: ${scene.say}`,
-        `- Suggested visual: ${scene.visual}`,
+        `### Scene ${idx + 1}: ${scene.title}`,
+        `- Status: ${scene.status || (scene.completed ? 'Complete' : 'Not Started')}`,
+        `- Estimated length: ${scene.estimatedLength || ''}`,
+        `- Goal: ${scene.goal || ''}`,
+        `- Narration/script: ${scene.say}`,
+        `- Visual direction: ${scene.visual}`,
+        `- Assets needed: ${scene.assetsNeeded || scene.assetType || ''}`,
         `- Short voiceover: ${scene.script?.shortVoiceover || ''}`,
         `- Natural talking version: ${scene.script?.naturalTalking || ''}`,
         `- Bullet version: ${(scene.script?.bulletVersion || '').replace(/\n/g, '; ')}`,
@@ -4402,7 +4583,15 @@
         `- Filename suggestion: ${scene.assetFilename || ''}`,
         `- Asset status: ${scene.assetStatus || 'Needed'}`,
         `- Screenshot needed: ${scene.screenshotNeeded ? 'Yes' : 'No'}`,
-        `- Completed: ${scene.completed ? 'Yes' : 'No'}`,
+        '',
+      ]),
+      '## Asset Checklist',
+      ...(project.assets || []).flatMap((asset, idx) => [
+        `### ${idx + 1}. ${asset.name || asset.assetType || 'Asset'}`,
+        `- Type: ${asset.assetType || ''}`,
+        `- Status: ${asset.status || 'Needed'}`,
+        `- Filename: ${asset.filename || ''}`,
+        `- Notes: ${asset.notes || ''}`,
         '',
       ]),
       '## Thumbnail Text',
@@ -4446,7 +4635,14 @@
 
   function assetChecklistMarkdown(project) {
     const scenes = project.scenes || [];
-    const counts = assetChecklistCounts(scenes);
+    const assets = project.assets || scenes.map(scene => ({
+      name: scene.assetsNeeded || scene.assetType || scene.title,
+      assetType: scene.assetType,
+      status: scene.assetStatus,
+      filename: scene.assetFilename,
+      notes: scene.assetNotes,
+    }));
+    const counts = assetChecklistCounts(scenes, assets);
     return [
       `# Asset Checklist: ${project.outline?.titles?.[0] || project.title || 'Video Project'}`,
       '',
@@ -4456,14 +4652,12 @@
       `Missing assets: ${counts.missing}`,
       '',
       '## Assets',
-      ...scenes.flatMap((scene, idx) => [
-        `### ${idx + 1}. ${scene.title}`,
-        `- Asset type: ${scene.assetType || 'No Asset Needed'}`,
-        `- Asset status: ${scene.assetStatus || 'Needed'}`,
-        `- Filename suggestion: ${scene.assetFilename || ''}`,
-        `- Asset notes: ${scene.assetNotes || ''}`,
-        `- Screenshot needed: ${scene.screenshotNeeded ? 'Yes' : 'No'}`,
-        `- Scene visual: ${scene.visual || ''}`,
+      ...assets.flatMap((asset, idx) => [
+        `### ${idx + 1}. ${asset.name || asset.assetType || 'Asset'}`,
+        `- Asset type: ${asset.assetType || 'No Asset Needed'}`,
+        `- Asset status: ${asset.status || 'Needed'}`,
+        `- Filename suggestion: ${asset.filename || ''}`,
+        `- Asset notes: ${asset.notes || ''}`,
         '',
       ]),
     ].join('\n');
