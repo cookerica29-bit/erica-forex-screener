@@ -1101,6 +1101,8 @@
       <div class="ai-knowledge-layout">
         <div>
           <div class="ai-knowledge-form">
+            <div class="ai-template-name">Knowledge Item Editor</div>
+            <div class="ai-template-use" style="margin-bottom:10px;">Save methodology as Draft Knowledge while writing. Switch to Approved Knowledge when it is ready to influence generated content.</div>
             <input type="hidden" id="aiKbEditingId" value="">
             <div class="studio-form-row">
               <label>Title</label>
@@ -1135,8 +1137,9 @@
             </div>
           </div>
           <div class="ai-suggestion-panel" style="margin-top:12px;">
-            <div class="ai-template-name">AI Suggested Lessons</div>
+            <div class="ai-template-name">AI Suggested Lesson</div>
             <div class="ai-template-use">Mock future journal-analysis suggestions. Approving creates a Knowledge Base item.</div>
+            <div id="aiSuggestionStatus" class="studio-subtitle" style="margin:8px 0 0;"></div>
             <div id="aiSuggestedLessons"></div>
           </div>
         </div>
@@ -2673,7 +2676,7 @@
   function loadAiKnowledgeItems() {
     try {
       const saved = JSON.parse(localStorage.getItem(AI_KNOWLEDGE_BASE_KEY) || 'null');
-      if (Array.isArray(saved) && saved.length) return saved.map(normalizeAiKnowledgeItem);
+      if (Array.isArray(saved)) return saved.map(normalizeAiKnowledgeItem);
     } catch (_) {}
     return defaultAiKnowledgeItems();
   }
@@ -2719,10 +2722,18 @@
     if (summary) summary.textContent = `${approvedCount} approved · ${draftCount} draft · only Approved items influence generated content`;
     const list = document.getElementById('aiKnowledgeList');
     if (list) {
-      list.innerHTML = items.map(item => `
+      if (!items.length) {
+        list.innerHTML = `<div class="studio-empty" style="grid-column:1 / -1;">
+          <div style="color:var(--text);font-weight:900;margin-bottom:6px;">No Knowledge Base items yet</div>
+          <div>Add Draft Knowledge in the editor, then mark it as Approved Knowledge when it is ready to influence generated content.</div>
+        </div>`;
+      } else {
+        list.innerHTML = items.map(item => {
+          const statusLabel = item.status === 'Approved' ? 'Approved Knowledge' : 'Draft Knowledge';
+          return `
         <div class="ai-knowledge-card ${item.status.toLowerCase()}">
           <div class="ai-knowledge-meta">
-            <span class="ai-kb-status ${item.status.toLowerCase()}">${escapeHtml(item.status)}</span>
+            <span class="ai-kb-status ${item.status.toLowerCase()}">${escapeHtml(statusLabel)}</span>
             <span>${escapeHtml(item.category)}</span>
           </div>
           <div class="ai-knowledge-title">${escapeHtml(item.title)}</div>
@@ -2732,7 +2743,9 @@
             <button class="studio-btn secondary small" onclick="editAiKnowledgeItem('${item.id}')">Edit</button>
             <button class="studio-btn secondary small" onclick="deleteAiKnowledgeItem('${item.id}')">Delete</button>
           </div>
-        </div>`).join('');
+        </div>`;
+        }).join('');
+      }
     }
     renderAiSuggestedLessons();
   }
@@ -2833,10 +2846,15 @@
         <div class="ai-template-meta"><strong>Sample size:</strong> ${escapeHtml(suggestion.sampleSize)}</div>
         <div class="ai-template-meta"><strong>Confidence:</strong> ${escapeHtml(suggestion.confidence)}</div>
         <div class="studio-actions" style="margin-top:10px;">
-          <button class="studio-btn secondary small" onclick="approveAiSuggestedLesson('${suggestion.id}')">Approve</button>
-          <button class="studio-btn secondary small" onclick="rejectAiSuggestedLesson('${suggestion.id}')">Reject</button>
+          <button class="studio-btn secondary small" onclick="approveAiSuggestedLesson('${suggestion.id}')">Approve Lesson</button>
+          <button class="studio-btn secondary small" onclick="rejectAiSuggestedLesson('${suggestion.id}')">Reject Lesson</button>
         </div>
       </div>`).join('');
+  }
+
+  function setAiSuggestionStatus(message) {
+    const status = document.getElementById('aiSuggestionStatus');
+    if (status) status.textContent = message;
   }
 
   function approveAiSuggestedLesson(id) {
@@ -2853,11 +2871,14 @@
     });
     saveAiKnowledgeItems([item, ...loadAiKnowledgeItems()]);
     renderAiKnowledgeBase();
+    setAiSuggestionStatus(`Approved Lesson: ${suggestion.title} was added as Approved Knowledge.`);
     showVideoToast('Suggested lesson approved');
   }
 
   function rejectAiSuggestedLesson(id) {
+    const suggestion = aiSuggestedLessonMocks().find(item => item.id === id);
     document.getElementById(`aiSuggestion-${id}`)?.remove();
+    setAiSuggestionStatus(`Rejected Lesson: ${suggestion?.title || 'Suggestion'} was dismissed for this session.`);
     showVideoToast('Suggested lesson rejected');
   }
 
