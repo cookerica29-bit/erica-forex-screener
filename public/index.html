@@ -975,7 +975,7 @@
         <div class="ai-panel-head">
           <div>
             <div class="studio-title">Content Queue</div>
-            <div class="studio-subtitle">Recent A-grade scanner signals ready to become content.</div>
+            <div class="studio-subtitle" id="aiQueueSubtitle">Recent A-grade scanner signals ready to become content.</div>
           </div>
           <span class="project-status-badge ready-to-record">Ready for Review</span>
         </div>
@@ -2189,11 +2189,11 @@
   function renderCard(s, idx) { return renderScoutCard(s); } // legacy alias
 
   function aiSignalRows() {
-    const source = Array.isArray(allSetups) && allSetups.length
-      ? allSetups.filter(row => (row.setupGrade || '').toUpperCase() === 'A')
-      : [];
-    if (source.length) {
-      return source.slice().sort((a, b) => new Date(b.scannedAt || b.candleTime || 0) - new Date(a.scannedAt || a.candleTime || 0)).slice(0, 12);
+    if (Array.isArray(allSetups) && allSetups.length) {
+      return allSetups
+        .filter(row => (row.setupGrade || '').toUpperCase() === 'A')
+        .sort((a, b) => new Date(b.scannedAt || b.candleTime || 0) - new Date(a.scannedAt || a.candleTime || 0))
+        .slice(0, 12);
     }
     return [
       {
@@ -2211,6 +2211,7 @@
         rrRatio: 2.85,
         entryStatus: 'Waiting',
         scannedAt: new Date().toISOString(),
+        isMock: true,
       },
       {
         pair: 'USD_JPY',
@@ -2227,6 +2228,7 @@
         rrRatio: 2.49,
         entryStatus: 'Entry Area',
         scannedAt: new Date().toISOString(),
+        isMock: true,
       },
     ];
   }
@@ -2256,13 +2258,22 @@
 
   function renderAiStudio() {
     const rows = aiSignalRows();
+    const hasRealScannerData = Array.isArray(allSetups) && allSetups.length > 0;
+    const usingMockRows = rows.some(row => row.isMock);
     document.getElementById('aiQueuedCount').textContent = rows.length;
     document.getElementById('aiEpisodeCount').textContent = currentAiPackage ? '1' : '0';
     document.getElementById('aiReviewCount').textContent = currentAiPackage ? '1' : '0';
     document.getElementById('aiActivePackage').textContent = currentAiPackage?.trade?.displaySymbol || currentAiPackage?.trade?.pair || 'None';
+    document.getElementById('aiQueueSubtitle').textContent = usingMockRows
+      ? 'Sample A-grade signals for testing the production workflow before scanner data is loaded.'
+      : 'Recent A-grade scanner signals ready to become content.';
     const queue = document.getElementById('aiContentQueue');
     if (!rows.length) {
-      queue.innerHTML = '<div class="studio-empty">No A-grade scanner signals are available yet. Run a Scout scan first, then return here.</div>';
+      queue.innerHTML = `<div class="studio-empty">
+        <div style="font-size:28px;margin-bottom:8px;">✨</div>
+        <div style="color:var(--text);font-weight:900;margin-bottom:6px;">No A-grade signals in the current scanner results</div>
+        <div>${hasRealScannerData ? 'Kairos AI Studio only queues A-grade signals. Run another Scout scan or produce content from a later A setup.' : 'Run a Scout scan to replace the sample queue with real scanner signals.'}</div>
+      </div>`;
       return;
     }
     queue.innerHTML = rows.map((row, idx) => renderAiTradeCard(row, idx)).join('');
@@ -2277,7 +2288,7 @@
       <div class="ai-trade-card">
         <div class="ai-trade-top">
           <div>
-            <div class="ai-trade-pair">${escapeHtml(displaySymbol)}</div>
+            <div class="ai-trade-pair">${escapeHtml(displaySymbol)}${row.isMock ? ' <span class="badge tf">Sample</span>' : ''}</div>
             <div class="project-meta">${escapeHtml(row.timeframe || 'H4')} · Found ${escapeHtml(aiFoundTime(row))}</div>
           </div>
           <div class="ai-trade-status">${escapeHtml(row.entryStatus || row.status || 'Ready for Review')}</div>
@@ -2322,6 +2333,18 @@
     const title = `${pair} ${grade} Setup: ${sideWord.toUpperCase()} Trade Plan from ${location}`;
     return {
       trade: { ...trade, displaySymbol: pair },
+      summary: {
+        pair,
+        direction,
+        grade,
+        timeframe: tf,
+        location,
+        entry,
+        sl,
+        tp,
+        rr,
+        status: trade.entryStatus || trade.status || 'Ready for Review',
+      },
       sections: [
         { label: 'YouTube Title', value: title },
         { label: 'Long-form YouTube Script', large: true, value:
@@ -2374,6 +2397,7 @@ This is for education and journal review only. It is not financial advice.` },
   function renderAiPackage(pkg) {
     const output = document.getElementById('aiEpisodeOutput');
     const pair = pkg.trade.displaySymbol || pkg.trade.pair || 'Draft Episode';
+    const summary = pkg.summary || {};
     output.innerHTML = `
       <div class="ai-package-card">
         <div class="ai-package-head">
@@ -2381,7 +2405,15 @@ This is for education and journal review only. It is not financial advice.` },
             <div class="ai-package-title">${escapeHtml(pair)} Content Package</div>
             <div class="ai-package-meta">Draft Episode · Ready for Review · ${escapeHtml(pkg.trade.setupGrade || 'A')} Setup</div>
           </div>
-          <button class="studio-btn secondary" onclick="approveAiPackage()">Approve</button>
+          <button class="studio-btn secondary" onclick="approveAiPackage()">Approve Content Package</button>
+        </div>
+        <div class="ai-trade-grid" style="margin-bottom:12px;">
+          <div class="ai-trade-field"><div class="ai-field-label">Pair</div><div class="ai-field-value">${escapeHtml(summary.pair || pair)}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Direction</div><div class="ai-field-value ${summary.direction === 'LONG' ? 'long' : 'short'}">${escapeHtml(summary.direction || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Status</div><div class="ai-field-value">${escapeHtml(summary.status || 'Ready for Review')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Entry / SL / TP</div><div class="ai-field-value">${escapeHtml(summary.entry || '—')} / ${escapeHtml(summary.sl || '—')} / ${escapeHtml(summary.tp || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">R:R</div><div class="ai-field-value">${escapeHtml(summary.rr || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Location</div><div class="ai-field-value">${escapeHtml(summary.location || '—')}</div></div>
         </div>
         ${pkg.sections.map(section => renderAiSection(section)).join('')}
       </div>`;
