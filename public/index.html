@@ -248,6 +248,42 @@
     .project-row { align-items:center; background:rgba(148,163,184,.04); border:1px solid rgba(148,163,184,.08); border-radius:8px; display:flex; gap:8px; justify-content:space-between; padding:8px 10px; }
     .project-title { color:var(--text); font-size:12px; font-weight:850; }
     .project-meta { color:var(--slate-dim); font-size:10px; margin-top:2px; line-height:1.45; }
+    .ai-studio-page { padding:18px 24px 28px; max-width:1480px; margin:0 auto; }
+    .ai-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:14px; padding:18px; border:1px solid rgba(96,165,250,.14); border-radius:14px; background:linear-gradient(135deg,rgba(96,165,250,.09),rgba(15,23,42,.26)); }
+    .ai-kicker { color:var(--blue); font-size:10px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px; }
+    .ai-title { color:var(--text); font-size:24px; font-weight:950; letter-spacing:-.03em; }
+    .ai-subtitle { color:var(--slate); font-size:12px; line-height:1.5; max-width:760px; margin-top:6px; }
+    .ai-hero-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .ai-section-nav { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+    .ai-section-pill { border:1px solid rgba(148,163,184,.13); background:rgba(148,163,184,.04); color:var(--slate); border-radius:999px; padding:7px 11px; font-size:11px; font-family:inherit; cursor:pointer; font-weight:800; }
+    .ai-section-pill.active { color:var(--text); border-color:rgba(96,165,250,.45); background:rgba(96,165,250,.12); }
+    .ai-overview-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .ai-studio-grid { display:grid; grid-template-columns:minmax(360px, 460px) minmax(0, 1fr); gap:14px; align-items:start; }
+    .ai-secondary-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:14px; }
+    .ai-panel { background:rgba(12,16,24,.94); border:1px solid rgba(148,163,184,.1); border-radius:12px; padding:14px; box-shadow:0 16px 36px rgba(0,0,0,.14); }
+    .ai-panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+    .ai-queue-list, .ai-output-list { display:flex; flex-direction:column; gap:10px; }
+    .ai-trade-card { border:1px solid rgba(96,165,250,.16); background:linear-gradient(135deg,rgba(15,23,42,.62),rgba(2,6,23,.24)); border-radius:12px; padding:12px; }
+    .ai-trade-top { display:flex; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    .ai-trade-pair { color:var(--text); font-size:20px; font-weight:950; letter-spacing:-.02em; }
+    .ai-trade-status { color:var(--green); border:1px solid rgba(0,255,136,.35); background:rgba(0,255,136,.08); border-radius:999px; padding:4px 8px; font-size:10px; font-weight:900; text-transform:uppercase; white-space:nowrap; }
+    .ai-trade-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin-bottom:10px; }
+    .ai-trade-field { background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.08); border-radius:8px; padding:8px; min-height:52px; }
+    .ai-field-label { color:var(--slate-dim); font-size:9px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+    .ai-field-value { color:var(--text); font-size:12px; font-weight:850; overflow-wrap:anywhere; }
+    .ai-field-value.long { color:var(--green); }
+    .ai-field-value.short { color:var(--red); }
+    .ai-package-card { background:rgba(2,6,23,.25); border:1px solid rgba(148,163,184,.1); border-radius:12px; padding:12px; }
+    .ai-package-head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:10px; }
+    .ai-package-title { color:var(--text); font-size:16px; font-weight:950; }
+    .ai-package-meta { color:var(--slate-dim); font-size:10px; margin-top:3px; }
+    .ai-output-section { border-top:1px solid rgba(148,163,184,.09); padding-top:10px; margin-top:10px; }
+    .ai-output-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:7px; }
+    .ai-output-label { color:#cbd5e1; font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+    .ai-output-textarea { width:100%; min-height:78px; resize:vertical; background:rgba(8,11,16,.92); border:1px solid rgba(148,163,184,.12); border-radius:8px; color:#dbe4ef; padding:9px; font-size:12px; line-height:1.5; font-family:inherit; outline:none; }
+    .ai-output-textarea.large { min-height:190px; }
+    .ai-mini-list { display:flex; flex-direction:column; gap:8px; color:var(--slate); font-size:12px; }
+    .ai-mini-list div { background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.08); border-radius:8px; padding:8px; }
     .video-toast { position:fixed; right:18px; bottom:18px; z-index:9999; background:rgba(15,23,42,.96); border:1px solid rgba(96,165,250,.28); color:var(--text); border-radius:10px; padding:10px 12px; font-size:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.35); }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
@@ -255,7 +291,7 @@
       .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
       .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
-      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid { grid-template-columns:1fr; }
+      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid { grid-template-columns:1fr; }
       .shorts-block.full { grid-column:auto; }
     }
     .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
@@ -512,6 +548,7 @@
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
   <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
   <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">🧮 Calculator</button>
+  <button class="tab-btn" onclick="switchTab('ai')" id="tab-ai">✨ AI Studio</button>
   <button class="tab-btn" onclick="switchTab('video')" id="tab-video">🎬 Video Studio</button>
   <button class="tab-btn" onclick="switchTab('bot')" id="tab-bot">🤖 Bot</button>
 </div>
@@ -903,6 +940,88 @@
   </div>
 </div>
 
+<div id="content-ai" class="tab-content">
+  <div class="ai-studio-page">
+    <div class="ai-hero">
+      <div>
+        <div class="ai-kicker">Kairos AI Studio</div>
+        <div class="ai-title">Signal-to-content production workflow</div>
+        <div class="ai-subtitle">Turn A-grade scanner signals into editable YouTube and social content packages. Sprint 1 is template-based and client-side only.</div>
+      </div>
+      <div class="ai-hero-actions">
+        <button class="studio-btn" onclick="renderAiStudio()">Refresh Queue</button>
+      </div>
+    </div>
+
+    <div class="ai-section-nav">
+      <button class="ai-section-pill active" data-ai-section="overview" onclick="setAiSection('overview')">Overview</button>
+      <button class="ai-section-pill" data-ai-section="queue" onclick="setAiSection('queue')">Content Queue</button>
+      <button class="ai-section-pill" data-ai-section="episodes" onclick="setAiSection('episodes')">Episodes</button>
+      <button class="ai-section-pill" data-ai-section="templates" onclick="setAiSection('templates')">Templates</button>
+      <button class="ai-section-pill" data-ai-section="publishing" onclick="setAiSection('publishing')">Publishing</button>
+      <button class="ai-section-pill" data-ai-section="analytics" onclick="setAiSection('analytics')">Analytics</button>
+      <button class="ai-section-pill" data-ai-section="settings" onclick="setAiSection('settings')">Settings</button>
+    </div>
+
+    <div class="ai-overview-grid" id="aiOverview">
+      <div class="creator-metric"><div class="creator-label">Queued A-grade signals</div><div class="creator-value" id="aiQueuedCount">0</div></div>
+      <div class="creator-metric"><div class="creator-label">Draft episodes</div><div class="creator-value" id="aiEpisodeCount">0</div></div>
+      <div class="creator-metric"><div class="creator-label">Ready for review</div><div class="creator-value" id="aiReviewCount">0</div></div>
+      <div class="creator-metric"><div class="creator-label">Active package</div><div class="creator-value" id="aiActivePackage">None</div></div>
+    </div>
+
+    <div class="ai-studio-grid">
+      <section class="ai-panel" id="aiQueuePanel">
+        <div class="ai-panel-head">
+          <div>
+            <div class="studio-title">Content Queue</div>
+            <div class="studio-subtitle">Recent A-grade scanner signals ready to become content.</div>
+          </div>
+          <span class="project-status-badge ready-to-record">Ready for Review</span>
+        </div>
+        <div id="aiContentQueue" class="ai-queue-list"></div>
+      </section>
+
+      <section class="ai-panel" id="aiEpisodePanel">
+        <div class="ai-panel-head">
+          <div>
+            <div class="studio-title">Episodes</div>
+            <div class="studio-subtitle">Draft Episode and Content Package output.</div>
+          </div>
+          <span class="project-status-badge draft" id="aiEpisodeStatus">Draft Episode</span>
+        </div>
+        <div id="aiEpisodeOutput" class="ai-output-list">
+          <div class="studio-empty">Choose an A-grade signal and click Produce Episode to generate an editable content package.</div>
+        </div>
+      </section>
+    </div>
+
+    <div class="ai-secondary-grid">
+      <section class="ai-panel">
+        <div class="studio-title">Templates</div>
+        <div class="studio-subtitle">Sprint 1 templates use scanner context, risk/reward, grade, and location language.</div>
+        <div class="ai-mini-list">
+          <div>Trade Breakdown</div>
+          <div>Setup Grade Review</div>
+          <div>Entry Timing Review</div>
+        </div>
+      </section>
+      <section class="ai-panel">
+        <div class="studio-title">Publishing</div>
+        <div class="studio-subtitle">YouTube, Shorts, X, Instagram, Facebook, and LinkedIn copy is generated for review. No API publishing is connected.</div>
+      </section>
+      <section class="ai-panel">
+        <div class="studio-title">Analytics</div>
+        <div class="studio-subtitle">Future sprint: track which scanner stories and setup grades perform best.</div>
+      </section>
+      <section class="ai-panel">
+        <div class="studio-title">Settings</div>
+        <div class="studio-subtitle">Future sprint: brand voice, disclaimers, channel defaults, and export preferences.</div>
+      </section>
+    </div>
+  </div>
+</div>
+
 <div id="content-video" class="tab-content">
   <div class="video-studio-page">
     <div class="creator-dashboard">
@@ -1036,6 +1155,7 @@
   let currentVideoProject = null;
   let videoProjectDirty = false;
   let videoTradeRows = [];
+  let currentAiPackage = null;
   const scoutDirMap = {};
   const scoutReportMap = {};
 
@@ -2068,6 +2188,235 @@
 
   function renderCard(s, idx) { return renderScoutCard(s); } // legacy alias
 
+  function aiSignalRows() {
+    const source = Array.isArray(allSetups) && allSetups.length
+      ? allSetups.filter(row => (row.setupGrade || '').toUpperCase() === 'A')
+      : [];
+    if (source.length) {
+      return source.slice().sort((a, b) => new Date(b.scannedAt || b.candleTime || 0) - new Date(a.scannedAt || a.candleTime || 0)).slice(0, 12);
+    }
+    return [
+      {
+        pair: 'EUR_AUD',
+        displaySymbol: 'EUR/AUD',
+        timeframe: 'H4',
+        tradeDirection: 'LONG',
+        setupGrade: 'A',
+        bias: 'BULLISH',
+        htfBias: 'BULLISH',
+        zone: 'DISCOUNT',
+        entry: 1.63578,
+        sl: 1.63018,
+        tp1: 1.65175,
+        rrRatio: 2.85,
+        entryStatus: 'Waiting',
+        scannedAt: new Date().toISOString(),
+      },
+      {
+        pair: 'USD_JPY',
+        displaySymbol: 'USD/JPY',
+        timeframe: 'M30',
+        tradeDirection: 'LONG',
+        setupGrade: 'A',
+        bias: 'BULLISH',
+        htfBias: 'BULLISH',
+        zone: 'DISCOUNT',
+        entry: 161.7495,
+        sl: 161.66896,
+        tp1: 161.95,
+        rrRatio: 2.49,
+        entryStatus: 'Entry Area',
+        scannedAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  function aiDirection(row) {
+    return String(row.tradeDirection || row.direction || row.scoutDirection || row.bias || '').toUpperCase().includes('SHORT') || String(row.bias || '').toUpperCase() === 'BEARISH'
+      ? 'SHORT'
+      : 'LONG';
+  }
+
+  function aiNumber(value, fallback = '—') {
+    if (value === null || value === undefined || value === '') return fallback;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return String(value);
+    return Math.abs(n) >= 100 ? n.toFixed(3) : n.toFixed(5);
+  }
+
+  function aiFoundTime(row) {
+    const raw = row.scannedAt || row.candleTime || row.foundAt;
+    if (!raw) return 'Recent';
+    try { return new Date(raw).toLocaleString(); } catch (_) { return String(raw); }
+  }
+
+  function aiPackageKey(label) {
+    return `ai-${String(label || '').replace(/[^a-z0-9]/gi, '-').toLowerCase()}`;
+  }
+
+  function renderAiStudio() {
+    const rows = aiSignalRows();
+    document.getElementById('aiQueuedCount').textContent = rows.length;
+    document.getElementById('aiEpisodeCount').textContent = currentAiPackage ? '1' : '0';
+    document.getElementById('aiReviewCount').textContent = currentAiPackage ? '1' : '0';
+    document.getElementById('aiActivePackage').textContent = currentAiPackage?.trade?.displaySymbol || currentAiPackage?.trade?.pair || 'None';
+    const queue = document.getElementById('aiContentQueue');
+    if (!rows.length) {
+      queue.innerHTML = '<div class="studio-empty">No A-grade scanner signals are available yet. Run a Scout scan first, then return here.</div>';
+      return;
+    }
+    queue.innerHTML = rows.map((row, idx) => renderAiTradeCard(row, idx)).join('');
+    if (currentAiPackage) renderAiPackage(currentAiPackage);
+  }
+
+  function renderAiTradeCard(row, idx) {
+    const direction = aiDirection(row);
+    const displaySymbol = row.displaySymbol || makePairLabel(row.pair || row.symbol || 'UNKNOWN');
+    const encoded = encodeURIComponent(JSON.stringify(row)).replace(/'/g, '%27');
+    return `
+      <div class="ai-trade-card">
+        <div class="ai-trade-top">
+          <div>
+            <div class="ai-trade-pair">${escapeHtml(displaySymbol)}</div>
+            <div class="project-meta">${escapeHtml(row.timeframe || 'H4')} · Found ${escapeHtml(aiFoundTime(row))}</div>
+          </div>
+          <div class="ai-trade-status">${escapeHtml(row.entryStatus || row.status || 'Ready for Review')}</div>
+        </div>
+        <div class="ai-trade-grid">
+          <div class="ai-trade-field"><div class="ai-field-label">Direction</div><div class="ai-field-value ${direction === 'LONG' ? 'long' : 'short'}">${direction}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Grade</div><div class="ai-field-value">${escapeHtml(row.setupGrade || 'A')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Bias</div><div class="ai-field-value">${escapeHtml(row.bias || row.trendDirection || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">HTF Bias</div><div class="ai-field-value">${escapeHtml(row.htfBias || row.trendDirection || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Location</div><div class="ai-field-value">${escapeHtml(row.zone || row.location || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">R:R</div><div class="ai-field-value">${escapeHtml(row.rrRatio ?? '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Entry</div><div class="ai-field-value">${aiNumber(row.entry)}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">SL</div><div class="ai-field-value">${aiNumber(row.sl)}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">TP</div><div class="ai-field-value">${aiNumber(row.tp1 || row.tp)}</div></div>
+        </div>
+        <button class="studio-btn" onclick="produceAiEpisode('${encoded}')">Produce Episode</button>
+      </div>`;
+  }
+
+  function produceAiEpisode(encodedTrade) {
+    const trade = JSON.parse(decodeURIComponent(encodedTrade));
+    currentAiPackage = buildAiContentPackage(trade);
+    renderAiStudio();
+    renderAiPackage(currentAiPackage);
+    document.getElementById('aiEpisodeStatus').textContent = 'Draft Episode';
+    document.getElementById('aiEpisodePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function buildAiContentPackage(trade) {
+    const pair = trade.displaySymbol || makePairLabel(trade.pair || trade.symbol || 'this pair');
+    const direction = aiDirection(trade);
+    const sideWord = direction === 'LONG' ? 'bullish' : 'bearish';
+    const actionWord = direction === 'LONG' ? 'long' : 'short';
+    const grade = trade.setupGrade || 'A';
+    const location = trade.zone || trade.location || 'key location';
+    const tf = trade.timeframe || 'H4';
+    const rr = trade.rrRatio || '—';
+    const entry = aiNumber(trade.entry);
+    const sl = aiNumber(trade.sl);
+    const tp = aiNumber(trade.tp1 || trade.tp);
+    const found = aiFoundTime(trade);
+    const title = `${pair} ${grade} Setup: ${sideWord.toUpperCase()} Trade Plan from ${location}`;
+    return {
+      trade: { ...trade, displaySymbol: pair },
+      sections: [
+        { label: 'YouTube Title', value: title },
+        { label: 'Long-form YouTube Script', large: true, value:
+`Intro:
+Today I am breaking down a ${grade}-grade ${pair} scanner signal and showing how I would review it before taking action.
+
+Context:
+The scanner found a ${sideWord} ${tf} setup with location marked as ${location}. The idea is not to blindly enter because a card printed. The goal is to understand trend, location, timing, and risk.
+
+Trade Plan:
+Direction: ${direction}
+Entry: ${entry}
+Stop loss: ${sl}
+Target: ${tp}
+Estimated R:R: ${rr}
+Found time: ${found}
+
+Review:
+This is the kind of signal I want to journal because it gives a clear structure to study. I would still check the live chart, confirm price behavior at the zone, and make sure the setup matches my eval risk plan before entering.
+
+Takeaway:
+The scanner is not here to replace judgment. It is here to help me find cleaner opportunities faster, then use manual confirmation before risking capital.` },
+        { label: 'Shorts Script', value:
+`This ${pair} ${grade}-grade setup caught my attention because the scanner found ${sideWord} structure at ${location}.
+The plan is simple: entry near ${entry}, stop at ${sl}, and first target around ${tp}.
+I am not treating this as an automatic entry. I want confirmation at the zone first.
+That is how I use the scanner: find the opportunity, then manually verify the trade.` },
+        { label: 'YouTube Description', value:
+`In this video, I review a ${grade}-grade ${pair} forex scanner signal and walk through the trade idea, location, risk, and target plan.
+
+Pair: ${pair}
+Timeframe: ${tf}
+Direction: ${direction}
+Entry: ${entry}
+Stop Loss: ${sl}
+Target: ${tp}
+R:R: ${rr}
+
+This is for education and journal review only. It is not financial advice.` },
+        { label: 'Tags', value: `forex trading, ${pair.replace('/', '')}, forex scanner, trade breakdown, prop firm trading, smart money concepts, supply and demand, trading journal` },
+        { label: 'Thumbnail Prompt', value: `Dark premium trading dashboard thumbnail showing ${pair}, ${grade} Setup, ${direction}, entry ${entry}, and a clean chart with supply/demand zones. Bold text: "${pair} ${grade} SETUP"` },
+        { label: 'X Post', value: `${pair} ${grade} setup on my scanner today.\n\nDirection: ${direction}\nLocation: ${location}\nR:R: ${rr}\n\nNot an auto-entry. The next step is chart confirmation and journal review.` },
+        { label: 'Instagram Caption', value: `Scanner found a ${grade}-grade ${pair} idea.\n\nI am watching ${location} for a ${sideWord} continuation setup.\n\nEntry: ${entry}\nSL: ${sl}\nTP: ${tp}\nR:R: ${rr}\n\nScanner finds the opportunity. The chart confirms the entry.` },
+        { label: 'Facebook Post', value: `Reviewing a ${grade}-grade ${pair} scanner signal today. The setup is ${sideWord}, located around ${location}, with a planned R:R of ${rr}. I am using this as a journal candidate, not an automatic entry.` },
+        { label: 'LinkedIn Post', value: `I am building a repeatable review process around scanner-generated trade candidates. Today’s example is ${pair}: a ${grade}-grade ${direction} setup with defined entry, stop, target, and R:R. The focus is process quality, journaling, and decision consistency.` },
+      ],
+    };
+  }
+
+  function renderAiPackage(pkg) {
+    const output = document.getElementById('aiEpisodeOutput');
+    const pair = pkg.trade.displaySymbol || pkg.trade.pair || 'Draft Episode';
+    output.innerHTML = `
+      <div class="ai-package-card">
+        <div class="ai-package-head">
+          <div>
+            <div class="ai-package-title">${escapeHtml(pair)} Content Package</div>
+            <div class="ai-package-meta">Draft Episode · Ready for Review · ${escapeHtml(pkg.trade.setupGrade || 'A')} Setup</div>
+          </div>
+          <button class="studio-btn secondary" onclick="approveAiPackage()">Approve</button>
+        </div>
+        ${pkg.sections.map(section => renderAiSection(section)).join('')}
+      </div>`;
+    document.getElementById('aiEpisodeCount').textContent = '1';
+    document.getElementById('aiReviewCount').textContent = '1';
+    document.getElementById('aiActivePackage').textContent = pair;
+  }
+
+  function renderAiSection(section) {
+    const key = aiPackageKey(section.label);
+    return `
+      <div class="ai-output-section">
+        <div class="ai-output-head">
+          <div class="ai-output-label">${escapeHtml(section.label)}</div>
+          <button class="studio-btn secondary small" onclick="copyAiSection('${key}', '${escapeHtml(section.label)}')">Copy</button>
+        </div>
+        <textarea id="${key}" class="ai-output-textarea ${section.large ? 'large' : ''}">${escapeHtml(section.value)}</textarea>
+      </div>`;
+  }
+
+  async function copyAiSection(id, label) {
+    await copyText(document.getElementById(id)?.value || '', `Copied ${label}`);
+  }
+
+  function approveAiPackage() {
+    document.getElementById('aiEpisodeStatus').textContent = 'Ready for Review';
+    showVideoToast('Content Package approved');
+  }
+
+  function setAiSection(section) {
+    document.querySelectorAll('.ai-section-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.aiSection === section));
+    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : 'aiOverview';
+    document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   function renderScoutCard(r) {
     const tradeDirection = tradeDirectionForReport(r);
     const scoutDirection = scoutDirectionForReport(r);
@@ -3038,6 +3387,7 @@
     if (tab === 'calculator') { document.getElementById('calc-account').value = '25308'; calcPosition(); }
     if (tab === 'trending') await loadTrending();
     if (tab === 'scalping') await loadScalpResults();
+    if (tab === 'ai') renderAiStudio();
     if (tab === 'video') { await loadJournal(); renderVideoStudio(); }
     clearInterval(autoRefreshTimer);
     if (tab === 'scanner') {
