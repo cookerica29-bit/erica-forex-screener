@@ -292,6 +292,11 @@
     .ai-template-name { color:var(--text); font-size:13px; font-weight:900; margin-bottom:6px; }
     .ai-template-meta { color:var(--slate-dim); font-size:10px; line-height:1.45; margin-top:6px; }
     .ai-template-use { color:var(--slate); font-size:11px; line-height:1.45; }
+    .ai-brand-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .ai-brand-group { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:11px; }
+    .ai-brand-options { display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; }
+    .ai-brand-option { display:flex; align-items:center; gap:6px; border:1px solid rgba(148,163,184,.13); border-radius:999px; padding:5px 8px; color:var(--slate); font-size:10px; cursor:pointer; }
+    .ai-brand-option input { accent-color:#60A5FA; }
     .video-toast { position:fixed; right:18px; bottom:18px; z-index:9999; background:rgba(15,23,42,.96); border:1px solid rgba(96,165,250,.28); color:var(--text); border-radius:10px; padding:10px 12px; font-size:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.35); }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
@@ -299,7 +304,7 @@
       .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
       .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
-      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid { grid-template-columns:1fr; }
+      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid, .ai-brand-grid { grid-template-columns:1fr; }
       .shorts-block.full { grid-column:auto; }
     }
     .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
@@ -1033,6 +1038,43 @@
       <div id="aiTemplateGrid" class="ai-template-grid"></div>
     </section>
 
+    <section class="ai-panel" id="aiBrandDnaPanel" style="margin-top:14px;">
+      <div class="ai-panel-head">
+        <div>
+          <div class="studio-title">Brand DNA</div>
+          <div class="studio-subtitle">Control Kairos AI Studio voice, audience, teaching structure, guardrails, and recurring signature segments.</div>
+        </div>
+        <span class="project-status-badge ready-to-record">Settings</span>
+      </div>
+      <div class="ai-brand-grid">
+        <div class="ai-brand-group">
+          <div class="ai-template-name">Brand Voice</div>
+          <div class="ai-template-use">Choose the tone every Content Package should use.</div>
+          <div id="aiBrandVoiceOptions" class="ai-brand-options"></div>
+        </div>
+        <div class="ai-brand-group">
+          <div class="ai-template-name">Avoid</div>
+          <div class="ai-template-use">Language guardrails applied to generated copy.</div>
+          <div id="aiAvoidOptions" class="ai-brand-options"></div>
+        </div>
+        <div class="ai-brand-group">
+          <div class="ai-template-name">Audience</div>
+          <div class="ai-template-use">Controls how technical or beginner-friendly the explanation feels.</div>
+          <select id="aiAudienceSelect" class="studio-select" onchange="saveAiBrandDna()" style="margin-top:8px;"></select>
+        </div>
+        <div class="ai-brand-group">
+          <div class="ai-template-name">Teaching Structure</div>
+          <div class="ai-template-use">Sections inserted into long-form scripts.</div>
+          <div id="aiTeachingOptions" class="ai-brand-options"></div>
+        </div>
+        <div class="ai-brand-group" style="grid-column:1 / -1;">
+          <div class="ai-template-name">Signature Segments</div>
+          <div class="ai-template-use">One recurring segment per line. These are automatically inserted into generated content.</div>
+          <textarea id="aiSignatureSegments" class="studio-textarea" oninput="saveAiBrandDna()" style="margin-top:8px;min-height:110px;"></textarea>
+        </div>
+      </div>
+    </section>
+
     <div class="ai-secondary-grid">
       <section class="ai-panel">
         <div class="studio-title">Publishing</div>
@@ -1044,7 +1086,7 @@
       </section>
       <section class="ai-panel">
         <div class="studio-title">Settings</div>
-        <div class="studio-subtitle">Future sprint: brand voice, disclaimers, channel defaults, and export preferences.</div>
+        <div class="studio-subtitle">Brand DNA settings now control generated content voice, audience, structure, and recurring segments.</div>
       </section>
     </div>
   </div>
@@ -1180,6 +1222,7 @@
   let scalpReports = [];
   let scalpLoaded = false;
   const VIDEO_PROJECTS_KEY = 'forex_scanner_video_projects';
+  const AI_BRAND_DNA_KEY = 'kairos_ai_studio_brand_dna';
   let currentVideoProject = null;
   let videoProjectDirty = false;
   let videoTradeRows = [];
@@ -2368,10 +2411,118 @@
       </div>`).join('');
   }
 
+  const AI_BRAND_DNA_DEFAULTS = {
+    voice: ['Professional', 'Educational', 'Calm', 'Confident'],
+    avoid: ['Clickbait', 'Hype', 'False urgency', 'Guaranteed profit language'],
+    audience: 'Prop Firm Traders',
+    teachingStructure: ['Hook', 'Setup Overview', 'Scanner Analysis', 'Risk Discussion', 'Educational Lesson', 'Call To Action'],
+    signatureSegments: ["Today's Setup", 'Why It Qualified', 'Kairos Insight', 'Risk Reminder', "Today's Lesson", "What I'll Be Watching Next"],
+  };
+  const AI_BRAND_VOICE_OPTIONS = ['Professional', 'Educational', 'Encouraging', 'Calm', 'Confident'];
+  const AI_AVOID_OPTIONS = ['Clickbait', 'Hype', 'False urgency', 'Guaranteed profit language'];
+  const AI_AUDIENCE_OPTIONS = ['Beginner', 'Intermediate', 'Advanced', 'Prop Firm Traders'];
+  const AI_TEACHING_OPTIONS = ['Hook', 'Setup Overview', 'Scanner Analysis', 'Risk Discussion', 'Educational Lesson', 'Call To Action'];
+
+  function loadAiBrandDna() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(AI_BRAND_DNA_KEY) || '{}');
+      return {
+        ...AI_BRAND_DNA_DEFAULTS,
+        ...saved,
+        voice: Array.isArray(saved.voice) ? saved.voice : AI_BRAND_DNA_DEFAULTS.voice,
+        avoid: Array.isArray(saved.avoid) ? saved.avoid : AI_BRAND_DNA_DEFAULTS.avoid,
+        teachingStructure: Array.isArray(saved.teachingStructure) ? saved.teachingStructure : AI_BRAND_DNA_DEFAULTS.teachingStructure,
+        signatureSegments: Array.isArray(saved.signatureSegments) ? saved.signatureSegments : AI_BRAND_DNA_DEFAULTS.signatureSegments,
+      };
+    } catch (_) {
+      return { ...AI_BRAND_DNA_DEFAULTS };
+    }
+  }
+
+  function renderAiChecklist(containerId, options, selected, field) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const selectedSet = new Set(selected || []);
+    container.innerHTML = options.map(option => `
+      <label class="ai-brand-option">
+        <input type="checkbox" value="${escapeHtml(option)}" ${selectedSet.has(option) ? 'checked' : ''} onchange="saveAiBrandDna()" data-brand-field="${field}" />
+        <span>${escapeHtml(option)}</span>
+      </label>`).join('');
+  }
+
+  function renderAiBrandDna() {
+    const settings = loadAiBrandDna();
+    renderAiChecklist('aiBrandVoiceOptions', AI_BRAND_VOICE_OPTIONS, settings.voice, 'voice');
+    renderAiChecklist('aiAvoidOptions', AI_AVOID_OPTIONS, settings.avoid, 'avoid');
+    renderAiChecklist('aiTeachingOptions', AI_TEACHING_OPTIONS, settings.teachingStructure, 'teachingStructure');
+    const audience = document.getElementById('aiAudienceSelect');
+    if (audience) {
+      audience.innerHTML = AI_AUDIENCE_OPTIONS.map(option => `<option value="${option}" ${settings.audience === option ? 'selected' : ''}>${option}</option>`).join('');
+    }
+    const signature = document.getElementById('aiSignatureSegments');
+    if (signature) signature.value = (settings.signatureSegments || []).join('\\n');
+  }
+
+  function saveAiBrandDna() {
+    const readChecked = field => Array.from(document.querySelectorAll(`[data-brand-field="${field}"]`))
+      .filter(input => input.checked)
+      .map(input => input.value);
+    const signatureText = document.getElementById('aiSignatureSegments')?.value || '';
+    const settings = {
+      voice: readChecked('voice'),
+      avoid: readChecked('avoid'),
+      audience: document.getElementById('aiAudienceSelect')?.value || AI_BRAND_DNA_DEFAULTS.audience,
+      teachingStructure: readChecked('teachingStructure'),
+      signatureSegments: signatureText.split('\\n').map(s => s.trim()).filter(Boolean),
+    };
+    localStorage.setItem(AI_BRAND_DNA_KEY, JSON.stringify(settings));
+  }
+
+  function aiBrandDnaProfile() {
+    const settings = loadAiBrandDna();
+    const voice = settings.voice.length ? settings.voice.join(', ') : 'Professional, Educational';
+    const avoid = settings.avoid.length ? settings.avoid.join(', ') : 'Clickbait, Hype, False urgency, Guaranteed profit language';
+    const structure = settings.teachingStructure.length ? settings.teachingStructure : AI_BRAND_DNA_DEFAULTS.teachingStructure;
+    const segments = settings.signatureSegments.length ? settings.signatureSegments : AI_BRAND_DNA_DEFAULTS.signatureSegments;
+    const audienceLine = settings.audience === 'Beginner'
+      ? 'Explain terms simply and define scanner context before assuming trading knowledge.'
+      : settings.audience === 'Advanced'
+      ? 'Keep the explanation efficient and focus on process, structure, risk, and execution quality.'
+      : settings.audience === 'Intermediate'
+      ? 'Balance plain-English teaching with practical trading terminology.'
+      : 'Connect the lesson to patience, risk control, drawdown protection, and eval consistency.';
+    return { ...settings, voice, avoid, structure, segments, audienceLine };
+  }
+
+  function aiSignatureBlock(profile) {
+    return profile.segments.map(segment => {
+      if (/risk/i.test(segment)) return `${segment}: This is a review candidate, not a guaranteed trade. Risk must stay defined before entry.`;
+      if (/qualified|why/i.test(segment)) return `${segment}: It qualified because the scanner found structure, location, and a defined trade plan from available data.`;
+      if (/insight/i.test(segment)) return `${segment}: Kairos helps narrow attention, but chart confirmation still matters.`;
+      if (/watch/i.test(segment)) return `${segment}: I am watching whether price respects the planned area and whether confirmation holds.`;
+      if (/lesson/i.test(segment)) return `${segment}: The lesson is to separate a good area from a confirmed entry.`;
+      return `${segment}: Use the scanner output as a starting point for structured review.`;
+    }).join('\\n');
+  }
+
+  function aiTeachingStructureBlock(profile, context) {
+    const map = {
+      Hook: `Hook: ${context.pair} printed a ${context.grade}-grade ${context.direction} idea, but the value is in reviewing the process, not chasing a signal.`,
+      'Setup Overview': `Setup Overview: ${context.pair} on ${context.tf} is framed as a ${context.direction} idea from ${context.location}.`,
+      'Scanner Analysis': `Scanner Analysis: Kairos surfaced the setup using available scanner data, including grade, bias/location context, and planned levels.`,
+      'Risk Discussion': `Risk Discussion: Entry ${context.entry}, SL ${context.sl}, TP ${context.tp}, planned R:R ${context.rr}. No outcome is guaranteed.`,
+      'Educational Lesson': `Educational Lesson: ${profile.audienceLine}`,
+      'Call To Action': 'Call To Action: Review the chart, journal the idea, and only act if the live setup still confirms.',
+    };
+    return profile.structure.map(section => map[section]).filter(Boolean).join('\\n');
+  }
+
   function renderAiStudio() {
     const rows = aiSignalRows();
     const hasRealScannerData = Array.isArray(allSetups) && allSetups.length > 0;
     const usingMockRows = rows.some(row => row.isMock);
+    renderAiTemplates();
+    renderAiBrandDna();
     document.getElementById('aiQueuedCount').textContent = rows.length;
     document.getElementById('aiEpisodeCount').textContent = currentAiPackage ? '1' : '0';
     document.getElementById('aiReviewCount').textContent = currentAiPackage ? '1' : '0';
@@ -2389,7 +2540,6 @@
       return;
     }
     queue.innerHTML = rows.map((row, idx) => renderAiTradeCard(row, idx)).join('');
-    renderAiTemplates();
     if (currentAiPackage) renderAiPackage(currentAiPackage);
   }
 
@@ -2500,8 +2650,12 @@
     const sl = aiNumber(trade.sl);
     const tp = aiNumber(trade.tp1 || trade.tp);
     const found = aiFoundTime(trade);
+    const brand = aiBrandDnaProfile();
     const templateCopy = aiTemplateCopy(templateKey, { pair, direction, sideWord, grade, location, tf, rr, entry, sl, tp, found });
     const title = templateCopy.title;
+    const brandContext = { pair, direction, grade, location, tf, rr, entry, sl, tp };
+    const teachingBlock = aiTeachingStructureBlock(brand, brandContext);
+    const signatureBlock = aiSignatureBlock(brand);
     return {
       trade: { ...trade, displaySymbol: pair },
       templateKey,
@@ -2511,6 +2665,8 @@
         direction,
         grade,
         template: templateCopy.template.name,
+        brandVoice: brand.voice,
+        audience: brand.audience,
         timeframe: tf,
         location,
         entry,
@@ -2525,8 +2681,16 @@
 `Intro:
 ${templateCopy.intro}
 
+Brand DNA:
+Voice: ${brand.voice}
+Audience: ${brand.audience}
+Avoid: ${brand.avoid}
+
 Context:
 ${templateCopy.focus}
+
+Teaching Structure:
+${teachingBlock}
 
 Trade Plan:
 Direction: ${direction}
@@ -2539,13 +2703,16 @@ Found time: ${found}
 Review:
 This is the kind of signal I want to journal because it gives a clear structure to study. I would still check the live chart, confirm price behavior at the zone, and make sure the setup matches my eval risk plan before entering.
 
+Signature Segments:
+${signatureBlock}
+
 Takeaway:
 ${templateCopy.takeaway}` },
         { label: 'Shorts Script', value:
 `${templateCopy.short}
 The plan is simple: entry near ${entry}, stop at ${sl}, and first target around ${tp}.
 I am not treating this as an automatic entry. I want confirmation at the zone first.
-That is how I use the scanner: find the opportunity, then manually verify the trade.` },
+${brand.segments.slice(0, 2).join(' / ')}: find the opportunity, explain why it qualified, then manually verify the trade.` },
         { label: 'YouTube Description', value:
 `In this video, I review a ${grade}-grade ${pair} forex scanner signal and walk through the trade idea, location, risk, and target plan.
 
@@ -2556,14 +2723,16 @@ Entry: ${entry}
 Stop Loss: ${sl}
 Target: ${tp}
 R:R: ${rr}
+Audience: ${brand.audience}
+Brand Voice: ${brand.voice}
 
 This is for education and journal review only. It is not financial advice.` },
         { label: 'Tags', value: `forex trading, ${pair.replace('/', '')}, forex scanner, trade breakdown, prop firm trading, smart money concepts, supply and demand, trading journal` },
         { label: 'Thumbnail Prompt', value: `Dark premium trading dashboard thumbnail showing ${pair}, ${grade} Setup, ${direction}, entry ${entry}, and a clean chart with supply/demand zones. Bold text: "${pair} ${grade} SETUP"` },
         { label: 'X Post', value: `${pair} ${grade} setup on my scanner today.\n\nDirection: ${direction}\nLocation: ${location}\nR:R: ${rr}\n\nNot an auto-entry. The next step is chart confirmation and journal review.` },
-        { label: 'Instagram Caption', value: `${templateCopy.social}\n\nEntry: ${entry}\nSL: ${sl}\nTP: ${tp}\nR:R: ${rr}\n\nScanner finds the opportunity. The chart confirms the entry.` },
-        { label: 'Facebook Post', value: `${templateCopy.social} Entry ${entry}, stop ${sl}, target ${tp}, planned R:R ${rr}. This remains a review candidate, not an automatic entry.` },
-        { label: 'LinkedIn Post', value: `${templateCopy.social} The focus is process quality, journaling, and decision consistency. Template used: ${templateCopy.template.name}.` },
+        { label: 'Instagram Caption', value: `${templateCopy.social}\n\nEntry: ${entry}\nSL: ${sl}\nTP: ${tp}\nR:R: ${rr}\n\n${brand.segments.includes('Risk Reminder') ? 'Risk Reminder: no setup guarantees profit. ' : ''}Scanner finds the opportunity. The chart confirms the entry.` },
+        { label: 'Facebook Post', value: `${templateCopy.social} Entry ${entry}, stop ${sl}, target ${tp}, planned R:R ${rr}. This remains a review candidate, not an automatic entry. Voice: ${brand.voice}.` },
+        { label: 'LinkedIn Post', value: `${templateCopy.social} The focus is process quality, journaling, and decision consistency for ${brand.audience}. Template used: ${templateCopy.template.name}.` },
       ],
     };
   }
@@ -2615,6 +2784,7 @@ This is for education and journal review only. It is not financial advice.` },
     const outcome = aiTradeOutcome(trade);
     const type = effectiveFollowUpType(requestedType, trade);
     const template = selectedAiTemplate(templateKey);
+    const brand = aiBrandDnaProfile();
     const developing = outcome === 'Unknown' || outcome === 'Running';
     const outcomeLine = developing
       ? 'The trade outcome is not confirmed yet, so this follow-up is framed as a developing Trade Update.'
@@ -2638,6 +2808,8 @@ This is for education and journal review only. It is not financial advice.` },
       : templateKey === 'propFirmChallengeUpdate'
       ? 'Use the follow-up to connect the trade to eval risk, patience, and account progress.'
       : 'Use the follow-up to quickly update what happened after the original setup.';
+    const teachingBlock = aiTeachingStructureBlock(brand, { pair, direction, grade, location: 'original scanner location', tf: summary.timeframe || trade.timeframe || 'scanner timeframe', rr, entry, sl, tp });
+    const signatureBlock = aiSignatureBlock(brand);
     return {
       type,
       requestedType,
@@ -2650,6 +2822,8 @@ This is for education and journal review only. It is not financial advice.` },
         direction,
         grade,
         template: template.name,
+        brandVoice: brand.voice,
+        audience: brand.audience,
         entry,
         sl,
         tp,
@@ -2665,6 +2839,11 @@ This is a follow-up episode for the ${pair} ${grade} setup from the scanner.
 Status:
 ${outcomeLine}
 
+Brand DNA:
+Voice: ${brand.voice}
+Audience: ${brand.audience}
+Avoid: ${brand.avoid}
+
 Original Trade Plan:
 Pair: ${pair}
 Direction: ${direction}
@@ -2679,11 +2858,17 @@ The goal of this follow-up is not to make the scanner look perfect. The goal is 
 Template Angle:
 ${templateFollowUpFocus}
 
+Teaching Structure:
+${teachingBlock}
+
 What I Am Watching:
 If the trade is still developing, I am watching whether price respects the original zone, whether the confirmation holds, and whether the setup continues to match the plan.
 
 Lesson:
 ${lesson}
+
+Signature Segments:
+${signatureBlock}
 
 Close:
 This is why I am building Kairos AI Studio around the scanner: every signal can become a documented case study instead of a random trade.` },
@@ -2692,7 +2877,7 @@ This is why I am building Kairos AI Studio around the scanner: every signal can 
 The original scanner idea was ${direction} from ${entry}, with stop at ${sl} and target near ${tp}.
 ${developing ? 'The trade is still developing, so I am not calling this a win or loss yet.' : `The recorded outcome is: ${outcome}.`}
 The point is simple: every setup becomes data when you review it honestly.
-Template: ${template.name}.` },
+${brand.segments.slice(0, 2).join(' / ')}. Template: ${template.name}.` },
         { label: 'Follow-up Description', value:
 `Follow-up review for the ${pair} ${grade} scanner setup.
 
@@ -2704,6 +2889,8 @@ R:R: ${rr}
 Outcome status: ${developing ? 'Still developing / unknown' : outcome}
 
 Template: ${template.name}
+Brand Voice: ${brand.voice}
+Audience: ${brand.audience}
 
 This is a journal and education review, not financial advice.` },
         { label: 'Follow-up Social Post', value:
@@ -2717,8 +2904,8 @@ R:R: ${rr}
 
 ${developing ? 'Outcome is still developing, so this is a Trade Update, not a win/loss claim.' : `Outcome: ${outcome}.`}
 
-The value is in reviewing the process.\n\nTemplate: ${template.name}` },
-        { label: 'Lesson / Takeaway', value: `${lesson}\n\nTemplate angle: ${templateFollowUpFocus}` },
+The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${template.name}` },
+        { label: 'Lesson / Takeaway', value: `${lesson}\n\nTemplate angle: ${templateFollowUpFocus}\n\nSignature Segments:\n${signatureBlock}` },
       ],
     };
   }
@@ -2825,7 +3012,7 @@ The value is in reviewing the process.\n\nTemplate: ${template.name}` },
 
   function setAiSection(section) {
     document.querySelectorAll('.ai-section-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.aiSection === section));
-    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : section === 'templates' ? 'aiTemplatesPanel' : 'aiOverview';
+    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : section === 'templates' ? 'aiTemplatesPanel' : section === 'settings' ? 'aiBrandDnaPanel' : 'aiOverview';
     document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
