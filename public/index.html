@@ -311,6 +311,10 @@
     .ai-kb-status.draft { color:var(--gold); border-color:rgba(245,166,35,.32); background:rgba(245,166,35,.07); }
     .ai-suggestion-card { border-top:1px solid rgba(148,163,184,.09); padding-top:10px; margin-top:10px; }
     .ai-suggestion-card:first-child { border-top:0; padding-top:0; margin-top:0; }
+    .ai-visual-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .ai-visual-card { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:11px; }
+    .ai-visual-type { color:var(--text); font-size:13px; font-weight:950; margin-bottom:6px; }
+    .ai-visual-meta { color:var(--slate-dim); font-size:10px; line-height:1.45; margin-bottom:8px; }
     .video-toast { position:fixed; right:18px; bottom:18px; z-index:9999; background:rgba(15,23,42,.96); border:1px solid rgba(96,165,250,.28); color:var(--text); border-radius:10px; padding:10px 12px; font-size:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.35); }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
@@ -318,7 +322,7 @@
       .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
       .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
-      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid, .ai-brand-grid, .ai-knowledge-layout, .ai-knowledge-list { grid-template-columns:1fr; }
+      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid, .ai-brand-grid, .ai-knowledge-layout, .ai-knowledge-list, .ai-visual-grid { grid-template-columns:1fr; }
       .shorts-block.full { grid-column:auto; }
     }
     .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
@@ -986,6 +990,7 @@
       <button class="ai-section-pill" data-ai-section="episodes" onclick="setAiSection('episodes')">Episodes</button>
       <button class="ai-section-pill" data-ai-section="story" onclick="setAiSection('story')">Story Mode</button>
       <button class="ai-section-pill" data-ai-section="templates" onclick="setAiSection('templates')">Templates</button>
+      <button class="ai-section-pill" data-ai-section="visuals" onclick="setAiSection('visuals')">Visual Assets</button>
       <button class="ai-section-pill" data-ai-section="knowledge" onclick="setAiSection('knowledge')">Knowledge Base</button>
       <button class="ai-section-pill" data-ai-section="publishing" onclick="setAiSection('publishing')">Publishing</button>
       <button class="ai-section-pill" data-ai-section="analytics" onclick="setAiSection('analytics')">Analytics</button>
@@ -1051,6 +1056,19 @@
         <select id="aiGlobalTemplate" class="studio-select" onchange="setAiTemplate(this.value)"></select>
       </div>
       <div id="aiTemplateGrid" class="ai-template-grid"></div>
+    </section>
+
+    <section class="ai-panel" id="aiVisualAssetsPanel" style="margin-top:14px;">
+      <div class="ai-panel-head">
+        <div>
+          <div class="studio-title">Visual Assets</div>
+          <div class="studio-subtitle">Editable briefs for thumbnails and video graphics. No image generation, Canva API, or rendering is connected.</div>
+        </div>
+        <button class="studio-btn secondary" onclick="createAiVisualAssets()">Create Visual Assets</button>
+      </div>
+      <div id="aiVisualAssetsOutput" class="ai-output-list">
+        <div class="studio-empty">Produce an episode first, then click Create Visual Assets to generate thumbnail and graphic briefs.</div>
+      </div>
     </section>
 
     <section class="ai-panel" id="aiBrandDnaPanel" style="margin-top:14px;">
@@ -3288,6 +3306,118 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     };
   }
 
+  const AI_VISUAL_ASSET_TYPES = [
+    'YouTube Thumbnail',
+    'YouTube Short Cover',
+    'Chart Callout Graphic',
+    'Community Post Image',
+    'Instagram Carousel Slide',
+    'X Post Graphic',
+  ];
+
+  function visualAssetTone(templateKey) {
+    if (templateKey === 'educationalLesson') return 'instructional, clean, lesson-focused';
+    if (templateKey === 'tradeJournalReview') return 'transparent journal review, process-first';
+    if (templateKey === 'scannerExplainer') return 'product-style scanner explainer, technical but readable';
+    if (templateKey === 'weeklyMarketRecap') return 'market recap, editorial, multi-setup energy';
+    if (templateKey === 'propFirmChallengeUpdate') return 'prop firm challenge update, disciplined and risk-aware';
+    return 'fast trade breakdown, clear and tactical';
+  }
+
+  function visualAssetBrief(type, context) {
+    const isLong = context.direction === 'LONG';
+    const directionColor = isLong ? 'green bullish accents' : 'red bearish accents';
+    const chartVerb = isLong ? 'demand/support reaction' : 'supply/resistance rejection';
+    const headlineBase = type === 'YouTube Thumbnail'
+      ? `${context.pair} ${context.grade} Setup`
+      : type === 'YouTube Short Cover'
+      ? `${context.pair} Setup`
+      : type === 'Chart Callout Graphic'
+      ? `${context.direction} Plan`
+      : type === 'Instagram Carousel Slide'
+      ? 'Why It Qualified'
+      : type === 'Community Post Image'
+      ? 'Scanner Review'
+      : 'Setup Watch';
+    const formatNote = type === 'YouTube Thumbnail'
+      ? '16:9 thumbnail, bold face, large pair text, one clear chart screenshot area'
+      : type === 'YouTube Short Cover'
+      ? '9:16 vertical cover, centered headline, mobile-readable text'
+      : type === 'Instagram Carousel Slide'
+      ? '4:5 carousel slide, clean title area, one lesson per slide'
+      : type === 'X Post Graphic'
+      ? '16:9 or 1.91:1 social graphic, minimal text, fast scan readability'
+      : 'dashboard-style graphic with one focal chart area';
+    return {
+      type,
+      fields: [
+        { label: 'Thumbnail Concept', value: `${type} for a ${context.templateName} about ${context.pair}. Show the scanner-driven ${context.direction} idea as a structured review, not a guaranteed outcome.` },
+        { label: 'Headline Text', value: headlineBase },
+        { label: 'Subtext', value: `${context.direction} · ${context.timeframe} · ${context.location} · ${context.rr}R` },
+        { label: 'Chart Focus', value: `Focus on ${chartVerb}, planned entry ${context.entry}, stop ${context.sl}, and target ${context.tp}. Use the chart as evidence for review, not as a promise.` },
+        { label: 'Visual Style', value: `${visualAssetTone(context.templateKey)}. Dark trading dashboard look, calm professional spacing, no hype or fake urgency.` },
+        { label: 'Colors / Branding Notes', value: `Use Kairos dark UI styling with blue accents, ${directionColor}, white typography, and subtle grid/chart texture. Brand voice: ${context.brandVoice}.` },
+        { label: 'Composition Notes', value: `${formatNote}. Keep the pair and grade readable first, chart second, risk/process cue third.` },
+        { label: 'Image Generation Prompt', value: `Create a polished trading content graphic for ${context.pair} ${context.grade} ${context.direction} setup. Include a dark forex scanner dashboard aesthetic, ${directionColor}, chart zone callouts, clean typography, and the headline "${headlineBase}". Avoid profit guarantees, hype, cash imagery, or fake broker UI. Knowledge themes: ${context.knowledgeTitles}.` },
+        { label: 'Canva / Design Prompt', value: `Design a ${type} using Kairos scanner branding. Headline: "${headlineBase}". Subtext: "${context.direction} · ${context.timeframe} · ${context.location}". Layout: ${formatNote}. Include chart/screenshot placeholder, entry/SL/TP callout, and a small risk-review note.` },
+      ],
+    };
+  }
+
+  function buildAiVisualAssets(pkg) {
+    const summary = pkg?.summary || {};
+    const trade = pkg?.trade || {};
+    const brand = aiBrandDnaProfile();
+    const context = {
+      pair: summary.pair || trade.displaySymbol || trade.pair || 'Scanner Setup',
+      direction: summary.direction || aiDirection(trade),
+      grade: summary.grade || trade.setupGrade || 'A',
+      timeframe: summary.timeframe || trade.timeframe || 'H4',
+      location: summary.location || trade.location || trade.zone || 'key location',
+      entry: summary.entry || aiNumber(trade.entry),
+      sl: summary.sl || aiNumber(trade.sl),
+      tp: summary.tp || aiNumber(trade.tp1 || trade.tp),
+      rr: summary.rr || trade.rrRatio || '—',
+      templateKey: pkg?.templateKey || currentAiTemplate,
+      templateName: pkg?.templateName || selectedAiTemplate(pkg?.templateKey || currentAiTemplate).name,
+      brandVoice: brand.voice,
+      audience: brand.audience,
+      knowledgeTitles: aiKnowledgeTitlesLine(),
+    };
+    return AI_VISUAL_ASSET_TYPES.map(type => visualAssetBrief(type, context));
+  }
+
+  function createAiVisualAssets() {
+    if (!currentAiPackage) {
+      showVideoToast('Produce an episode first');
+      setAiSection('episodes');
+      return;
+    }
+    currentAiPackage.visualAssets = buildAiVisualAssets(currentAiPackage);
+    renderAiVisualAssets(currentAiPackage.visualAssets);
+    setAiSection('visuals');
+    showVideoToast('Visual asset briefs created');
+  }
+
+  function renderAiVisualAssets(assets = []) {
+    const output = document.getElementById('aiVisualAssetsOutput');
+    if (!output) return;
+    if (!assets.length) {
+      output.innerHTML = '<div class="studio-empty">Produce an episode first, then click Create Visual Assets to generate editable visual briefs.</div>';
+      return;
+    }
+    output.innerHTML = `
+      <div class="ai-visual-grid">
+        ${assets.map(asset => `
+          <div class="ai-visual-card">
+            <div class="ai-visual-type">${escapeHtml(asset.type)}</div>
+            <div class="ai-visual-meta">Editable brief · Copy individual fields into a designer, image model, or Canva later.</div>
+            ${asset.fields.map(field => renderAiSection({ label: `${asset.type} ${field.label}`, value: field.value, large: /Prompt|Composition|Concept/.test(field.label) })).join('')}
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
   function renderAiPackage(pkg) {
     const output = document.getElementById('aiEpisodeOutput');
     const pair = pkg.trade.displaySymbol || pkg.trade.pair || 'Draft Episode';
@@ -3305,6 +3435,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           </div>
           <div class="studio-actions">
             <button class="studio-btn secondary" onclick="approveAiPackage()">Approve Content Package</button>
+            <button class="studio-btn secondary" onclick="createAiVisualAssets()">Create Visual Assets</button>
             <select id="aiFollowUpType" class="studio-select" style="width:auto;">
               <option value="Trade Update">Trade Update</option>
               <option value="TP Hit Review">TP Hit Review</option>
@@ -3333,6 +3464,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     document.getElementById('aiReviewCount').textContent = '1';
     document.getElementById('aiActivePackage').textContent = pair;
     if (pkg.followUp) renderAiFollowUp(pkg.followUp);
+    if (pkg.visualAssets) renderAiVisualAssets(pkg.visualAssets);
   }
 
   function renderAiFollowUp(followUp) {
@@ -3390,7 +3522,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
 
   function setAiSection(section) {
     document.querySelectorAll('.ai-section-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.aiSection === section));
-    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : section === 'templates' ? 'aiTemplatesPanel' : section === 'knowledge' ? 'aiKnowledgePanel' : section === 'settings' ? 'aiBrandDnaPanel' : 'aiOverview';
+    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : section === 'templates' ? 'aiTemplatesPanel' : section === 'visuals' ? 'aiVisualAssetsPanel' : section === 'knowledge' ? 'aiKnowledgePanel' : section === 'settings' ? 'aiBrandDnaPanel' : 'aiOverview';
     document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
