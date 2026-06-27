@@ -286,6 +286,12 @@
     .ai-output-textarea.large { min-height:190px; }
     .ai-mini-list { display:flex; flex-direction:column; gap:8px; color:var(--slate); font-size:12px; }
     .ai-mini-list div { background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.08); border-radius:8px; padding:8px; }
+    .ai-template-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .ai-template-card { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:11px; }
+    .ai-template-card.active { border-color:rgba(96,165,250,.5); background:rgba(96,165,250,.08); }
+    .ai-template-name { color:var(--text); font-size:13px; font-weight:900; margin-bottom:6px; }
+    .ai-template-meta { color:var(--slate-dim); font-size:10px; line-height:1.45; margin-top:6px; }
+    .ai-template-use { color:var(--slate); font-size:11px; line-height:1.45; }
     .video-toast { position:fixed; right:18px; bottom:18px; z-index:9999; background:rgba(15,23,42,.96); border:1px solid rgba(96,165,250,.28); color:var(--text); border-radius:10px; padding:10px 12px; font-size:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.35); }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
@@ -293,7 +299,7 @@
       .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
       .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
-      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid { grid-template-columns:1fr; }
+      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid { grid-template-columns:1fr; }
       .shorts-block.full { grid-column:auto; }
     }
     .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
@@ -1012,16 +1018,22 @@
       </div>
     </section>
 
-    <div class="ai-secondary-grid">
-      <section class="ai-panel">
-        <div class="studio-title">Templates</div>
-        <div class="studio-subtitle">Sprint 1 templates use scanner context, risk/reward, grade, and location language.</div>
-        <div class="ai-mini-list">
-          <div>Trade Breakdown</div>
-          <div>Setup Grade Review</div>
-          <div>Entry Timing Review</div>
+    <section class="ai-panel" id="aiTemplatesPanel" style="margin-top:14px;">
+      <div class="ai-panel-head">
+        <div>
+          <div class="studio-title">Content Templates</div>
+          <div class="studio-subtitle">Reusable production styles for consistent scanner content. Choose a template before Produce Episode or Create Follow-Up.</div>
         </div>
-      </section>
+        <span class="project-status-badge ready-to-record">Selected Template</span>
+      </div>
+      <div class="studio-form-row" style="max-width:360px;">
+        <label>Selected Template</label>
+        <select id="aiGlobalTemplate" class="studio-select" onchange="setAiTemplate(this.value)"></select>
+      </div>
+      <div id="aiTemplateGrid" class="ai-template-grid"></div>
+    </section>
+
+    <div class="ai-secondary-grid">
       <section class="ai-panel">
         <div class="studio-title">Publishing</div>
         <div class="studio-subtitle">YouTube, Shorts, X, Instagram, Facebook, and LinkedIn copy is generated for review. No API publishing is connected.</div>
@@ -1172,6 +1184,7 @@
   let videoProjectDirty = false;
   let videoTradeRows = [];
   let currentAiPackage = null;
+  let currentAiTemplate = 'quickTradeBreakdown';
   const scoutDirMap = {};
   const scoutReportMap = {};
 
@@ -2272,6 +2285,89 @@
     return `ai-${String(label || '').replace(/[^a-z0-9]/gi, '-').toLowerCase()}`;
   }
 
+  const AI_CONTENT_TEMPLATES = {
+    quickTradeBreakdown: {
+      name: 'Quick Trade Breakdown',
+      useCase: 'Fast setup explanation for a single scanner signal.',
+      length: '2-4 min',
+      tone: 'Direct, tactical, concise',
+      outputs: 'YouTube, Shorts, X, Instagram',
+      angle: 'fast setup review',
+    },
+    educationalLesson: {
+      name: 'Educational Lesson',
+      useCase: 'Teach the trading concept behind the setup.',
+      length: '5-8 min',
+      tone: 'Clear, beginner friendly, instructional',
+      outputs: 'YouTube, Shorts, Description, LinkedIn',
+      angle: 'teaching breakdown',
+    },
+    tradeJournalReview: {
+      name: 'Trade Journal Review',
+      useCase: 'Review decision quality, outcome, and lessons.',
+      length: '5-10 min',
+      tone: 'Honest, reflective, process-focused',
+      outputs: 'YouTube, Journal recap, Social posts',
+      angle: 'journal review',
+    },
+    scannerExplainer: {
+      name: 'Scanner Explainer',
+      useCase: 'Explain how and why the scanner identified the setup.',
+      length: '4-7 min',
+      tone: 'Product-style, transparent, technical-lite',
+      outputs: 'YouTube, Shorts, X, LinkedIn',
+      angle: 'scanner logic explainer',
+    },
+    weeklyMarketRecap: {
+      name: 'Weekly Market Recap',
+      useCase: 'Summarize multiple setups and market themes.',
+      length: '8-12 min',
+      tone: 'Structured, editorial, recap-focused',
+      outputs: 'YouTube, Shorts pack, Description, Social recap',
+      angle: 'weekly recap',
+    },
+    propFirmChallengeUpdate: {
+      name: 'Prop Firm Challenge Update',
+      useCase: 'Connect scanner trades to eval progress and risk control.',
+      length: '5-8 min',
+      tone: 'Transparent, disciplined, challenge-focused',
+      outputs: 'YouTube, Shorts, X, Instagram, LinkedIn',
+      angle: 'eval challenge update',
+    },
+  };
+
+  function aiTemplateOptions(selected = currentAiTemplate) {
+    return Object.entries(AI_CONTENT_TEMPLATES)
+      .map(([key, template]) => `<option value="${key}" ${key === selected ? 'selected' : ''}>${escapeHtml(template.name)}</option>`)
+      .join('');
+  }
+
+  function selectedAiTemplate(key = currentAiTemplate) {
+    return AI_CONTENT_TEMPLATES[key] || AI_CONTENT_TEMPLATES.quickTradeBreakdown;
+  }
+
+  function setAiTemplate(key) {
+    currentAiTemplate = AI_CONTENT_TEMPLATES[key] ? key : 'quickTradeBreakdown';
+    renderAiTemplates();
+  }
+
+  function renderAiTemplates() {
+    const select = document.getElementById('aiGlobalTemplate');
+    const grid = document.getElementById('aiTemplateGrid');
+    if (!select || !grid) return;
+    select.innerHTML = aiTemplateOptions(currentAiTemplate);
+    grid.innerHTML = Object.entries(AI_CONTENT_TEMPLATES).map(([key, template]) => `
+      <div class="ai-template-card ${key === currentAiTemplate ? 'active' : ''}">
+        <div class="ai-template-name">${escapeHtml(template.name)}</div>
+        <div class="ai-template-use">${escapeHtml(template.useCase)}</div>
+        <div class="ai-template-meta"><strong>Best use:</strong> ${escapeHtml(template.angle)}</div>
+        <div class="ai-template-meta"><strong>Default length:</strong> ${escapeHtml(template.length)}</div>
+        <div class="ai-template-meta"><strong>Tone:</strong> ${escapeHtml(template.tone)}</div>
+        <div class="ai-template-meta"><strong>Outputs:</strong> ${escapeHtml(template.outputs)}</div>
+        <button class="studio-btn secondary small" style="margin-top:8px;" onclick="setAiTemplate('${key}')">Use Template</button>
+      </div>`).join('');
+  }
+
   function renderAiStudio() {
     const rows = aiSignalRows();
     const hasRealScannerData = Array.isArray(allSetups) && allSetups.length > 0;
@@ -2293,6 +2389,7 @@
       return;
     }
     queue.innerHTML = rows.map((row, idx) => renderAiTradeCard(row, idx)).join('');
+    renderAiTemplates();
     if (currentAiPackage) renderAiPackage(currentAiPackage);
   }
 
@@ -2300,6 +2397,7 @@
     const direction = aiDirection(row);
     const displaySymbol = row.displaySymbol || makePairLabel(row.pair || row.symbol || 'UNKNOWN');
     const encoded = encodeURIComponent(JSON.stringify(row)).replace(/'/g, '%27');
+    const templateSelectId = `aiTemplate-${idx}`;
     return `
       <div class="ai-trade-card">
         <div class="ai-trade-top">
@@ -2320,20 +2418,76 @@
           <div class="ai-trade-field"><div class="ai-field-label">SL</div><div class="ai-field-value">${aiNumber(row.sl)}</div></div>
           <div class="ai-trade-field"><div class="ai-field-label">TP</div><div class="ai-field-value">${aiNumber(row.tp1 || row.tp)}</div></div>
         </div>
-        <button class="studio-btn" onclick="produceAiEpisode('${encoded}')">Produce Episode</button>
+        <div class="studio-actions">
+          <select id="${templateSelectId}" class="studio-select" style="width:auto;">
+            ${aiTemplateOptions(currentAiTemplate)}
+          </select>
+          <button class="studio-btn" onclick="produceAiEpisode('${encoded}', document.getElementById('${templateSelectId}')?.value)">Produce Episode</button>
+        </div>
       </div>`;
   }
 
-  function produceAiEpisode(encodedTrade) {
+  function produceAiEpisode(encodedTrade, templateKey = currentAiTemplate) {
     const trade = JSON.parse(decodeURIComponent(encodedTrade));
-    currentAiPackage = buildAiContentPackage(trade);
+    currentAiTemplate = AI_CONTENT_TEMPLATES[templateKey] ? templateKey : currentAiTemplate;
+    currentAiPackage = buildAiContentPackage(trade, currentAiTemplate);
     renderAiStudio();
     renderAiPackage(currentAiPackage);
     document.getElementById('aiEpisodeStatus').textContent = 'Draft Episode';
     document.getElementById('aiEpisodePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function buildAiContentPackage(trade) {
+  function aiTemplateCopy(templateKey, context) {
+    const template = selectedAiTemplate(templateKey);
+    const { pair, direction, sideWord, grade, location, tf, rr, entry, sl, tp, found } = context;
+    const base = {
+      title: `${pair} ${grade} Setup: ${sideWord.toUpperCase()} Trade Plan from ${location}`,
+      intro: `Today I am breaking down a ${grade}-grade ${pair} scanner signal and showing how I would review it before taking action.`,
+      focus: `The scanner found a ${sideWord} ${tf} setup with location marked as ${location}. The goal is to understand trend, location, timing, and risk.`,
+      takeaway: 'The scanner is not here to replace judgment. It is here to help me find cleaner opportunities faster, then use manual confirmation before risking capital.',
+      short: `This ${pair} ${grade}-grade setup caught my attention because the scanner found ${sideWord} structure at ${location}.`,
+      social: `Scanner found a ${grade}-grade ${pair} idea. I am watching ${location} for a ${sideWord} continuation setup.`,
+    };
+    if (templateKey === 'educationalLesson') {
+      base.title = `Educational Lesson: Why ${pair} Became a ${grade} Setup`;
+      base.intro = `In this lesson, I am using ${pair} to teach how trend, location, confirmation, and risk come together in a scanner setup.`;
+      base.focus = `The key concept is not the signal by itself. It is why a ${sideWord} idea at ${location} can become meaningful when it lines up with structure and risk.`;
+      base.takeaway = 'The lesson is to understand the setup type first, then decide whether price action confirms the idea.';
+      base.short = `Here is the lesson behind this ${pair} setup: location matters, but confirmation decides whether the idea is worth acting on.`;
+      base.social = `Educational breakdown: ${pair} shows how I review trend, location, and risk before treating a scanner signal as useful.`;
+    } else if (templateKey === 'tradeJournalReview') {
+      base.title = `Trade Journal Review: ${pair} ${grade} Setup`;
+      base.intro = `This is a journal-style review of a ${pair} scanner setup, focused on decision quality instead of hype.`;
+      base.focus = `I want to document the original plan, the entry area, the stop, the target, and what I would need to see before risking capital.`;
+      base.takeaway = 'The journal question is simple: was the idea good, was the timing good, and did the trade match the plan?';
+      base.short = `${pair} journal review: the setup is only useful if I can explain the plan, the risk, and the reason for entry.`;
+      base.social = `Journal review: ${pair} ${grade} setup, ${direction}, ${rr}R plan. The goal is process quality and repeatable review.`;
+    } else if (templateKey === 'scannerExplainer') {
+      base.title = `Scanner Explainer: Why Kairos Flagged ${pair}`;
+      base.intro = `In this scanner explainer, I am showing why Kairos surfaced ${pair} as a ${grade}-grade setup.`;
+      base.focus = `The scanner read the trade as ${direction}, with ${location} location, an entry near ${entry}, and a target around ${tp}. This is about understanding the scanner output, not blindly following it.`;
+      base.takeaway = 'The scanner narrows the chart list. The trader still confirms structure, rejection, and risk before acting.';
+      base.short = `Kairos flagged ${pair}. Here is what the scanner saw: direction, location, risk, and a clear review point.`;
+      base.social = `Scanner explainer: Kairos flagged ${pair} because the setup had ${direction} context, ${location} location, and ${rr}R potential.`;
+    } else if (templateKey === 'weeklyMarketRecap') {
+      base.title = `Weekly Market Recap: ${pair} and the Cleanest Scanner Setups`;
+      base.intro = `This weekly recap uses ${pair} as the lead example from the scanner queue.`;
+      base.focus = `The point is to compare the cleanest setups of the week, starting with this ${grade}-grade ${pair} idea, then look for repeatable themes across trend, location, and risk.`;
+      base.takeaway = 'The weekly question is which markets were clean, which were noisy, and which setups deserve journal review.';
+      base.short = `Weekly recap lead setup: ${pair}. I am looking for clean themes, not random signals.`;
+      base.social = `Weekly recap: ${pair} leads the scanner queue with a ${grade} setup. Reviewing trend, location, and execution quality.`;
+    } else if (templateKey === 'propFirmChallengeUpdate') {
+      base.title = `Prop Firm Challenge Update: ${pair} Scanner Setup and Risk Plan`;
+      base.intro = `This prop firm update connects the ${pair} scanner setup to evaluation discipline and risk control.`;
+      base.focus = `The setup matters only if it fits the challenge plan. Entry ${entry}, stop ${sl}, target ${tp}, and ${rr}R all have to make sense inside the account rules.`;
+      base.takeaway = 'Passing an eval is not about forcing trades. It is about taking clean setups, controlling risk, and documenting every decision.';
+      base.short = `Prop firm update: ${pair} is on watch, but the setup has to fit the risk plan before it matters.`;
+      base.social = `Eval update: watching ${pair} ${direction}. Clean scanner idea, but the priority is risk control and journal discipline.`;
+    }
+    return { ...base, template };
+  }
+
+  function buildAiContentPackage(trade, templateKey = currentAiTemplate) {
     const pair = trade.displaySymbol || makePairLabel(trade.pair || trade.symbol || 'this pair');
     const direction = aiDirection(trade);
     const sideWord = direction === 'LONG' ? 'bullish' : 'bearish';
@@ -2346,13 +2500,17 @@
     const sl = aiNumber(trade.sl);
     const tp = aiNumber(trade.tp1 || trade.tp);
     const found = aiFoundTime(trade);
-    const title = `${pair} ${grade} Setup: ${sideWord.toUpperCase()} Trade Plan from ${location}`;
+    const templateCopy = aiTemplateCopy(templateKey, { pair, direction, sideWord, grade, location, tf, rr, entry, sl, tp, found });
+    const title = templateCopy.title;
     return {
       trade: { ...trade, displaySymbol: pair },
+      templateKey,
+      templateName: templateCopy.template.name,
       summary: {
         pair,
         direction,
         grade,
+        template: templateCopy.template.name,
         timeframe: tf,
         location,
         entry,
@@ -2365,10 +2523,10 @@
         { label: 'YouTube Title', value: title },
         { label: 'Long-form YouTube Script', large: true, value:
 `Intro:
-Today I am breaking down a ${grade}-grade ${pair} scanner signal and showing how I would review it before taking action.
+${templateCopy.intro}
 
 Context:
-The scanner found a ${sideWord} ${tf} setup with location marked as ${location}. The idea is not to blindly enter because a card printed. The goal is to understand trend, location, timing, and risk.
+${templateCopy.focus}
 
 Trade Plan:
 Direction: ${direction}
@@ -2382,9 +2540,9 @@ Review:
 This is the kind of signal I want to journal because it gives a clear structure to study. I would still check the live chart, confirm price behavior at the zone, and make sure the setup matches my eval risk plan before entering.
 
 Takeaway:
-The scanner is not here to replace judgment. It is here to help me find cleaner opportunities faster, then use manual confirmation before risking capital.` },
+${templateCopy.takeaway}` },
         { label: 'Shorts Script', value:
-`This ${pair} ${grade}-grade setup caught my attention because the scanner found ${sideWord} structure at ${location}.
+`${templateCopy.short}
 The plan is simple: entry near ${entry}, stop at ${sl}, and first target around ${tp}.
 I am not treating this as an automatic entry. I want confirmation at the zone first.
 That is how I use the scanner: find the opportunity, then manually verify the trade.` },
@@ -2403,9 +2561,9 @@ This is for education and journal review only. It is not financial advice.` },
         { label: 'Tags', value: `forex trading, ${pair.replace('/', '')}, forex scanner, trade breakdown, prop firm trading, smart money concepts, supply and demand, trading journal` },
         { label: 'Thumbnail Prompt', value: `Dark premium trading dashboard thumbnail showing ${pair}, ${grade} Setup, ${direction}, entry ${entry}, and a clean chart with supply/demand zones. Bold text: "${pair} ${grade} SETUP"` },
         { label: 'X Post', value: `${pair} ${grade} setup on my scanner today.\n\nDirection: ${direction}\nLocation: ${location}\nR:R: ${rr}\n\nNot an auto-entry. The next step is chart confirmation and journal review.` },
-        { label: 'Instagram Caption', value: `Scanner found a ${grade}-grade ${pair} idea.\n\nI am watching ${location} for a ${sideWord} continuation setup.\n\nEntry: ${entry}\nSL: ${sl}\nTP: ${tp}\nR:R: ${rr}\n\nScanner finds the opportunity. The chart confirms the entry.` },
-        { label: 'Facebook Post', value: `Reviewing a ${grade}-grade ${pair} scanner signal today. The setup is ${sideWord}, located around ${location}, with a planned R:R of ${rr}. I am using this as a journal candidate, not an automatic entry.` },
-        { label: 'LinkedIn Post', value: `I am building a repeatable review process around scanner-generated trade candidates. Today’s example is ${pair}: a ${grade}-grade ${direction} setup with defined entry, stop, target, and R:R. The focus is process quality, journaling, and decision consistency.` },
+        { label: 'Instagram Caption', value: `${templateCopy.social}\n\nEntry: ${entry}\nSL: ${sl}\nTP: ${tp}\nR:R: ${rr}\n\nScanner finds the opportunity. The chart confirms the entry.` },
+        { label: 'Facebook Post', value: `${templateCopy.social} Entry ${entry}, stop ${sl}, target ${tp}, planned R:R ${rr}. This remains a review candidate, not an automatic entry.` },
+        { label: 'LinkedIn Post', value: `${templateCopy.social} The focus is process quality, journaling, and decision consistency. Template used: ${templateCopy.template.name}.` },
       ],
     };
   }
@@ -2436,13 +2594,15 @@ This is for education and journal review only. It is not financial advice.` },
       return;
     }
     const requestedType = document.getElementById('aiFollowUpType')?.value || 'Trade Update';
-    const followUp = buildAiFollowUpPackage(currentAiPackage, requestedType);
+    const templateKey = document.getElementById('aiFollowUpTemplate')?.value || currentAiTemplate;
+    currentAiTemplate = AI_CONTENT_TEMPLATES[templateKey] ? templateKey : currentAiTemplate;
+    const followUp = buildAiFollowUpPackage(currentAiPackage, requestedType, currentAiTemplate);
     currentAiPackage.followUp = followUp;
     renderAiFollowUp(followUp);
     document.getElementById('aiStoryPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function buildAiFollowUpPackage(pkg, requestedType) {
+  function buildAiFollowUpPackage(pkg, requestedType, templateKey = currentAiTemplate) {
     const trade = pkg.trade || {};
     const summary = pkg.summary || {};
     const pair = summary.pair || trade.displaySymbol || trade.pair || 'this setup';
@@ -2454,6 +2614,7 @@ This is for education and journal review only. It is not financial advice.` },
     const rr = summary.rr || trade.rrRatio || '—';
     const outcome = aiTradeOutcome(trade);
     const type = effectiveFollowUpType(requestedType, trade);
+    const template = selectedAiTemplate(templateKey);
     const developing = outcome === 'Unknown' || outcome === 'Running';
     const outcomeLine = developing
       ? 'The trade outcome is not confirmed yet, so this follow-up is framed as a developing Trade Update.'
@@ -2466,15 +2627,29 @@ This is for education and journal review only. It is not financial advice.` },
       ? 'The lesson is to review whether the setup failed because of direction, location, timing, or trade management.'
       : 'The lesson is to evaluate whether risk was protected without cutting the trade too early.';
     const titlePrefix = type === 'Trade Update' ? 'Trade Update' : type;
+    const templateFollowUpFocus = templateKey === 'educationalLesson'
+      ? 'Use the follow-up to teach what the setup can show about patience, confirmation, and risk.'
+      : templateKey === 'tradeJournalReview'
+      ? 'Use the follow-up as a journal review: plan, result, mistake or strength, and next adjustment.'
+      : templateKey === 'scannerExplainer'
+      ? 'Use the follow-up to compare what the scanner identified against what price did afterward.'
+      : templateKey === 'weeklyMarketRecap'
+      ? 'Use the follow-up as one chapter in a wider weekly market recap.'
+      : templateKey === 'propFirmChallengeUpdate'
+      ? 'Use the follow-up to connect the trade to eval risk, patience, and account progress.'
+      : 'Use the follow-up to quickly update what happened after the original setup.';
     return {
       type,
       requestedType,
       outcome,
       developing,
+      templateKey,
+      templateName: template.name,
       summary: {
         pair,
         direction,
         grade,
+        template: template.name,
         entry,
         sl,
         tp,
@@ -2501,6 +2676,9 @@ R:R: ${rr}
 Story Mode Review:
 The goal of this follow-up is not to make the scanner look perfect. The goal is to document what happened after the original signal and turn the trade into a useful lesson.
 
+Template Angle:
+${templateFollowUpFocus}
+
 What I Am Watching:
 If the trade is still developing, I am watching whether price respects the original zone, whether the confirmation holds, and whether the setup continues to match the plan.
 
@@ -2513,7 +2691,8 @@ This is why I am building Kairos AI Studio around the scanner: every signal can 
 `${pair} follow-up.
 The original scanner idea was ${direction} from ${entry}, with stop at ${sl} and target near ${tp}.
 ${developing ? 'The trade is still developing, so I am not calling this a win or loss yet.' : `The recorded outcome is: ${outcome}.`}
-The point is simple: every setup becomes data when you review it honestly.` },
+The point is simple: every setup becomes data when you review it honestly.
+Template: ${template.name}.` },
         { label: 'Follow-up Description', value:
 `Follow-up review for the ${pair} ${grade} scanner setup.
 
@@ -2523,6 +2702,8 @@ Stop Loss: ${sl}
 Target: ${tp}
 R:R: ${rr}
 Outcome status: ${developing ? 'Still developing / unknown' : outcome}
+
+Template: ${template.name}
 
 This is a journal and education review, not financial advice.` },
         { label: 'Follow-up Social Post', value:
@@ -2536,8 +2717,8 @@ R:R: ${rr}
 
 ${developing ? 'Outcome is still developing, so this is a Trade Update, not a win/loss claim.' : `Outcome: ${outcome}.`}
 
-The value is in reviewing the process.` },
-        { label: 'Lesson / Takeaway', value: lesson },
+The value is in reviewing the process.\n\nTemplate: ${template.name}` },
+        { label: 'Lesson / Takeaway', value: `${lesson}\n\nTemplate angle: ${templateFollowUpFocus}` },
       ],
     };
   }
@@ -2551,7 +2732,7 @@ The value is in reviewing the process.` },
         <div class="ai-package-head">
           <div>
             <div class="ai-package-title">${escapeHtml(pair)} Content Package</div>
-            <div class="ai-package-meta">Draft Episode · Ready for Review · ${escapeHtml(pkg.trade.setupGrade || 'A')} Setup</div>
+            <div class="ai-package-meta">Draft Episode · Ready for Review · ${escapeHtml(pkg.trade.setupGrade || 'A')} Setup · Selected Template: ${escapeHtml(pkg.templateName || selectedAiTemplate().name)}</div>
             <div class="ai-package-badges">
               <span class="project-status-badge draft">Initial Episode</span>
               <span class="project-status-badge ready-to-record">Content Package</span>
@@ -2567,6 +2748,9 @@ The value is in reviewing the process.` },
               <option value="Lesson Learned">Lesson Learned</option>
               <option value="Weekly Recap">Weekly Recap</option>
             </select>
+            <select id="aiFollowUpTemplate" class="studio-select" style="width:auto;">
+              ${aiTemplateOptions(pkg.templateKey || currentAiTemplate)}
+            </select>
             <button class="studio-btn" onclick="createAiFollowUp()">Create Follow-Up</button>
           </div>
         </div>
@@ -2576,7 +2760,7 @@ The value is in reviewing the process.` },
           <div class="ai-trade-field"><div class="ai-field-label">Status</div><div class="ai-field-value">${escapeHtml(summary.status || 'Ready for Review')}</div></div>
           <div class="ai-trade-field"><div class="ai-field-label">Entry / SL / TP</div><div class="ai-field-value">${escapeHtml(summary.entry || '—')} / ${escapeHtml(summary.sl || '—')} / ${escapeHtml(summary.tp || '—')}</div></div>
           <div class="ai-trade-field"><div class="ai-field-label">R:R</div><div class="ai-field-value">${escapeHtml(summary.rr || '—')}</div></div>
-          <div class="ai-trade-field"><div class="ai-field-label">Location</div><div class="ai-field-value">${escapeHtml(summary.location || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Template</div><div class="ai-field-value">${escapeHtml(summary.template || pkg.templateName || selectedAiTemplate().name)}</div></div>
         </div>
         ${pkg.sections.map(section => renderAiSection(section)).join('')}
       </div>`;
@@ -2597,7 +2781,7 @@ The value is in reviewing the process.` },
         <div class="ai-package-head">
           <div>
             <div class="ai-package-title">${escapeHtml(followUp.type)} Follow-Up Episode</div>
-            <div class="ai-package-meta">Requested: ${escapeHtml(followUp.requestedType)} · Outcome: ${escapeHtml(followUp.outcome)} · Editable Story Mode package</div>
+            <div class="ai-package-meta">Requested: ${escapeHtml(followUp.requestedType)} · Outcome: ${escapeHtml(followUp.outcome)} · Selected Template: ${escapeHtml(followUp.templateName || selectedAiTemplate().name)} · Editable Story Mode package</div>
             <div class="ai-package-badges">
               <span class="project-status-badge ready-to-record">Follow-Up Episode</span>
               <span class="project-status-badge draft">${escapeHtml(followUp.type)}</span>
@@ -2612,7 +2796,7 @@ The value is in reviewing the process.` },
           <div class="ai-trade-field"><div class="ai-field-label">Outcome</div><div class="ai-field-value">${escapeHtml(summary.outcome || followUp.outcome || '—')}</div></div>
           <div class="ai-trade-field"><div class="ai-field-label">Entry / SL / TP</div><div class="ai-field-value">${escapeHtml(summary.entry || '—')} / ${escapeHtml(summary.sl || '—')} / ${escapeHtml(summary.tp || '—')}</div></div>
           <div class="ai-trade-field"><div class="ai-field-label">R:R</div><div class="ai-field-value">${escapeHtml(summary.rr || '—')}</div></div>
-          <div class="ai-trade-field"><div class="ai-field-label">Story Type</div><div class="ai-field-value">${escapeHtml(followUp.type)}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Template</div><div class="ai-field-value">${escapeHtml(summary.template || followUp.templateName || '—')}</div></div>
         </div>
         ${followUp.sections.map(section => renderAiSection(section)).join('')}
       </div>`;
@@ -2641,7 +2825,7 @@ The value is in reviewing the process.` },
 
   function setAiSection(section) {
     document.querySelectorAll('.ai-section-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.aiSection === section));
-    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : 'aiOverview';
+    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : section === 'templates' ? 'aiTemplatesPanel' : 'aiOverview';
     document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
