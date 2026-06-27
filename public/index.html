@@ -277,6 +277,8 @@
     .ai-package-head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:10px; }
     .ai-package-title { color:var(--text); font-size:16px; font-weight:950; }
     .ai-package-meta { color:var(--slate-dim); font-size:10px; margin-top:3px; }
+    .ai-package-badges { display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+    .ai-warning { color:#fcd34d; background:rgba(245,166,35,.08); border:1px solid rgba(245,166,35,.22); border-radius:9px; padding:9px 10px; font-size:11px; line-height:1.45; margin:10px 0 12px; }
     .ai-output-section { border-top:1px solid rgba(148,163,184,.09); padding-top:10px; margin-top:10px; }
     .ai-output-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:7px; }
     .ai-output-label { color:#cbd5e1; font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
@@ -2420,6 +2422,7 @@ This is for education and journal review only. It is not financial advice.` },
 
   function effectiveFollowUpType(requestedType, trade) {
     const outcome = aiTradeOutcome(trade);
+    if (outcome === 'Unknown' || outcome === 'Running') return 'Trade Update';
     if (requestedType === 'Weekly Recap' || requestedType === 'Lesson Learned' || requestedType === 'Trade Update') return requestedType;
     if (requestedType === 'TP Hit Review' && outcome === 'TP Hit') return requestedType;
     if (requestedType === 'Stop Loss Review' && outcome === 'Stop Loss') return requestedType;
@@ -2467,6 +2470,17 @@ This is for education and journal review only. It is not financial advice.` },
       type,
       requestedType,
       outcome,
+      developing,
+      summary: {
+        pair,
+        direction,
+        grade,
+        entry,
+        sl,
+        tp,
+        rr,
+        outcome: developing ? 'Still developing' : outcome,
+      },
       sections: [
         { label: 'Follow-up YouTube Title', value: `${titlePrefix}: ${pair} ${grade} Setup Review` },
         { label: 'Follow-up Long-form Script', large: true, value:
@@ -2538,6 +2552,10 @@ The value is in reviewing the process.` },
           <div>
             <div class="ai-package-title">${escapeHtml(pair)} Content Package</div>
             <div class="ai-package-meta">Draft Episode · Ready for Review · ${escapeHtml(pkg.trade.setupGrade || 'A')} Setup</div>
+            <div class="ai-package-badges">
+              <span class="project-status-badge draft">Initial Episode</span>
+              <span class="project-status-badge ready-to-record">Content Package</span>
+            </div>
           </div>
           <div class="studio-actions">
             <button class="studio-btn secondary" onclick="approveAiPackage()">Approve Content Package</button>
@@ -2570,14 +2588,31 @@ The value is in reviewing the process.` },
 
   function renderAiFollowUp(followUp) {
     const output = document.getElementById('aiStoryOutput');
+    const summary = followUp.summary || {};
+    const warning = followUp.developing
+      ? '<div class="ai-warning"><strong>Outcome unknown:</strong> Story Mode is generating this as a Trade Update only. It does not claim TP, SL, or breakeven happened.</div>'
+      : '';
     output.innerHTML = `
       <div class="ai-package-card">
         <div class="ai-package-head">
           <div>
             <div class="ai-package-title">${escapeHtml(followUp.type)} Follow-Up Episode</div>
             <div class="ai-package-meta">Requested: ${escapeHtml(followUp.requestedType)} · Outcome: ${escapeHtml(followUp.outcome)} · Editable Story Mode package</div>
+            <div class="ai-package-badges">
+              <span class="project-status-badge ready-to-record">Follow-Up Episode</span>
+              <span class="project-status-badge draft">${escapeHtml(followUp.type)}</span>
+            </div>
           </div>
           <span class="project-status-badge ready-to-record">Ready for Review</span>
+        </div>
+        ${warning}
+        <div class="ai-trade-grid" style="margin-bottom:12px;">
+          <div class="ai-trade-field"><div class="ai-field-label">Pair</div><div class="ai-field-value">${escapeHtml(summary.pair || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Direction</div><div class="ai-field-value ${summary.direction === 'LONG' ? 'long' : 'short'}">${escapeHtml(summary.direction || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Outcome</div><div class="ai-field-value">${escapeHtml(summary.outcome || followUp.outcome || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Entry / SL / TP</div><div class="ai-field-value">${escapeHtml(summary.entry || '—')} / ${escapeHtml(summary.sl || '—')} / ${escapeHtml(summary.tp || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">R:R</div><div class="ai-field-value">${escapeHtml(summary.rr || '—')}</div></div>
+          <div class="ai-trade-field"><div class="ai-field-label">Story Type</div><div class="ai-field-value">${escapeHtml(followUp.type)}</div></div>
         </div>
         ${followUp.sections.map(section => renderAiSection(section)).join('')}
       </div>`;
