@@ -957,6 +957,7 @@
       <button class="ai-section-pill active" data-ai-section="overview" onclick="setAiSection('overview')">Overview</button>
       <button class="ai-section-pill" data-ai-section="queue" onclick="setAiSection('queue')">Content Queue</button>
       <button class="ai-section-pill" data-ai-section="episodes" onclick="setAiSection('episodes')">Episodes</button>
+      <button class="ai-section-pill" data-ai-section="story" onclick="setAiSection('story')">Story Mode</button>
       <button class="ai-section-pill" data-ai-section="templates" onclick="setAiSection('templates')">Templates</button>
       <button class="ai-section-pill" data-ai-section="publishing" onclick="setAiSection('publishing')">Publishing</button>
       <button class="ai-section-pill" data-ai-section="analytics" onclick="setAiSection('analytics')">Analytics</button>
@@ -995,6 +996,19 @@
         </div>
       </section>
     </div>
+
+    <section class="ai-panel" id="aiStoryPanel" style="margin-top:14px;">
+      <div class="ai-panel-head">
+        <div>
+          <div class="studio-title">Story Mode</div>
+          <div class="studio-subtitle">Create follow-up episodes from generated scanner stories and known trade outcomes. Unknown outcomes become Trade Update content.</div>
+        </div>
+        <span class="project-status-badge draft">Follow-Up Episode</span>
+      </div>
+      <div id="aiStoryOutput" class="ai-output-list">
+        <div class="studio-empty">Produce an episode first, then use Create Follow-Up to build a Trade Update, Lesson Learned, or recap package.</div>
+      </div>
+    </section>
 
     <div class="ai-secondary-grid">
       <section class="ai-panel">
@@ -2394,6 +2408,126 @@ This is for education and journal review only. It is not financial advice.` },
     };
   }
 
+  function aiTradeOutcome(trade) {
+    const raw = String(trade?.reviewResult || trade?.result || trade?.outcome || trade?.tradeResult || '').trim().toUpperCase();
+    if (['WINNER', 'WIN', 'TP', 'TP HIT', 'TAKE PROFIT'].includes(raw)) return 'TP Hit';
+    if (['STOPPED', 'STOP LOSS', 'SL', 'SL HIT', 'LOSS', 'LOSER'].includes(raw)) return 'Stop Loss';
+    if (['BREAKEVEN', 'BREAK EVEN', 'BE'].includes(raw)) return 'Breakeven';
+    if (['FAILED'].includes(raw)) return 'Stop Loss';
+    if (['RUNNING', 'OPEN'].includes(raw)) return 'Running';
+    return 'Unknown';
+  }
+
+  function effectiveFollowUpType(requestedType, trade) {
+    const outcome = aiTradeOutcome(trade);
+    if (requestedType === 'Weekly Recap' || requestedType === 'Lesson Learned' || requestedType === 'Trade Update') return requestedType;
+    if (requestedType === 'TP Hit Review' && outcome === 'TP Hit') return requestedType;
+    if (requestedType === 'Stop Loss Review' && outcome === 'Stop Loss') return requestedType;
+    if (requestedType === 'Breakeven Review' && outcome === 'Breakeven') return requestedType;
+    return 'Trade Update';
+  }
+
+  function createAiFollowUp() {
+    if (!currentAiPackage) {
+      showVideoToast('Produce an episode first');
+      return;
+    }
+    const requestedType = document.getElementById('aiFollowUpType')?.value || 'Trade Update';
+    const followUp = buildAiFollowUpPackage(currentAiPackage, requestedType);
+    currentAiPackage.followUp = followUp;
+    renderAiFollowUp(followUp);
+    document.getElementById('aiStoryPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function buildAiFollowUpPackage(pkg, requestedType) {
+    const trade = pkg.trade || {};
+    const summary = pkg.summary || {};
+    const pair = summary.pair || trade.displaySymbol || trade.pair || 'this setup';
+    const direction = summary.direction || aiDirection(trade);
+    const grade = summary.grade || trade.setupGrade || 'A';
+    const entry = summary.entry || aiNumber(trade.entry);
+    const sl = summary.sl || aiNumber(trade.sl);
+    const tp = summary.tp || aiNumber(trade.tp1 || trade.tp);
+    const rr = summary.rr || trade.rrRatio || '—';
+    const outcome = aiTradeOutcome(trade);
+    const type = effectiveFollowUpType(requestedType, trade);
+    const developing = outcome === 'Unknown' || outcome === 'Running';
+    const outcomeLine = developing
+      ? 'The trade outcome is not confirmed yet, so this follow-up is framed as a developing Trade Update.'
+      : `Known outcome: ${outcome}.`;
+    const lesson = developing
+      ? 'The lesson is to document the plan while the trade is still developing, then compare the plan against the final result later.'
+      : outcome === 'TP Hit'
+      ? 'The lesson is to review what made the setup work and whether the entry, patience, and target selection were repeatable.'
+      : outcome === 'Stop Loss'
+      ? 'The lesson is to review whether the setup failed because of direction, location, timing, or trade management.'
+      : 'The lesson is to evaluate whether risk was protected without cutting the trade too early.';
+    const titlePrefix = type === 'Trade Update' ? 'Trade Update' : type;
+    return {
+      type,
+      requestedType,
+      outcome,
+      sections: [
+        { label: 'Follow-up YouTube Title', value: `${titlePrefix}: ${pair} ${grade} Setup Review` },
+        { label: 'Follow-up Long-form Script', large: true, value:
+`Intro:
+This is a follow-up episode for the ${pair} ${grade} setup from the scanner.
+
+Status:
+${outcomeLine}
+
+Original Trade Plan:
+Pair: ${pair}
+Direction: ${direction}
+Entry: ${entry}
+Stop Loss: ${sl}
+Target: ${tp}
+R:R: ${rr}
+
+Story Mode Review:
+The goal of this follow-up is not to make the scanner look perfect. The goal is to document what happened after the original signal and turn the trade into a useful lesson.
+
+What I Am Watching:
+If the trade is still developing, I am watching whether price respects the original zone, whether the confirmation holds, and whether the setup continues to match the plan.
+
+Lesson:
+${lesson}
+
+Close:
+This is why I am building Kairos AI Studio around the scanner: every signal can become a documented case study instead of a random trade.` },
+        { label: 'Follow-up Shorts Script', value:
+`${pair} follow-up.
+The original scanner idea was ${direction} from ${entry}, with stop at ${sl} and target near ${tp}.
+${developing ? 'The trade is still developing, so I am not calling this a win or loss yet.' : `The recorded outcome is: ${outcome}.`}
+The point is simple: every setup becomes data when you review it honestly.` },
+        { label: 'Follow-up Description', value:
+`Follow-up review for the ${pair} ${grade} scanner setup.
+
+Original direction: ${direction}
+Entry: ${entry}
+Stop Loss: ${sl}
+Target: ${tp}
+R:R: ${rr}
+Outcome status: ${developing ? 'Still developing / unknown' : outcome}
+
+This is a journal and education review, not financial advice.` },
+        { label: 'Follow-up Social Post', value:
+`${pair} scanner follow-up:
+
+Original plan: ${direction}
+Entry: ${entry}
+SL: ${sl}
+TP: ${tp}
+R:R: ${rr}
+
+${developing ? 'Outcome is still developing, so this is a Trade Update, not a win/loss claim.' : `Outcome: ${outcome}.`}
+
+The value is in reviewing the process.` },
+        { label: 'Lesson / Takeaway', value: lesson },
+      ],
+    };
+  }
+
   function renderAiPackage(pkg) {
     const output = document.getElementById('aiEpisodeOutput');
     const pair = pkg.trade.displaySymbol || pkg.trade.pair || 'Draft Episode';
@@ -2405,7 +2539,18 @@ This is for education and journal review only. It is not financial advice.` },
             <div class="ai-package-title">${escapeHtml(pair)} Content Package</div>
             <div class="ai-package-meta">Draft Episode · Ready for Review · ${escapeHtml(pkg.trade.setupGrade || 'A')} Setup</div>
           </div>
-          <button class="studio-btn secondary" onclick="approveAiPackage()">Approve Content Package</button>
+          <div class="studio-actions">
+            <button class="studio-btn secondary" onclick="approveAiPackage()">Approve Content Package</button>
+            <select id="aiFollowUpType" class="studio-select" style="width:auto;">
+              <option value="Trade Update">Trade Update</option>
+              <option value="TP Hit Review">TP Hit Review</option>
+              <option value="Stop Loss Review">Stop Loss Review</option>
+              <option value="Breakeven Review">Breakeven Review</option>
+              <option value="Lesson Learned">Lesson Learned</option>
+              <option value="Weekly Recap">Weekly Recap</option>
+            </select>
+            <button class="studio-btn" onclick="createAiFollowUp()">Create Follow-Up</button>
+          </div>
         </div>
         <div class="ai-trade-grid" style="margin-bottom:12px;">
           <div class="ai-trade-field"><div class="ai-field-label">Pair</div><div class="ai-field-value">${escapeHtml(summary.pair || pair)}</div></div>
@@ -2420,6 +2565,22 @@ This is for education and journal review only. It is not financial advice.` },
     document.getElementById('aiEpisodeCount').textContent = '1';
     document.getElementById('aiReviewCount').textContent = '1';
     document.getElementById('aiActivePackage').textContent = pair;
+    if (pkg.followUp) renderAiFollowUp(pkg.followUp);
+  }
+
+  function renderAiFollowUp(followUp) {
+    const output = document.getElementById('aiStoryOutput');
+    output.innerHTML = `
+      <div class="ai-package-card">
+        <div class="ai-package-head">
+          <div>
+            <div class="ai-package-title">${escapeHtml(followUp.type)} Follow-Up Episode</div>
+            <div class="ai-package-meta">Requested: ${escapeHtml(followUp.requestedType)} · Outcome: ${escapeHtml(followUp.outcome)} · Editable Story Mode package</div>
+          </div>
+          <span class="project-status-badge ready-to-record">Ready for Review</span>
+        </div>
+        ${followUp.sections.map(section => renderAiSection(section)).join('')}
+      </div>`;
   }
 
   function renderAiSection(section) {
@@ -2445,7 +2606,7 @@ This is for education and journal review only. It is not financial advice.` },
 
   function setAiSection(section) {
     document.querySelectorAll('.ai-section-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.aiSection === section));
-    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : 'aiOverview';
+    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : 'aiOverview';
     document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
