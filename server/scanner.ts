@@ -1005,6 +1005,29 @@ export interface ScalpReport {
   candleTime: string;
 }
 
+export interface IndependentWatchlistCandidate {
+  symbol: string;
+  displaySymbol: string;
+  direction: 'LONG' | 'SHORT';
+  timeframe: string;
+  trendH4: DirectionLabel;
+  trendH1: DirectionLabel;
+  entryFrame: DirectionLabel;
+  currentPrice: number;
+  entry: number;
+  sl: number;
+  tp1: number;
+  tp2: number | null;
+  rrRatio: number;
+  nearestDemand: number | null;
+  nearestSupply: number | null;
+  distanceToEntryAtr: number;
+  status: 'Entry Area' | 'Nearby' | 'Wait';
+  reason: string;
+  candleTime: string;
+  scannedAt: string;
+}
+
 function momentumLabel(score: number): MomentumLabel {
   if (score >= 7) return 'Strong Bullish';
   if (score >= 3) return 'Bullish';
@@ -2454,6 +2477,143 @@ function isScalpSessionActive(session: string) {
 
 function zoneMid(zone: { obHigh: number; obLow: number }) {
   return (zone.obHigh + zone.obLow) / 2;
+}
+
+function analyzeIndependentCandidate(
+  pair: string,
+  m30Candles: Candle[],
+  h1Candles: Candle[],
+  h4Candles: Candle[],
+  minRR: number
+): IndependentWatchlistCandidate | null {
+  if (m30Candles.length < 80 || h1Candles.length < 80 || h4Candles.length < 80) return null;
+
+  const price = m30Candles.at(-1)!.c;
+  const atr = Math.max(calcATR(m30Candles.slice(-60)), Math.abs(price) * 0.0001, 0.00001);
+  const h4Frame = analyzeDirectionalFrame(h4Candles, 'H4');
+  const h1Frame = analyzeDirectionalFrame(h1Candles, 'H1');
+  const m30Frame = analyzeDirectionalFrame(m30Candles, 'M30');
+  const trendH4 = dominantFrameDirection(h4Frame);
+  const trendH1 = dominantFrameDirection(h1Frame);
+  const entryFrame = dominantFrameDirection(m30Frame);
+  const structures = computeStructures(m30Candles.slice(-140), 4);
+  const demands = structures.demandZones
+    .filter(z => zoneMid(z) <= price + 0.25 * atr)
+    .sort((a, b) => Math.abs(price - zoneMid(a)) - Math.abs(price - zoneMid(b)));
+  const supplies = structures.supplyZones
+    .filter(z => zoneMid(z) >= price - 0.25 * atr)
+    .sort((a, b) => Math.abs(price - zoneMid(a)) - Math.abs(price - zoneMid(b)));
+  const demand = demands[0] ?? null;
+  const supply = supplies[0] ?? null;
+  const nearestDemand = demand ? roundPrice(zoneMid(demand)) : null;
+  const nearestSupply = supply ? roundPrice(zoneMid(supply)) : null;
+  const htfBullish = trendH4 === 'Bullish' && (trendH1 === 'Bullish' || entryFrame === 'Bullish');
+  const htfBearish = trendH4 === 'Bearish' && (trendH1 === 'Bearish' || entryFrame === 'Bearish');
+  const directions: Array<'LONG' | 'SHORT'> = [];
+  if (htfBullish) directions.push('LONG');
+  if (htfBearish) directions.push('SHORT');
+  if (!directions.length) return null;
+
+  const swingHighs = structures.swingHighs.map(s => s.price).sort((a, b) => a - b);
+  const swingLows = structures.swingLows.map(s => s.price).sort((a, b) => b - a);
+  const candidates = directions.map(direction => {
+    if (direction === 'LONG') {
+      if (!demand) return null;
+      const entry = roundPrice(Math.min(price, zoneMid(demand)));
+      const sl = roundPrice(Math.min(demand.obLow, entry - atr) - 0.25 * atr);
+      const risk = Math.abs(entry - sl);
+      if (risk <= 0) return null;
+      const zoneTarget = supply && zoneMid(supply) > entry ? zoneMid(supply) : null;
+      const swingTarget = swingHighs.find(level => level > entry + minRR * risk);
+      const tp1 = roundPrice(zoneTarget && zoneTarget > entry + minRR * risk ? zoneTarget : swingTarget ?? entry + minRR * risk);
+      const tp2 = swingHighs.find(level => level > tp1 + 0.5 * atr) ?? null;
+      const rrRatio = Math.round(((tp1 - entry) / risk) * 100) / 100;
+      const distanceToEntryAtr = Math.round((Math.abs(price - entry) / atr) * 100) / 100;
+      return {
+        symbol: pair,
+        displaySymbol: pair.replace('_', '/'),
+        direction,
+        timeframe: 'M30',
+        trendH4,
+        trendH1,
+        entryFrame,
+        currentPrice: roundPrice(price),
+        entry,
+        sl,
+        tp1,
+        tp2: tp2 ? roundPrice(tp2) : null,
+        rrRatio,
+        nearestDemand,
+        nearestSupply,
+        distanceToEntryAtr,
+        status: distanceToEntryAtr <= 0.25 ? 'Entry Area' as const : distanceToEntryAtr <= 0.75 ? 'Nearby' as const : 'Wait' as const,
+        reason: `H4 ${trendH4}, H1 ${trendH1}; long idea from nearest demand with ${rrRatio}R to first target.`,
+        candleTime: m30Candles.at(-1)!.t,
+        scannedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!supply) return null;
+    const entry = roundPrice(Math.max(price, zoneMid(supply)));
+    const sl = roundPrice(Math.max(supply.obHigh, entry + atr) + 0.25 * atr);
+    const risk = Math.abs(entry - sl);
+    if (risk <= 0) return null;
+    const zoneTarget = demand && zoneMid(demand) < entry ? zoneMid(demand) : null;
+    const swingTarget = swingLows.find(level => level < entry - minRR * risk);
+    const tp1 = roundPrice(zoneTarget && zoneTarget < entry - minRR * risk ? zoneTarget : swingTarget ?? entry - minRR * risk);
+    const tp2 = swingLows.find(level => level < tp1 - 0.5 * atr) ?? null;
+    const rrRatio = Math.round(((entry - tp1) / risk) * 100) / 100;
+    const distanceToEntryAtr = Math.round((Math.abs(price - entry) / atr) * 100) / 100;
+    return {
+      symbol: pair,
+      displaySymbol: pair.replace('_', '/'),
+      direction,
+      timeframe: 'M30',
+      trendH4,
+      trendH1,
+      entryFrame,
+      currentPrice: roundPrice(price),
+      entry,
+      sl,
+      tp1,
+      tp2: tp2 ? roundPrice(tp2) : null,
+      rrRatio,
+      nearestDemand,
+      nearestSupply,
+      distanceToEntryAtr,
+      status: distanceToEntryAtr <= 0.25 ? 'Entry Area' as const : distanceToEntryAtr <= 0.75 ? 'Nearby' as const : 'Wait' as const,
+      reason: `H4 ${trendH4}, H1 ${trendH1}; short idea from nearest supply with ${rrRatio}R to first target.`,
+      candleTime: m30Candles.at(-1)!.t,
+      scannedAt: new Date().toISOString(),
+    };
+  }).filter((candidate): candidate is IndependentWatchlistCandidate => Boolean(candidate && candidate.rrRatio >= minRR));
+
+  return candidates.sort((a, b) => a.distanceToEntryAtr - b.distanceToEntryAtr || b.rrRatio - a.rrRatio)[0] ?? null;
+}
+
+export async function runIndependentWatchlistScan(symbols: string[], minRR = 2): Promise<IndependentWatchlistCandidate[]> {
+  const uniqueSymbols = Array.from(new Set(symbols.filter(Boolean)));
+  const results: IndependentWatchlistCandidate[] = [];
+  for (const pair of uniqueSymbols) {
+    try {
+      const [m30Candles, h1Candles, h4Candles] = await Promise.all([
+        fetchCandles(pair, 'M30', 180),
+        fetchCandles(pair, 'H1', 180),
+        fetchCandles(pair, 'H4', 180),
+      ]);
+      const candidate = analyzeIndependentCandidate(pair, m30Candles, h1Candles, h4Candles, minRR);
+      if (candidate) results.push(candidate);
+    } catch (e: any) {
+      console.error(`Independent watchlist skip ${pair}:`, e.message);
+    }
+  }
+  const statusRank: Record<IndependentWatchlistCandidate['status'], number> = { 'Entry Area': 0, Nearby: 1, Wait: 2 };
+  return results.sort((a, b) =>
+    statusRank[a.status] - statusRank[b.status] ||
+    a.distanceToEntryAtr - b.distanceToEntryAtr ||
+    b.rrRatio - a.rrRatio ||
+    a.symbol.localeCompare(b.symbol)
+  );
 }
 
 function lastCandleMomentum(candles: Candle[]) {

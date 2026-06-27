@@ -7,7 +7,7 @@ import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats, getSetting, setSetting, deleteSetting, getSettingsStorageInfo } from './db.js';
-import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS, runScoutScan, ScoutReport, runScalpScan, ScalpReport, runTrendScan, TrendReport, TrendScanResult } from './scanner.js';
+import { debugScan, Setup, JournalStats, fetchCandles, computeStructures, PAIRS as FULL_PAIRS, runScoutScan, ScoutReport, runScalpScan, ScalpReport, runTrendScan, TrendReport, TrendScanResult, runIndependentWatchlistScan } from './scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -70,9 +70,23 @@ const PRIORITY_PAIRS_SETTING_KEY = 'priority_pairs';
 // Convert bare symbol (EURUSD, XAU_USD, FX:EURUSD) to OANDA underscore format
 function toOandaFormat(symbol: string): string {
   const s = symbol.replace(/^[^:]+:/, '').toUpperCase(); // strip exchange prefix
+  const compact = s.replace(/[^A-Z0-9_]/g, '');
+  const aliases: Record<string, string> = {
+    GOLD: 'XAU_USD',
+    XAU: 'XAU_USD',
+    XAUUSD: 'XAU_USD',
+    SILVER: 'XAG_USD',
+    XAG: 'XAG_USD',
+    XAGUSD: 'XAG_USD',
+    US30: 'US30_USD',
+    US30USD: 'US30_USD',
+    NAS100: 'NAS100_USD',
+    NAS100USD: 'NAS100_USD',
+  };
+  if (aliases[compact]) return aliases[compact];
   if (s.includes('_')) return s;                          // already OANDA format
-  if (s.length === 6) return `${s.slice(0, 3)}_${s.slice(3)}`; // EURUSD → EUR_USD
-  return s;
+  if (compact.length === 6) return `${compact.slice(0, 3)}_${compact.slice(3)}`; // EURUSD → EUR_USD
+  return compact;
 }
 
 function parsePriorityPairs(value: string | null): PriorityPairsData | null {
@@ -743,6 +757,32 @@ app.post('/api/scalp', async (_req, res) => {
   try {
     latestScalpResults = await runScalpScan();
     res.json({ reports: latestScalpResults, lastScanTime: new Date().toISOString(), count: latestScalpResults.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Independent Watchlist Analysis API ───────────────────────────────────────
+// Separate from Scout/Scalping filters. Used for manual review of a pasted list.
+app.post('/api/independent-watchlist-scan', async (req, res) => {
+  try {
+    const rawSymbols = Array.isArray(req.body?.symbols) ? req.body.symbols : [];
+    const symbols = Array.from(new Set(rawSymbols.map((s: unknown) => toOandaFormat(String(s || ''))).filter(Boolean)));
+    const minRR = Number.isFinite(Number(req.body?.minRR)) ? Math.max(1, Number(req.body.minRR)) : 2;
+    if (!symbols.length) {
+      res.status(400).json({ error: 'symbols array is required' });
+      return;
+    }
+    const candidates = await runIndependentWatchlistScan(symbols, minRR);
+    res.json({
+      candidates,
+      top: candidates.slice(0, 2),
+      symbols,
+      minRR,
+      count: candidates.length,
+      scannedAt: new Date().toISOString(),
+      note: 'Independent watchlist scan only. Does not change Scout, Scalping, alerts, journals, entries, stops, or targets.',
+    });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
