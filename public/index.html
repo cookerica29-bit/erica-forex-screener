@@ -315,6 +315,25 @@
     .ai-visual-card { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:11px; }
     .ai-visual-type { color:var(--text); font-size:13px; font-weight:950; margin-bottom:6px; }
     .ai-visual-meta { color:var(--slate-dim); font-size:10px; line-height:1.45; margin-bottom:8px; }
+    .ai-production-progress { height:9px; border-radius:999px; background:rgba(148,163,184,.1); overflow:hidden; margin:10px 0 14px; }
+    .ai-production-progress-bar { height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,#60A5FA,#00FF88); transition:width .25s ease; }
+    .ai-pipeline-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; }
+    .ai-stage-card { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:9px; min-height:92px; }
+    .ai-stage-card.complete { border-color:rgba(0,255,136,.28); background:rgba(0,255,136,.055); }
+    .ai-stage-card.ready { border-color:rgba(96,165,250,.28); background:rgba(96,165,250,.055); }
+    .ai-stage-card.in-progress { border-color:rgba(245,166,35,.28); background:rgba(245,166,35,.055); }
+    .ai-stage-title { color:var(--text); font-size:11px; font-weight:900; line-height:1.25; margin-bottom:7px; }
+    .ai-stage-status { display:inline-flex; align-items:center; gap:4px; font-size:9px; font-weight:900; padding:3px 7px; border-radius:999px; border:1px solid rgba(148,163,184,.18); color:var(--slate); }
+    .ai-stage-status.complete { color:var(--green); border-color:rgba(0,255,136,.35); background:rgba(0,255,136,.08); }
+    .ai-stage-status.ready { color:var(--green); border-color:rgba(0,255,136,.28); background:rgba(0,255,136,.06); }
+    .ai-stage-status.in-progress { color:var(--gold); border-color:rgba(245,166,35,.35); background:rgba(245,166,35,.07); }
+    .ai-stage-status.not-started { color:var(--slate-dim); }
+    .ai-checklist-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:12px; }
+    .ai-checklist-card { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:11px; }
+    .ai-checklist-title { color:var(--text); font-size:12px; font-weight:950; margin-bottom:8px; }
+    .ai-check-item { display:flex; align-items:flex-start; gap:7px; color:var(--slate); font-size:11px; line-height:1.35; padding:4px 0; }
+    .ai-check-item span:first-child { color:var(--slate-dim); font-weight:900; }
+    .ai-check-item.done span:first-child { color:var(--green); }
     .video-toast { position:fixed; right:18px; bottom:18px; z-index:9999; background:rgba(15,23,42,.96); border:1px solid rgba(96,165,250,.28); color:var(--text); border-radius:10px; padding:10px 12px; font-size:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.35); }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
@@ -322,7 +341,7 @@
       .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
       .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
-      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid, .ai-brand-grid, .ai-knowledge-layout, .ai-knowledge-list, .ai-visual-grid { grid-template-columns:1fr; }
+      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid, .ai-brand-grid, .ai-knowledge-layout, .ai-knowledge-list, .ai-visual-grid, .ai-pipeline-grid, .ai-checklist-grid { grid-template-columns:1fr; }
       .shorts-block.full { grid-column:auto; }
     }
     .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
@@ -991,6 +1010,7 @@
       <button class="ai-section-pill" data-ai-section="story" onclick="setAiSection('story')">Story Mode</button>
       <button class="ai-section-pill" data-ai-section="templates" onclick="setAiSection('templates')">Templates</button>
       <button class="ai-section-pill" data-ai-section="visuals" onclick="setAiSection('visuals')">Visual Assets</button>
+      <button class="ai-section-pill" data-ai-section="production" onclick="setAiSection('production')">Production</button>
       <button class="ai-section-pill" data-ai-section="knowledge" onclick="setAiSection('knowledge')">Knowledge Base</button>
       <button class="ai-section-pill" data-ai-section="publishing" onclick="setAiSection('publishing')">Publishing</button>
       <button class="ai-section-pill" data-ai-section="analytics" onclick="setAiSection('analytics')">Analytics</button>
@@ -1068,6 +1088,19 @@
       </div>
       <div id="aiVisualAssetsOutput" class="ai-output-list">
         <div class="studio-empty">Produce an episode first, then click Create Visual Assets to generate thumbnail and graphic briefs.</div>
+      </div>
+    </section>
+
+    <section class="ai-panel" id="aiProductionPanel" style="margin-top:14px;">
+      <div class="ai-panel-head">
+        <div>
+          <div class="studio-title">Production Pipeline</div>
+          <div class="studio-subtitle">Automatic production status inferred from the current episode, follow-up, visual briefs, and metadata outputs. Narration, rendering, publishing, and analytics are placeholders only.</div>
+        </div>
+        <span class="project-status-badge ready-to-record" id="aiProductionBadge">Production</span>
+      </div>
+      <div id="aiProductionOutput">
+        <div class="studio-empty">Produce an episode to start the production pipeline.</div>
       </div>
     </section>
 
@@ -3395,6 +3428,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     }
     currentAiPackage.visualAssets = buildAiVisualAssets(currentAiPackage);
     renderAiVisualAssets(currentAiPackage.visualAssets);
+    renderAiProductionPipeline(currentAiPackage);
     setAiSection('visuals');
     showVideoToast('Visual asset briefs created');
   }
@@ -3415,6 +3449,116 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             ${asset.fields.map(field => renderAiSection({ label: `${asset.type} ${field.label}`, value: field.value, large: /Prompt|Composition|Concept/.test(field.label) })).join('')}
           </div>
         `).join('')}
+      </div>`;
+  }
+
+  function aiPackageHasSection(pkg, pattern) {
+    return (pkg?.sections || []).some(section => pattern.test(section.label || ''));
+  }
+
+  function aiProductionStatus(label, status) {
+    const map = {
+      'Not Started': 'not-started',
+      'In Progress': 'in-progress',
+      Ready: 'ready',
+      Complete: 'complete',
+    };
+    const icon = status === 'Complete' ? '✅' : status === 'Ready' ? '🟢' : status === 'In Progress' ? '🟡' : '○';
+    return `<span class="ai-stage-status ${map[status] || 'not-started'}">${icon} ${escapeHtml(status)}</span>`;
+  }
+
+  function aiProductionSnapshot(pkg = currentAiPackage) {
+    const hasTrade = !!pkg?.trade;
+    const hasEpisode = Array.isArray(pkg?.sections) && pkg.sections.length > 0;
+    const hasFollowUp = !!pkg?.followUp;
+    const hasSocial = hasEpisode && ['X Post', 'Instagram Caption', 'Facebook Post', 'LinkedIn Post'].every(label => (pkg.sections || []).some(section => section.label === label));
+    const assets = pkg?.visualAssets || [];
+    const hasVisuals = assets.length > 0;
+    const hasThumbnail = assets.some(asset => asset.type === 'YouTube Thumbnail');
+    const hasShortCover = assets.some(asset => asset.type === 'YouTube Short Cover');
+    const hasCommunity = assets.some(asset => asset.type === 'Community Post Image');
+    const hasScript = aiPackageHasSection(pkg, /Long-form YouTube Script/i);
+    const hasMetadata = ['YouTube Title', 'YouTube Description', 'Tags'].every(label => (pkg?.sections || []).some(section => section.label === label));
+    const stages = [
+      { name: 'Trade Selected', status: hasTrade ? 'Complete' : 'Not Started', note: hasTrade ? 'Trade data attached' : 'Choose a signal' },
+      { name: 'Episode Produced', status: hasEpisode ? 'Complete' : hasTrade ? 'In Progress' : 'Not Started', note: hasEpisode ? 'Content Package exists' : 'Produce episode' },
+      { name: 'Visual Assets Ready', status: hasVisuals ? 'Complete' : hasEpisode ? 'Ready' : 'Not Started', note: hasVisuals ? 'Briefs created' : 'Create briefs' },
+      { name: 'Ready for Narration', status: hasScript ? 'Ready' : 'Not Started', note: hasScript ? 'Script available' : 'Needs script' },
+      { name: 'Ready for Rendering', status: hasVisuals && hasScript ? 'Ready' : 'Not Started', note: hasVisuals && hasScript ? 'Future renderer placeholder' : 'Needs script and visuals' },
+      { name: 'Ready for Publishing', status: hasMetadata && hasVisuals ? 'Ready' : 'Not Started', note: hasMetadata && hasVisuals ? 'Metadata and visuals ready' : 'Needs package assets' },
+      { name: 'Published', status: 'Not Started', note: 'Future publishing placeholder' },
+    ];
+    const checklist = [
+      { group: 'Content', items: [
+        { label: 'Episode', done: hasEpisode },
+        { label: 'Follow-Up', done: hasFollowUp },
+        { label: 'Social Posts', done: hasSocial },
+      ] },
+      { group: 'Visuals', items: [
+        { label: 'Thumbnail Brief', done: hasThumbnail },
+        { label: 'Shorts Cover', done: hasShortCover },
+        { label: 'Community Image', done: hasCommunity },
+      ] },
+      { group: 'Production', items: [
+        { label: 'Narration Script', done: hasScript },
+        { label: 'Visual Assets', done: hasVisuals },
+        { label: 'Render Package', done: false },
+      ] },
+      { group: 'Publishing', items: [
+        { label: 'Metadata', done: hasMetadata },
+        { label: 'Upload Ready', done: false },
+      ] },
+      { group: 'Analytics', items: [
+        { label: 'Awaiting Results', done: false },
+      ] },
+    ];
+    const completeCount = stages.filter(stage => stage.status === 'Complete').length;
+    const readyCount = stages.filter(stage => stage.status === 'Ready').length;
+    return { stages, checklist, completeCount, readyCount, progress: Math.round((completeCount / stages.length) * 100) };
+  }
+
+  function renderAiProductionPipeline(pkg = currentAiPackage) {
+    const output = document.getElementById('aiProductionOutput');
+    if (!output) return;
+    if (!pkg) {
+      output.innerHTML = '<div class="studio-empty">Produce an episode to start the production pipeline.</div>';
+      const badge = document.getElementById('aiProductionBadge');
+      if (badge) badge.textContent = 'Production';
+      return;
+    }
+    const snapshot = aiProductionSnapshot(pkg);
+    const pair = pkg.summary?.pair || pkg.trade?.displaySymbol || pkg.trade?.pair || 'Current Episode';
+    const badge = document.getElementById('aiProductionBadge');
+    if (badge) badge.textContent = `${snapshot.completeCount} / ${snapshot.stages.length} Complete`;
+    output.innerHTML = `
+      <div class="ai-package-card">
+        <div class="ai-package-head">
+          <div>
+            <div class="ai-package-title">${escapeHtml(pair)} Production Pipeline</div>
+            <div class="ai-package-meta">${snapshot.completeCount} complete · ${snapshot.readyCount} ready · automatic status from current AI Studio outputs</div>
+          </div>
+          ${aiProductionStatus('Pipeline', snapshot.completeCount === snapshot.stages.length ? 'Complete' : snapshot.completeCount ? 'In Progress' : 'Not Started')}
+        </div>
+        <div class="ai-production-progress"><div class="ai-production-progress-bar" style="width:${snapshot.progress}%;"></div></div>
+        <div class="ai-pipeline-grid">
+          ${snapshot.stages.map(stage => `
+            <div class="ai-stage-card ${stage.status.toLowerCase().replace(/\s+/g, '-')}">
+              <div class="ai-stage-title">${escapeHtml(stage.name)}</div>
+              ${aiProductionStatus(stage.name, stage.status)}
+              <div class="ai-template-meta">${escapeHtml(stage.note)}</div>
+            </div>`).join('')}
+        </div>
+        <div class="ai-checklist-grid">
+          ${snapshot.checklist.map(group => `
+            <div class="ai-checklist-card">
+              <div class="ai-checklist-title">${escapeHtml(group.group)}</div>
+              ${group.items.map(item => `
+                <div class="ai-check-item ${item.done ? 'done' : ''}">
+                  <span>${item.done ? '☑' : '□'}</span>
+                  <span>${escapeHtml(item.label)}</span>
+                </div>`).join('')}
+            </div>`).join('')}
+        </div>
       </div>`;
   }
 
@@ -3465,6 +3609,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     document.getElementById('aiActivePackage').textContent = pair;
     if (pkg.followUp) renderAiFollowUp(pkg.followUp);
     if (pkg.visualAssets) renderAiVisualAssets(pkg.visualAssets);
+    renderAiProductionPipeline(pkg);
   }
 
   function renderAiFollowUp(followUp) {
@@ -3497,6 +3642,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
         </div>
         ${followUp.sections.map(section => renderAiSection(section)).join('')}
       </div>`;
+    renderAiProductionPipeline(currentAiPackage);
   }
 
   function renderAiSection(section) {
@@ -3522,7 +3668,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
 
   function setAiSection(section) {
     document.querySelectorAll('.ai-section-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.aiSection === section));
-    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : section === 'templates' ? 'aiTemplatesPanel' : section === 'visuals' ? 'aiVisualAssetsPanel' : section === 'knowledge' ? 'aiKnowledgePanel' : section === 'settings' ? 'aiBrandDnaPanel' : 'aiOverview';
+    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : section === 'templates' ? 'aiTemplatesPanel' : section === 'visuals' ? 'aiVisualAssetsPanel' : section === 'production' ? 'aiProductionPanel' : section === 'knowledge' ? 'aiKnowledgePanel' : section === 'settings' ? 'aiBrandDnaPanel' : 'aiOverview';
     document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
