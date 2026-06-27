@@ -297,6 +297,20 @@
     .ai-brand-options { display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; }
     .ai-brand-option { display:flex; align-items:center; gap:6px; border:1px solid rgba(148,163,184,.13); border-radius:999px; padding:5px 8px; color:var(--slate); font-size:10px; cursor:pointer; }
     .ai-brand-option input { accent-color:#60A5FA; }
+    .ai-knowledge-layout { display:grid; grid-template-columns:minmax(280px,.9fr) minmax(0,1.4fr); gap:12px; align-items:start; }
+    .ai-knowledge-form, .ai-suggestion-panel { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:11px; }
+    .ai-knowledge-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .ai-knowledge-card { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:11px; }
+    .ai-knowledge-card.approved { border-color:rgba(0,255,136,.22); }
+    .ai-knowledge-card.draft { border-color:rgba(245,166,35,.18); }
+    .ai-knowledge-title { color:var(--text); font-size:13px; font-weight:900; margin-bottom:5px; }
+    .ai-knowledge-summary { color:var(--slate); font-size:11px; line-height:1.45; margin-top:7px; }
+    .ai-knowledge-meta { display:flex; flex-wrap:wrap; gap:6px; align-items:center; color:var(--slate-dim); font-size:10px; }
+    .ai-kb-status { display:inline-flex; padding:3px 8px; border-radius:999px; border:1px solid rgba(148,163,184,.2); font-size:9px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+    .ai-kb-status.approved { color:var(--green); border-color:rgba(0,255,136,.35); background:rgba(0,255,136,.08); }
+    .ai-kb-status.draft { color:var(--gold); border-color:rgba(245,166,35,.32); background:rgba(245,166,35,.07); }
+    .ai-suggestion-card { border-top:1px solid rgba(148,163,184,.09); padding-top:10px; margin-top:10px; }
+    .ai-suggestion-card:first-child { border-top:0; padding-top:0; margin-top:0; }
     .video-toast { position:fixed; right:18px; bottom:18px; z-index:9999; background:rgba(15,23,42,.96); border:1px solid rgba(96,165,250,.28); color:var(--text); border-radius:10px; padding:10px 12px; font-size:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.35); }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
@@ -304,7 +318,7 @@
       .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
       .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
-      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid, .ai-brand-grid { grid-template-columns:1fr; }
+      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid, .ai-brand-grid, .ai-knowledge-layout, .ai-knowledge-list { grid-template-columns:1fr; }
       .shorts-block.full { grid-column:auto; }
     }
     .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
@@ -972,6 +986,7 @@
       <button class="ai-section-pill" data-ai-section="episodes" onclick="setAiSection('episodes')">Episodes</button>
       <button class="ai-section-pill" data-ai-section="story" onclick="setAiSection('story')">Story Mode</button>
       <button class="ai-section-pill" data-ai-section="templates" onclick="setAiSection('templates')">Templates</button>
+      <button class="ai-section-pill" data-ai-section="knowledge" onclick="setAiSection('knowledge')">Knowledge Base</button>
       <button class="ai-section-pill" data-ai-section="publishing" onclick="setAiSection('publishing')">Publishing</button>
       <button class="ai-section-pill" data-ai-section="analytics" onclick="setAiSection('analytics')">Analytics</button>
       <button class="ai-section-pill" data-ai-section="settings" onclick="setAiSection('settings')">Settings</button>
@@ -1071,6 +1086,63 @@
           <div class="ai-template-name">Signature Segments</div>
           <div class="ai-template-use">One recurring segment per line. These are automatically inserted into generated content.</div>
           <textarea id="aiSignatureSegments" class="studio-textarea" oninput="saveAiBrandDna()" style="margin-top:8px;min-height:110px;"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="ai-panel" id="aiKnowledgePanel" style="margin-top:14px;">
+      <div class="ai-panel-head">
+        <div>
+          <div class="studio-title">Knowledge Base</div>
+          <div class="studio-subtitle">Approved methodology, lessons, and trading concepts used by AI Studio. Draft items stay out of generated content.</div>
+        </div>
+        <span class="project-status-badge ready-to-record">Approved Knowledge</span>
+      </div>
+      <div class="ai-knowledge-layout">
+        <div>
+          <div class="ai-knowledge-form">
+            <input type="hidden" id="aiKbEditingId" value="">
+            <div class="studio-form-row">
+              <label>Title</label>
+              <input id="aiKbTitle" class="studio-input" placeholder="Example: A Setup Definition">
+            </div>
+            <div class="studio-form-row">
+              <label>Category</label>
+              <select id="aiKbCategory" class="studio-select"></select>
+            </div>
+            <div class="studio-form-row">
+              <label>Status</label>
+              <select id="aiKbStatus" class="studio-select">
+                <option value="Draft">Draft</option>
+                <option value="Approved">Approved</option>
+              </select>
+            </div>
+            <div class="studio-form-row">
+              <label>Summary</label>
+              <textarea id="aiKbSummary" class="studio-textarea" placeholder="Short lesson summary"></textarea>
+            </div>
+            <div class="studio-form-row">
+              <label>Detailed explanation</label>
+              <textarea id="aiKbDetails" class="studio-textarea" style="min-height:110px;" placeholder="Methodology, context, or teaching notes"></textarea>
+            </div>
+            <div class="studio-form-row">
+              <label>Example</label>
+              <textarea id="aiKbExample" class="studio-textarea" placeholder="Example use case or chart lesson"></textarea>
+            </div>
+            <div class="studio-actions">
+              <button class="studio-btn" onclick="saveAiKnowledgeItem()">Save Knowledge Item</button>
+              <button class="studio-btn secondary" onclick="clearAiKnowledgeForm()">New Draft</button>
+            </div>
+          </div>
+          <div class="ai-suggestion-panel" style="margin-top:12px;">
+            <div class="ai-template-name">AI Suggested Lessons</div>
+            <div class="ai-template-use">Mock future journal-analysis suggestions. Approving creates a Knowledge Base item.</div>
+            <div id="aiSuggestedLessons"></div>
+          </div>
+        </div>
+        <div>
+          <div class="studio-subtitle" id="aiKnowledgeSummary" style="margin-bottom:10px;"></div>
+          <div id="aiKnowledgeList" class="ai-knowledge-list"></div>
         </div>
       </div>
     </section>
@@ -1223,6 +1295,7 @@
   let scalpLoaded = false;
   const VIDEO_PROJECTS_KEY = 'forex_scanner_video_projects';
   const AI_BRAND_DNA_KEY = 'kairos_ai_studio_brand_dna';
+  const AI_KNOWLEDGE_BASE_KEY = 'kairos_ai_studio_knowledge_base';
   let currentVideoProject = null;
   let videoProjectDirty = false;
   let videoTradeRows = [];
@@ -2517,12 +2590,284 @@
     return profile.structure.map(section => map[section]).filter(Boolean).join('\\n');
   }
 
+  const AI_KNOWLEDGE_CATEGORIES = [
+    'Scanner Methodology',
+    'A/B/C Grade Definitions',
+    'Market Structure',
+    'Premium & Discount',
+    'Entry Timing',
+    'Risk Management',
+    'Trade Management',
+    'Psychology',
+    'Prop Firm Rules',
+    'Educational Concepts',
+    'Approved Trading Lessons',
+  ];
+
+  function aiKbId() {
+    return `kb-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function defaultAiKnowledgeItems() {
+    return [
+      {
+        id: 'kb-scanner-methodology',
+        title: 'Scanner Narrows Attention',
+        category: 'Scanner Methodology',
+        summary: 'Kairos is a workflow tool that highlights structured candidates; the trader still confirms the chart before entry.',
+        details: 'The scanner should not be presented as an automatic trade system. It organizes trend, location, grade, timing, and risk so the user can focus on clean candidates and then make a manual decision.',
+        example: 'If EUR/AUD prints an A setup near demand, the next step is still to check whether price taps and rejects the demand area before entry.',
+        status: 'Approved',
+      },
+      {
+        id: 'kb-grade-definitions',
+        title: 'A/B/C Setup Framework',
+        category: 'A/B/C Grade Definitions',
+        summary: 'A setups have trend, location, and confirmation. B setups have trend and location but need patience. C setups are mixed, counter-trend, or lower quality.',
+        details: 'Grades are prioritization labels. A means review first, B means watch the area, and C means caution. The grade should guide attention without guaranteeing outcome.',
+        example: 'A Setup: bullish trend, discount/demand area, and structure shift detected. B Setup: bullish trend and demand nearby, but price is still approaching the zone.',
+        status: 'Approved',
+      },
+      {
+        id: 'kb-entry-timing',
+        title: 'Good Area vs Confirmed Entry',
+        category: 'Entry Timing',
+        summary: 'A good zone is not the same as a confirmed entry. Wait for tap, rejection, or structure shift when timing is not ready.',
+        details: 'Many early losses come from entering because location is valid before the pullback has finished. Content should clearly separate area selection from actual entry timing.',
+        example: 'Price approaching demand can be a watch condition. Price rejecting demand after a bullish CHoCH is stronger entry evidence.',
+        status: 'Approved',
+      },
+      {
+        id: 'kb-risk-management',
+        title: 'Defined Risk Comes First',
+        category: 'Risk Management',
+        summary: 'Every setup needs a clear invalidation point, target, and minimum acceptable R:R before it becomes actionable.',
+        details: 'Risk discussion should stay honest and avoid hype. A clean chart still fails sometimes, so the risk plan is part of the education.',
+        example: 'For an eval account, one clean 1:2 trade at controlled risk is better than forcing several low-quality entries.',
+        status: 'Approved',
+      },
+      {
+        id: 'kb-draft-psychology',
+        title: 'Draft Lesson: Patience After Missed Moves',
+        category: 'Psychology',
+        summary: 'Draft example proving unapproved items should not influence generation.',
+        details: 'This item is intentionally Draft and should not appear in generated AI Studio content unless a future option explicitly includes drafts.',
+        example: 'Do not chase after a missed London move.',
+        status: 'Draft',
+      },
+    ];
+  }
+
+  function normalizeAiKnowledgeItem(item) {
+    return {
+      id: item.id || aiKbId(),
+      title: item.title || 'Untitled Lesson',
+      category: AI_KNOWLEDGE_CATEGORIES.includes(item.category) ? item.category : 'Educational Concepts',
+      summary: item.summary || '',
+      details: item.details || item.detailedExplanation || '',
+      example: item.example || '',
+      status: item.status === 'Approved' ? 'Approved' : 'Draft',
+    };
+  }
+
+  function loadAiKnowledgeItems() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(AI_KNOWLEDGE_BASE_KEY) || 'null');
+      if (Array.isArray(saved) && saved.length) return saved.map(normalizeAiKnowledgeItem);
+    } catch (_) {}
+    return defaultAiKnowledgeItems();
+  }
+
+  function saveAiKnowledgeItems(items) {
+    localStorage.setItem(AI_KNOWLEDGE_BASE_KEY, JSON.stringify(items.map(normalizeAiKnowledgeItem)));
+  }
+
+  function approvedAiKnowledgeItems() {
+    return loadAiKnowledgeItems().filter(item => item.status === 'Approved');
+  }
+
+  function aiKnowledgeBlock(context = {}) {
+    const approved = approvedAiKnowledgeItems();
+    if (!approved.length) return 'No approved Knowledge Base items are available yet.';
+    const priority = ['Scanner Methodology', 'A/B/C Grade Definitions', 'Entry Timing', 'Premium & Discount', 'Market Structure', 'Risk Management', 'Approved Trading Lessons'];
+    const ordered = [...approved].sort((a, b) => {
+      const ai = priority.includes(a.category) ? priority.indexOf(a.category) : priority.length;
+      const bi = priority.includes(b.category) ? priority.indexOf(b.category) : priority.length;
+      return ai - bi || a.title.localeCompare(b.title);
+    }).slice(0, 5);
+    return [`Approved Knowledge References for ${context.pair || 'this episode'}:`, ...ordered.map(item => {
+      const example = item.example ? ` Example: ${item.example}` : '';
+      return `- ${item.title} (${item.category}): ${item.summary}${example}`;
+    })].join('\\n');
+  }
+
+  function aiKnowledgeTitlesLine() {
+    const titles = approvedAiKnowledgeItems().slice(0, 4).map(item => item.title);
+    return titles.length ? titles.join(', ') : 'No approved knowledge selected yet';
+  }
+
+  function renderAiKnowledgeBase() {
+    const categorySelect = document.getElementById('aiKbCategory');
+    if (categorySelect) {
+      const current = categorySelect.value || 'Scanner Methodology';
+      categorySelect.innerHTML = AI_KNOWLEDGE_CATEGORIES.map(category => `<option value="${escapeHtml(category)}" ${category === current ? 'selected' : ''}>${escapeHtml(category)}</option>`).join('');
+    }
+    const items = loadAiKnowledgeItems();
+    const approvedCount = items.filter(item => item.status === 'Approved').length;
+    const draftCount = items.filter(item => item.status !== 'Approved').length;
+    const summary = document.getElementById('aiKnowledgeSummary');
+    if (summary) summary.textContent = `${approvedCount} approved · ${draftCount} draft · only Approved items influence generated content`;
+    const list = document.getElementById('aiKnowledgeList');
+    if (list) {
+      list.innerHTML = items.map(item => `
+        <div class="ai-knowledge-card ${item.status.toLowerCase()}">
+          <div class="ai-knowledge-meta">
+            <span class="ai-kb-status ${item.status.toLowerCase()}">${escapeHtml(item.status)}</span>
+            <span>${escapeHtml(item.category)}</span>
+          </div>
+          <div class="ai-knowledge-title">${escapeHtml(item.title)}</div>
+          <div class="ai-knowledge-summary">${escapeHtml(item.summary || 'No summary yet.')}</div>
+          ${item.example ? `<div class="ai-template-meta"><strong>Example:</strong> ${escapeHtml(item.example)}</div>` : ''}
+          <div class="studio-actions" style="margin-top:10px;">
+            <button class="studio-btn secondary small" onclick="editAiKnowledgeItem('${item.id}')">Edit</button>
+            <button class="studio-btn secondary small" onclick="deleteAiKnowledgeItem('${item.id}')">Delete</button>
+          </div>
+        </div>`).join('');
+    }
+    renderAiSuggestedLessons();
+  }
+
+  function clearAiKnowledgeForm() {
+    const set = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
+    set('aiKbEditingId', '');
+    set('aiKbTitle', '');
+    set('aiKbCategory', 'Scanner Methodology');
+    set('aiKbStatus', 'Draft');
+    set('aiKbSummary', '');
+    set('aiKbDetails', '');
+    set('aiKbExample', '');
+  }
+
+  function editAiKnowledgeItem(id) {
+    const item = loadAiKnowledgeItems().find(entry => entry.id === id);
+    if (!item) return;
+    const set = (fieldId, value) => { const el = document.getElementById(fieldId); if (el) el.value = value || ''; };
+    set('aiKbEditingId', item.id);
+    set('aiKbTitle', item.title);
+    set('aiKbCategory', item.category);
+    set('aiKbStatus', item.status);
+    set('aiKbSummary', item.summary);
+    set('aiKbDetails', item.details);
+    set('aiKbExample', item.example);
+    document.getElementById('aiKnowledgePanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function saveAiKnowledgeItem() {
+    const id = document.getElementById('aiKbEditingId')?.value || aiKbId();
+    const title = (document.getElementById('aiKbTitle')?.value || '').trim();
+    if (!title) {
+      showVideoToast('Knowledge item needs a title');
+      return;
+    }
+    const item = normalizeAiKnowledgeItem({
+      id,
+      title,
+      category: document.getElementById('aiKbCategory')?.value,
+      status: document.getElementById('aiKbStatus')?.value,
+      summary: (document.getElementById('aiKbSummary')?.value || '').trim(),
+      details: (document.getElementById('aiKbDetails')?.value || '').trim(),
+      example: (document.getElementById('aiKbExample')?.value || '').trim(),
+    });
+    const items = loadAiKnowledgeItems();
+    const idx = items.findIndex(entry => entry.id === id);
+    if (idx >= 0) items[idx] = item;
+    else items.unshift(item);
+    saveAiKnowledgeItems(items);
+    clearAiKnowledgeForm();
+    renderAiKnowledgeBase();
+    showVideoToast('Knowledge item saved');
+  }
+
+  function deleteAiKnowledgeItem(id) {
+    if (!confirm('Delete this Knowledge Base item?')) return;
+    saveAiKnowledgeItems(loadAiKnowledgeItems().filter(item => item.id !== id));
+    clearAiKnowledgeForm();
+    renderAiKnowledgeBase();
+    showVideoToast('Knowledge item deleted');
+  }
+
+  function aiSuggestedLessonMocks() {
+    return [
+      {
+        id: 'suggest-entry-timing',
+        title: 'Wait for the Zone Tap',
+        category: 'Entry Timing',
+        observation: 'Several review candidates became cleaner after price fully tapped demand or supply before entry.',
+        sampleSize: 'Mock sample: 12 journal rows',
+        confidence: 'Medium',
+        summary: 'When the scanner says the area is nearby, content should teach patience until price actually interacts with the zone.',
+        details: 'Future journal analysis can compare early entries against zone-tap entries and promote this lesson when the data supports it.',
+        example: 'A setup approaching demand should be described as watch demand, not enter immediately.',
+      },
+      {
+        id: 'suggest-grade-review',
+        title: 'Separate A Setups from B Setups',
+        category: 'A/B/C Grade Definitions',
+        observation: 'A and B setups can both be useful, but the content should explain that B setups usually need more timing evidence.',
+        sampleSize: 'Mock sample: 18 scanner cards',
+        confidence: 'High',
+        summary: 'A setups deserve immediate review; B setups should be framed as watchlist candidates until timing improves.',
+        details: 'This reinforces the current workflow without changing scanner logic.',
+        example: 'B Setup - Wait means trend and location may be useful, but confirmation is not ready yet.',
+      },
+    ];
+  }
+
+  function renderAiSuggestedLessons() {
+    const box = document.getElementById('aiSuggestedLessons');
+    if (!box) return;
+    box.innerHTML = aiSuggestedLessonMocks().map(suggestion => `
+      <div class="ai-suggestion-card" id="aiSuggestion-${suggestion.id}">
+        <div class="ai-knowledge-title">${escapeHtml(suggestion.title)}</div>
+        <div class="ai-template-meta"><strong>Supporting observation:</strong> ${escapeHtml(suggestion.observation)}</div>
+        <div class="ai-template-meta"><strong>Sample size:</strong> ${escapeHtml(suggestion.sampleSize)}</div>
+        <div class="ai-template-meta"><strong>Confidence:</strong> ${escapeHtml(suggestion.confidence)}</div>
+        <div class="studio-actions" style="margin-top:10px;">
+          <button class="studio-btn secondary small" onclick="approveAiSuggestedLesson('${suggestion.id}')">Approve</button>
+          <button class="studio-btn secondary small" onclick="rejectAiSuggestedLesson('${suggestion.id}')">Reject</button>
+        </div>
+      </div>`).join('');
+  }
+
+  function approveAiSuggestedLesson(id) {
+    const suggestion = aiSuggestedLessonMocks().find(item => item.id === id);
+    if (!suggestion) return;
+    const item = normalizeAiKnowledgeItem({
+      id: aiKbId(),
+      title: suggestion.title,
+      category: suggestion.category,
+      summary: suggestion.summary,
+      details: suggestion.details,
+      example: suggestion.example,
+      status: 'Approved',
+    });
+    saveAiKnowledgeItems([item, ...loadAiKnowledgeItems()]);
+    renderAiKnowledgeBase();
+    showVideoToast('Suggested lesson approved');
+  }
+
+  function rejectAiSuggestedLesson(id) {
+    document.getElementById(`aiSuggestion-${id}`)?.remove();
+    showVideoToast('Suggested lesson rejected');
+  }
+
   function renderAiStudio() {
     const rows = aiSignalRows();
     const hasRealScannerData = Array.isArray(allSetups) && allSetups.length > 0;
     const usingMockRows = rows.some(row => row.isMock);
     renderAiTemplates();
     renderAiBrandDna();
+    renderAiKnowledgeBase();
     document.getElementById('aiQueuedCount').textContent = rows.length;
     document.getElementById('aiEpisodeCount').textContent = currentAiPackage ? '1' : '0';
     document.getElementById('aiReviewCount').textContent = currentAiPackage ? '1' : '0';
@@ -2656,6 +3001,8 @@
     const brandContext = { pair, direction, grade, location, tf, rr, entry, sl, tp };
     const teachingBlock = aiTeachingStructureBlock(brand, brandContext);
     const signatureBlock = aiSignatureBlock(brand);
+    const knowledgeBlock = aiKnowledgeBlock(brandContext);
+    const knowledgeTitles = aiKnowledgeTitlesLine();
     return {
       trade: { ...trade, displaySymbol: pair },
       templateKey,
@@ -2692,6 +3039,9 @@ ${templateCopy.focus}
 Teaching Structure:
 ${teachingBlock}
 
+Approved Knowledge Base:
+${knowledgeBlock}
+
 Trade Plan:
 Direction: ${direction}
 Entry: ${entry}
@@ -2725,6 +3075,7 @@ Target: ${tp}
 R:R: ${rr}
 Audience: ${brand.audience}
 Brand Voice: ${brand.voice}
+Approved Knowledge Used: ${knowledgeTitles}
 
 This is for education and journal review only. It is not financial advice.` },
         { label: 'Tags', value: `forex trading, ${pair.replace('/', '')}, forex scanner, trade breakdown, prop firm trading, smart money concepts, supply and demand, trading journal` },
@@ -2810,6 +3161,8 @@ This is for education and journal review only. It is not financial advice.` },
       : 'Use the follow-up to quickly update what happened after the original setup.';
     const teachingBlock = aiTeachingStructureBlock(brand, { pair, direction, grade, location: 'original scanner location', tf: summary.timeframe || trade.timeframe || 'scanner timeframe', rr, entry, sl, tp });
     const signatureBlock = aiSignatureBlock(brand);
+    const knowledgeBlock = aiKnowledgeBlock({ pair, direction, grade, location: 'original scanner location', tf: summary.timeframe || trade.timeframe || 'scanner timeframe', rr, entry, sl, tp });
+    const knowledgeTitles = aiKnowledgeTitlesLine();
     return {
       type,
       requestedType,
@@ -2861,6 +3214,9 @@ ${templateFollowUpFocus}
 Teaching Structure:
 ${teachingBlock}
 
+Approved Knowledge Base:
+${knowledgeBlock}
+
 What I Am Watching:
 If the trade is still developing, I am watching whether price respects the original zone, whether the confirmation holds, and whether the setup continues to match the plan.
 
@@ -2891,6 +3247,7 @@ Outcome status: ${developing ? 'Still developing / unknown' : outcome}
 Template: ${template.name}
 Brand Voice: ${brand.voice}
 Audience: ${brand.audience}
+Approved Knowledge Used: ${knowledgeTitles}
 
 This is a journal and education review, not financial advice.` },
         { label: 'Follow-up Social Post', value:
@@ -3012,7 +3369,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
 
   function setAiSection(section) {
     document.querySelectorAll('.ai-section-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.aiSection === section));
-    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : section === 'templates' ? 'aiTemplatesPanel' : section === 'settings' ? 'aiBrandDnaPanel' : 'aiOverview';
+    const target = section === 'queue' ? 'aiQueuePanel' : section === 'episodes' ? 'aiEpisodePanel' : section === 'story' ? 'aiStoryPanel' : section === 'templates' ? 'aiTemplatesPanel' : section === 'knowledge' ? 'aiKnowledgePanel' : section === 'settings' ? 'aiBrandDnaPanel' : 'aiOverview';
     document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
