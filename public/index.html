@@ -1123,9 +1123,9 @@
         <div class="ai-brand-group" style="grid-column:1 / -1;">
           <div class="ai-provider-header">
             <div class="ai-template-name" style="margin-bottom:0;">AI Provider</div>
-            <span class="ai-provider-badge">Mock</span>
+            <span id="aiProviderRuntimeStatus" class="ai-provider-badge">Mock Active</span>
           </div>
-          <div class="ai-template-use">Mock generates the current AI Studio output in-browser with no API keys. OpenAI runs through backend AI Studio routes so the API key never reaches the browser. Anthropic, Google, and Local remain future provider slots that safely fall back to Mock output.</div>
+          <div class="ai-template-use">Mock generates the current AI Studio output in-browser with no API keys. OpenAI runs through backend AI Studio routes and uses the server environment variable configured during deployment, so no API key is stored in localStorage or exposed to the browser. If OpenAI is not configured or a request fails, AI Studio intentionally returns Mock output so the content workflow can continue.</div>
           <select id="aiProviderSelect" class="studio-select" onchange="saveAiProvider()" style="margin-top:8px;max-width:360px;"></select>
           <div class="ai-provider-list">
             <span class="ai-provider-pill">OpenAI <span class="ai-provider-badge">Backend</span></span>
@@ -2580,12 +2580,29 @@
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || `AI Studio request failed (${response.status})`);
     if (data.usedFallback) showAiProviderFallback(data.fallbackReason || 'OpenAI unavailable');
+    else updateAiProviderRuntimeStatus('OpenAI Ready');
     return data.result;
   }
 
+  function friendlyAiProviderFallbackReason(reason) {
+    const text = String(reason || '');
+    if (/api[_\s-]?key|missing/i.test(text)) return 'OpenAI is not configured on the server yet.';
+    if (/request failed|timeout|network|fetch/i.test(text)) return 'The OpenAI request did not complete successfully.';
+    return 'The backend chose the Mock fallback for this request.';
+  }
+
+  function updateAiProviderRuntimeStatus(label) {
+    const indicator = document.getElementById('aiProviderRuntimeStatus');
+    if (!indicator) return;
+    indicator.textContent = label;
+    indicator.classList.toggle('soon', label === 'OpenAI Fallback');
+  }
+
   function showAiProviderFallback(reason) {
-    const message = `OpenAI was unavailable, so AI Studio used Mock output. ${reason ? `Reason: ${reason}` : ''}`;
-    showVideoToast('OpenAI unavailable - using Mock output');
+    const friendlyReason = friendlyAiProviderFallbackReason(reason);
+    const message = `OpenAI fallback is active. AI Studio used Mock output for this generation so the workflow can continue. ${friendlyReason}`;
+    updateAiProviderRuntimeStatus('OpenAI Fallback');
+    showVideoToast('OpenAI fallback active - Mock output used');
     const notice = document.getElementById('aiProviderFallbackNotice');
     if (notice) {
       notice.style.display = 'block';
@@ -2684,6 +2701,9 @@
       .map(key => `<option value="${key}" ${key === selected ? 'selected' : ''}>${labels[key]}</option>`)
       .join('');
     if (status) status.textContent = currentAiProvider().status;
+    if (selected === 'mock') updateAiProviderRuntimeStatus('Mock Active');
+    else if (selected === 'openai') updateAiProviderRuntimeStatus('OpenAI Ready');
+    else updateAiProviderRuntimeStatus('Mock Active');
     if (notice) {
       const provider = currentAiProvider();
       const isFutureProvider = !['mock', 'openai'].includes(provider.id);
