@@ -292,6 +292,12 @@
     .ai-template-name { color:var(--text); font-size:13px; font-weight:900; margin-bottom:6px; }
     .ai-template-meta { color:var(--slate-dim); font-size:10px; line-height:1.45; margin-top:6px; }
     .ai-template-use { color:var(--slate); font-size:11px; line-height:1.45; }
+    .ai-provider-header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+    .ai-provider-badge { display:inline-flex; align-items:center; border-radius:999px; border:1px solid rgba(148,163,184,.18); color:var(--slate); background:rgba(148,163,184,.06); font-size:9px; font-weight:900; letter-spacing:.06em; padding:3px 7px; text-transform:uppercase; }
+    .ai-provider-badge.soon { color:#fcd34d; border-color:rgba(245,166,35,.34); background:rgba(245,166,35,.08); }
+    .ai-provider-list { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+    .ai-provider-pill { display:inline-flex; align-items:center; gap:6px; color:var(--slate); border:1px solid rgba(148,163,184,.12); background:rgba(148,163,184,.04); border-radius:999px; padding:5px 8px; font-size:10px; }
+    .ai-provider-notice { color:#fcd34d; background:rgba(245,166,35,.08); border:1px solid rgba(245,166,35,.22); border-radius:8px; padding:8px 9px; font-size:11px; line-height:1.45; margin-top:10px; }
     .ai-brand-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
     .ai-brand-group { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:10px; padding:11px; }
     .ai-brand-options { display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; }
@@ -1107,17 +1113,27 @@
     <section class="ai-panel" id="aiBrandDnaPanel" style="margin-top:14px;">
       <div class="ai-panel-head">
         <div>
-          <div class="studio-title">AI Settings</div>
+          <div class="studio-title">Provider Settings</div>
           <div class="studio-subtitle">Choose the AI provider architecture and control Kairos AI Studio voice, audience, teaching structure, guardrails, and recurring signature segments.</div>
         </div>
         <span class="project-status-badge ready-to-record">Settings</span>
       </div>
       <div class="ai-brand-grid">
         <div class="ai-brand-group" style="grid-column:1 / -1;">
-          <div class="ai-template-name">Provider</div>
-          <div class="ai-template-use">Mock is active today. Future providers are selectable placeholders and still use Mock output until API integrations are added.</div>
+          <div class="ai-provider-header">
+            <div class="ai-template-name" style="margin-bottom:0;">AI Provider</div>
+            <span class="ai-provider-badge">Mock</span>
+          </div>
+          <div class="ai-template-use">Mock generates the current AI Studio output in-browser with no API keys. OpenAI, Anthropic, Google, and Local are future provider slots; selecting one persists the choice but safely falls back to Mock output.</div>
           <select id="aiProviderSelect" class="studio-select" onchange="saveAiProvider()" style="margin-top:8px;max-width:360px;"></select>
+          <div class="ai-provider-list">
+            <span class="ai-provider-pill">OpenAI <span class="ai-provider-badge soon">Coming Soon</span></span>
+            <span class="ai-provider-pill">Anthropic <span class="ai-provider-badge soon">Coming Soon</span></span>
+            <span class="ai-provider-pill">Google <span class="ai-provider-badge soon">Coming Soon</span></span>
+            <span class="ai-provider-pill">Local <span class="ai-provider-badge soon">Coming Soon</span></span>
+          </div>
           <div id="aiProviderStatus" class="ai-template-meta"></div>
+          <div id="aiProviderFallbackNotice" class="ai-provider-notice" style="display:none;"></div>
         </div>
         <div class="ai-brand-group">
           <div class="ai-template-name">Brand Voice</div>
@@ -2550,7 +2566,7 @@
     return {
       id,
       name,
-      status: 'Coming soon - using MockProvider output until API integration is added',
+      status: 'Coming Soon - safely falling back to Mock output',
       generateEpisode(trade, templateKey) {
         return mock.generateEpisode(trade, templateKey);
       },
@@ -2590,19 +2606,26 @@
   function renderAiProviderSettings() {
     const select = document.getElementById('aiProviderSelect');
     const status = document.getElementById('aiProviderStatus');
+    const notice = document.getElementById('aiProviderFallbackNotice');
     if (!select) return;
     const selected = loadAiProviderKey();
     const labels = {
       mock: 'Mock',
-      openai: 'OpenAI (coming soon)',
-      anthropic: 'Anthropic (coming soon)',
-      google: 'Google (coming soon)',
-      local: 'Local (coming soon)',
+      openai: 'OpenAI - Coming Soon',
+      anthropic: 'Anthropic - Coming Soon',
+      google: 'Google - Coming Soon',
+      local: 'Local - Coming Soon',
     };
     select.innerHTML = Object.keys(AI_PROVIDER_REGISTRY)
       .map(key => `<option value="${key}" ${key === selected ? 'selected' : ''}>${labels[key]}</option>`)
       .join('');
     if (status) status.textContent = currentAiProvider().status;
+    if (notice) {
+      const provider = currentAiProvider();
+      const isMock = provider.id === 'mock';
+      notice.style.display = isMock ? 'none' : 'block';
+      notice.textContent = isMock ? '' : `${provider.name} is Coming Soon. AI Studio will use Mock output for Produce Episode, Create Follow-Up, and Create Visual Assets until API integration is added.`;
+    }
   }
 
   function renderAiTemplates() {
