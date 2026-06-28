@@ -342,13 +342,49 @@
     .ai-check-item span:first-child { color:var(--slate-dim); font-weight:900; }
     .ai-check-item.done span:first-child { color:var(--green); }
     .video-toast { position:fixed; right:18px; bottom:18px; z-index:9999; background:rgba(15,23,42,.96); border:1px solid rgba(96,165,250,.28); color:var(--text); border-radius:10px; padding:10px 12px; font-size:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.35); }
+    .home-page { padding:18px 24px 28px; max-width:1480px; margin:0 auto; }
+    .home-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:14px; padding:18px; border:1px solid rgba(96,165,250,.14); border-radius:14px; background:linear-gradient(135deg,rgba(15,23,42,.72),rgba(2,6,23,.32)); }
+    .home-kicker { color:var(--blue); font-size:10px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; margin-bottom:4px; }
+    .home-title { color:var(--text); font-size:26px; font-weight:950; letter-spacing:-.03em; }
+    .home-subtitle { color:var(--slate); font-size:12px; line-height:1.5; max-width:760px; margin-top:6px; }
+    .home-primary { padding:9px 16px; border-radius:8px; border:1px solid rgba(96,165,250,.45); background:rgba(96,165,250,.12); color:var(--text); font-size:12px; font-family:inherit; cursor:pointer; font-weight:900; white-space:nowrap; }
+    .home-primary:hover { background:rgba(96,165,250,.2); }
+    .home-metrics { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .home-metric { background:rgba(12,16,24,.94); border:1px solid rgba(148,163,184,.1); border-radius:8px; padding:12px; min-height:82px; }
+    .home-metric-label { color:var(--slate-dim); font-size:9px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; line-height:1.3; }
+    .home-metric-value { color:var(--text); font-size:24px; font-weight:950; line-height:1; }
+    .home-metric-note { color:var(--slate-dim); font-size:10px; margin-top:7px; line-height:1.35; }
+    .home-layout { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(340px,.75fr); gap:14px; align-items:start; }
+    .home-panel { background:rgba(12,16,24,.94); border:1px solid rgba(148,163,184,.1); border-radius:12px; padding:14px; box-shadow:0 16px 36px rgba(0,0,0,.14); }
+    .home-panel-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .home-panel-title { color:var(--text); font-size:15px; font-weight:950; letter-spacing:.04em; }
+    .home-panel-subtitle { color:var(--slate-dim); font-size:11px; line-height:1.45; margin-top:4px; }
+    .home-work-list, .home-activity-list, .home-plan-list { display:flex; flex-direction:column; gap:8px; }
+    .home-work-row { display:grid; grid-template-columns:minmax(120px,1fr) minmax(140px,1.1fr) 64px; gap:10px; align-items:center; background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.08); border-radius:8px; padding:11px 12px; }
+    .home-work-pair { color:var(--text); font-size:15px; font-weight:950; }
+    .home-work-meta { color:var(--slate-dim); font-size:10px; margin-top:3px; }
+    .home-work-status { color:var(--slate); font-size:12px; font-weight:850; }
+    .home-work-status.episode-needed { color:var(--gold); }
+    .home-work-status.follow-up-recommended { color:var(--blue); }
+    .home-work-status.ready-for-review { color:var(--green); }
+    .home-work-time { color:var(--slate); font-size:12px; font-weight:900; text-align:right; }
+    .home-plan-card { background:rgba(15,23,42,.38); border:1px solid rgba(148,163,184,.1); border-radius:8px; padding:10px; }
+    .home-plan-title { color:var(--text); font-size:12px; font-weight:900; margin-bottom:4px; }
+    .home-plan-copy { color:var(--slate); font-size:11px; line-height:1.45; }
+    .home-activity-item { display:flex; gap:9px; align-items:flex-start; background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.08); border-radius:8px; padding:9px 10px; }
+    .home-activity-dot { width:7px; height:7px; border-radius:99px; background:var(--blue); margin-top:5px; flex:0 0 auto; }
+    .home-activity-text { color:var(--slate); font-size:11px; line-height:1.4; }
+    .home-empty { color:var(--slate-dim); border:1px dashed rgba(148,163,184,.16); border-radius:8px; padding:24px; text-align:center; font-size:12px; line-height:1.5; }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
       .setup-grid { grid-template-columns: 1fr; padding: 10px; }
       .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
       .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
-      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid, .ai-brand-grid, .ai-knowledge-layout, .ai-knowledge-list, .ai-visual-grid, .ai-pipeline-grid, .ai-checklist-grid { grid-template-columns:1fr; }
+      .studio-layout, .creator-dashboard-grid, .asset-grid, .asset-summary, .script-grid, .shorts-grid, .ai-overview-grid, .ai-studio-grid, .ai-secondary-grid, .ai-trade-grid, .ai-template-grid, .ai-brand-grid, .ai-knowledge-layout, .ai-knowledge-list, .ai-visual-grid, .ai-pipeline-grid, .ai-checklist-grid, .home-metrics, .home-layout, .home-work-row { grid-template-columns:1fr; }
+      .home-page { padding:12px; }
+      .home-hero { flex-direction:column; }
+      .home-work-time { text-align:left; }
       .shorts-block.full { grid-column:auto; }
     }
     .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
@@ -599,7 +635,8 @@
 </div>
 
 <div class="tab-nav">
-  <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
+  <button class="tab-btn active" onclick="switchTab('home')" id="tab-home">🏠 Home</button>
+  <button class="tab-btn" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
   <button class="tab-btn" onclick="switchTab('scalping')" id="tab-scalping">⚡ Scalping</button>
   <button class="tab-btn" onclick="switchTab('trending')" id="tab-trending">🔥 Trending</button>
   <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
@@ -610,7 +647,94 @@
   <button class="tab-btn" onclick="switchTab('bot')" id="tab-bot">🤖 Bot</button>
 </div>
 
-<div id="content-scanner" class="tab-content active">
+<div id="content-home" class="tab-content active">
+  <div class="home-page">
+    <div class="home-hero">
+      <div>
+        <div class="home-kicker">Kairos Dogfood Mode</div>
+        <div class="home-title">Good Morning Erica</div>
+        <div class="home-subtitle" id="homeDailySummary">Your daily workflow will appear here once Kairos reviews today's scanner and content state.</div>
+      </div>
+      <button class="home-primary" onclick="workMyDay()">🎬 Work My Day</button>
+    </div>
+
+    <div class="home-metrics">
+      <div class="home-metric">
+        <div class="home-metric-label">Today's A-grade trades</div>
+        <div class="home-metric-value" id="homeAGradeCount">0</div>
+        <div class="home-metric-note" id="homeAGradeNote">Waiting for scanner data</div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">Episodes Ready</div>
+        <div class="home-metric-value" id="homeEpisodesReady">0</div>
+        <div class="home-metric-note">Ready for review</div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">Episodes In Progress</div>
+        <div class="home-metric-value" id="homeEpisodesInProgress">0</div>
+        <div class="home-metric-note">Selected but not complete</div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">Follow-Ups Waiting</div>
+        <div class="home-metric-value" id="homeFollowUpsWaiting">0</div>
+        <div class="home-metric-note">Needs update or recap</div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">Estimated Review Time</div>
+        <div class="home-metric-value" id="homeReviewTime">0m</div>
+        <div class="home-metric-note">Total queue time</div>
+      </div>
+      <div class="home-metric">
+        <div class="home-metric-label">Recent Activity</div>
+        <div class="home-metric-value" id="homeActivityCount">0</div>
+        <div class="home-metric-note">Latest workflow events</div>
+      </div>
+    </div>
+
+    <div class="home-layout">
+      <section class="home-panel">
+        <div class="home-panel-head">
+          <div>
+            <div class="home-panel-title">Today's Work</div>
+            <div class="home-panel-subtitle">A daily queue sorted by what should be worked on first.</div>
+          </div>
+          <span class="project-status-badge ready-to-record" id="homeWorkBadge">Plan</span>
+        </div>
+        <div id="homeWorkQueue" class="home-work-list">
+          <div class="home-empty">Click Work My Day to plan today's queue.</div>
+        </div>
+      </section>
+
+      <div class="home-plan-list">
+        <section class="home-panel">
+          <div class="home-panel-head">
+            <div>
+              <div class="home-panel-title">My Day</div>
+              <div class="home-panel-subtitle">Planning only. No generation starts from this button.</div>
+            </div>
+          </div>
+          <div id="homeDayPlan" class="home-plan-list">
+            <div class="home-empty">Kairos will show what has episodes, what needs episodes, and what has follow-ups.</div>
+          </div>
+        </section>
+
+        <section class="home-panel">
+          <div class="home-panel-head">
+            <div>
+              <div class="home-panel-title">Recent Activity</div>
+              <div class="home-panel-subtitle">Simple feed from today's scanner and content workflow.</div>
+            </div>
+          </div>
+          <div id="homeRecentActivity" class="home-activity-list">
+            <div class="home-empty">No activity yet.</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="content-scanner" class="tab-content">
 
 <div class="stats-bar">
   <div class="stat-box"><div class="stat-value" id="s-total" style="color:var(--text)">—</div><div class="stat-label">Scanned</div></div>
@@ -1854,6 +1978,7 @@
         document.getElementById('lastScan').textContent = `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
       }
       renderSetups();
+      renderHome();
     } catch(e) {
       console.warn('Could not fetch latest scout:', e.message);
     }
@@ -2122,6 +2247,7 @@
     }
     scanning = false; updateScanBtn(false);
     renderSetups();
+    renderHome();
     // suppress near-misses and priority watchlist in scout mode
     allNearMisses = [];
     document.getElementById('nearMissContent').innerHTML = '';
@@ -2454,6 +2580,152 @@
         isMock: true,
       },
     ];
+  }
+
+  function homeAgradeRows() {
+    if (!Array.isArray(allSetups) || !allSetups.length) return [];
+    return allSetups
+      .filter(row => (row.setupGrade || '').toUpperCase() === 'A')
+      .sort((a, b) => new Date(b.scannedAt || b.candleTime || 0) - new Date(a.scannedAt || a.candleTime || 0))
+      .slice(0, 12);
+  }
+
+  function homePair(row) {
+    return row?.displaySymbol || makePairLabel(row?.pair || row?.symbol || 'UNKNOWN');
+  }
+
+  function homeCurrentPackagePair() {
+    return currentAiPackage?.summary?.pair || currentAiPackage?.trade?.displaySymbol || currentAiPackage?.trade?.pair || '';
+  }
+
+  function homePackageMatches(row) {
+    const pkgPair = homeCurrentPackagePair();
+    if (!pkgPair) return false;
+    const rowPair = homePair(row);
+    const compactPkg = pkgPair.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    const compactRow = rowPair.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    return compactPkg === compactRow;
+  }
+
+  function homeHasEpisode(row) {
+    return homePackageMatches(row) && Array.isArray(currentAiPackage?.sections) && currentAiPackage.sections.length > 0;
+  }
+
+  function homeHasFollowUp(row) {
+    return homePackageMatches(row) && !!currentAiPackage?.followUp;
+  }
+
+  function homeWorkItems() {
+    return homeAgradeRows().map(row => {
+      const hasEpisode = homeHasEpisode(row);
+      const hasFollowUp = homeHasFollowUp(row);
+      let status = 'Episode Needed';
+      let minutes = 5;
+      let priority = 1;
+      if (hasEpisode && !hasFollowUp) {
+        status = 'Follow-Up Recommended';
+        minutes = 3;
+        priority = 2;
+      }
+      if (hasEpisode && hasFollowUp) {
+        status = 'Ready For Review';
+        minutes = 2;
+        priority = 3;
+      }
+      return { row, status, minutes, priority };
+    }).sort((a, b) => a.priority - b.priority || new Date(b.row.scannedAt || b.row.candleTime || 0) - new Date(a.row.scannedAt || a.row.candleTime || 0));
+  }
+
+  function homeRecentActivityItems(rows = homeAgradeRows()) {
+    const items = rows.slice(0, 4).map(row => `Scout found ${homePair(row)}.`);
+    if (currentAiPackage?.sections?.length) items.unshift(`Writer drafted ${homeCurrentPackagePair()}.`);
+    if (currentAiPackage?.visualAssets?.length) items.unshift(`Designer created artwork for ${homeCurrentPackagePair()}.`);
+    if (currentAiPackage?.sections?.length) items.unshift(`Producer packaged ${homeCurrentPackagePair()}.`);
+    return items.slice(0, 6);
+  }
+
+  function renderHome() {
+    const rows = homeAgradeRows();
+    const items = homeWorkItems();
+    const ready = rows.filter(homeHasEpisode).length;
+    const inProgress = currentAiPackage?.trade && !currentAiPackage?.sections?.length ? 1 : 0;
+    const followUps = items.filter(item => item.status === 'Follow-Up Recommended').length;
+    const totalMinutes = items.reduce((sum, item) => sum + item.minutes, 0);
+    const activity = homeRecentActivityItems(rows);
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+
+    setText('homeAGradeCount', rows.length);
+    setText('homeAGradeNote', rows.length ? 'From current scanner results' : 'Run Scout to fill today');
+    setText('homeEpisodesReady', ready);
+    setText('homeEpisodesInProgress', inProgress);
+    setText('homeFollowUpsWaiting', followUps);
+    setText('homeReviewTime', `${totalMinutes}m`);
+    setText('homeActivityCount', activity.length);
+    setText('homeWorkBadge', items.length ? `${items.length} Items` : 'Plan');
+    setText('homeDailySummary', items.length
+      ? `${items.length} item${items.length === 1 ? '' : 's'} need attention today. Estimated review time: ${totalMinutes} minutes.`
+      : 'No A-grade scanner work is waiting yet. Run Scout when you are ready to plan the day.');
+
+    const queue = document.getElementById('homeWorkQueue');
+    if (queue) {
+      queue.innerHTML = items.length ? items.map(item => {
+        const pair = homePair(item.row);
+        const statusClass = item.status.toLowerCase().replace(/\s+/g, '-');
+        const meta = `${escapeHtml(item.row.timeframe || 'H4')} · ${escapeHtml(aiFoundTime(item.row))}`;
+        return `
+          <div class="home-work-row">
+            <div>
+              <div class="home-work-pair">${escapeHtml(pair)}</div>
+              <div class="home-work-meta">${meta}</div>
+            </div>
+            <div class="home-work-status ${statusClass}">${escapeHtml(item.status)}</div>
+            <div class="home-work-time">${item.minutes} min</div>
+          </div>`;
+      }).join('') : '<div class="home-empty">No A-grade trades are waiting in the current scanner results.</div>';
+    }
+
+    const plan = document.getElementById('homeDayPlan');
+    if (plan) {
+      const episodeReady = rows.filter(homeHasEpisode).map(homePair);
+      const episodeNeeded = rows.filter(row => !homeHasEpisode(row)).map(homePair);
+      const followUpRows = rows.filter(homeHasFollowUp).map(homePair);
+      const first = items[0];
+      plan.innerHTML = `
+        <div class="home-plan-card">
+          <div class="home-plan-title">Today's A-grade trades</div>
+          <div class="home-plan-copy">${rows.length ? rows.map(homePair).map(escapeHtml).join(', ') : 'None loaded yet.'}</div>
+        </div>
+        <div class="home-plan-card">
+          <div class="home-plan-title">Already have episodes</div>
+          <div class="home-plan-copy">${episodeReady.length ? episodeReady.map(escapeHtml).join(', ') : 'None yet.'}</div>
+        </div>
+        <div class="home-plan-card">
+          <div class="home-plan-title">Need episodes</div>
+          <div class="home-plan-copy">${episodeNeeded.length ? episodeNeeded.map(escapeHtml).join(', ') : 'No episode gaps.'}</div>
+        </div>
+        <div class="home-plan-card">
+          <div class="home-plan-title">Have follow-ups</div>
+          <div class="home-plan-copy">${followUpRows.length ? followUpRows.map(escapeHtml).join(', ') : 'No follow-ups attached yet.'}</div>
+        </div>
+        <div class="home-plan-card">
+          <div class="home-plan-title">Recommended first</div>
+          <div class="home-plan-copy">${first ? `${escapeHtml(homePair(first.row))}: ${escapeHtml(first.status)} (${first.minutes} min)` : 'Run Scout, then work the first A-grade trade.'}</div>
+        </div>`;
+    }
+
+    const feed = document.getElementById('homeRecentActivity');
+    if (feed) {
+      feed.innerHTML = activity.length ? activity.map(text => `
+        <div class="home-activity-item">
+          <span class="home-activity-dot"></span>
+          <div class="home-activity-text">${escapeHtml(text)}</div>
+        </div>`).join('') : '<div class="home-empty">No activity yet.</div>';
+    }
+  }
+
+  function workMyDay() {
+    renderHome();
+    document.getElementById('homeWorkQueue')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function aiDirection(row) {
@@ -3150,6 +3422,7 @@
     }
     queue.innerHTML = rows.map((row, idx) => renderAiTradeCard(row, idx)).join('');
     if (currentAiPackage) renderAiPackage(currentAiPackage);
+    renderHome();
   }
 
   function renderAiTradeCard(row, idx) {
@@ -3195,6 +3468,7 @@
       currentAiPackage = await currentAiProvider().generateEpisode(trade, currentAiTemplate);
       renderAiStudio();
       renderAiPackage(currentAiPackage);
+      renderHome();
       document.getElementById('aiEpisodeStatus').textContent = 'Draft Episode';
       document.getElementById('aiEpisodePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
@@ -3393,6 +3667,7 @@ This is for education and journal review only. It is not financial advice.` },
       const followUp = await currentAiProvider().generateFollowUp(currentAiPackage, requestedType, currentAiTemplate);
       currentAiPackage.followUp = followUp;
       renderAiFollowUp(followUp);
+      renderHome();
       document.getElementById('aiStoryPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
       if (output) output.innerHTML = `<div class="ai-warning error"><strong>AI Studio error:</strong> ${escapeHtml(error.message || 'Follow-up generation failed.')}</div>`;
@@ -3638,6 +3913,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       currentAiPackage.visualAssets = await currentAiProvider().generateVisualBriefs(currentAiPackage);
       renderAiVisualAssets(currentAiPackage.visualAssets);
       renderAiProductionPipeline(currentAiPackage);
+      renderHome();
       setAiSection('visuals');
       showVideoToast('Visual asset briefs created');
     } catch (error) {
@@ -3876,6 +4152,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
 
   function approveAiPackage() {
     document.getElementById('aiEpisodeStatus').textContent = 'Ready for Review';
+    renderHome();
     showVideoToast('Content Package approved');
   }
 
@@ -4855,6 +5132,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     if (tab === 'calculator') { document.getElementById('calc-account').value = '25308'; calcPosition(); }
     if (tab === 'trending') await loadTrending();
     if (tab === 'scalping') await loadScalpResults();
+    if (tab === 'home') renderHome();
     if (tab === 'ai') renderAiStudio();
     if (tab === 'video') { await loadJournal(); renderVideoStudio(); }
     clearInterval(autoRefreshTimer);
