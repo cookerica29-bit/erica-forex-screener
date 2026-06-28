@@ -1107,12 +1107,18 @@
     <section class="ai-panel" id="aiBrandDnaPanel" style="margin-top:14px;">
       <div class="ai-panel-head">
         <div>
-          <div class="studio-title">Brand DNA</div>
-          <div class="studio-subtitle">Control Kairos AI Studio voice, audience, teaching structure, guardrails, and recurring signature segments.</div>
+          <div class="studio-title">AI Settings</div>
+          <div class="studio-subtitle">Choose the AI provider architecture and control Kairos AI Studio voice, audience, teaching structure, guardrails, and recurring signature segments.</div>
         </div>
         <span class="project-status-badge ready-to-record">Settings</span>
       </div>
       <div class="ai-brand-grid">
+        <div class="ai-brand-group" style="grid-column:1 / -1;">
+          <div class="ai-template-name">Provider</div>
+          <div class="ai-template-use">Mock is active today. Future providers are selectable placeholders and still use Mock output until API integrations are added.</div>
+          <select id="aiProviderSelect" class="studio-select" onchange="saveAiProvider()" style="margin-top:8px;max-width:360px;"></select>
+          <div id="aiProviderStatus" class="ai-template-meta"></div>
+        </div>
         <div class="ai-brand-group">
           <div class="ai-template-name">Brand Voice</div>
           <div class="ai-template-use">Choose the tone every Content Package should use.</div>
@@ -1350,6 +1356,7 @@
   const VIDEO_PROJECTS_KEY = 'forex_scanner_video_projects';
   const AI_BRAND_DNA_KEY = 'kairos_ai_studio_brand_dna';
   const AI_KNOWLEDGE_BASE_KEY = 'kairos_ai_studio_knowledge_base';
+  const AI_PROVIDER_KEY = 'kairos_ai_studio_provider';
   let currentVideoProject = null;
   let videoProjectDirty = false;
   let videoTradeRows = [];
@@ -2521,6 +2528,83 @@
     renderAiTemplates();
   }
 
+  function MockProvider() {
+    return {
+      id: 'mock',
+      name: 'Mock',
+      status: 'Active template provider',
+      generateEpisode(trade, templateKey) {
+        return buildAiContentPackage(trade, templateKey);
+      },
+      generateFollowUp(pkg, requestedType, templateKey) {
+        return buildAiFollowUpPackage(pkg, requestedType, templateKey);
+      },
+      generateVisualBriefs(pkg) {
+        return buildAiVisualAssets(pkg);
+      },
+    };
+  }
+
+  function placeholderAiProvider(id, name) {
+    const mock = MockProvider();
+    return {
+      id,
+      name,
+      status: 'Coming soon - using MockProvider output until API integration is added',
+      generateEpisode(trade, templateKey) {
+        return mock.generateEpisode(trade, templateKey);
+      },
+      generateFollowUp(pkg, requestedType, templateKey) {
+        return mock.generateFollowUp(pkg, requestedType, templateKey);
+      },
+      generateVisualBriefs(pkg) {
+        return mock.generateVisualBriefs(pkg);
+      },
+    };
+  }
+
+  const AI_PROVIDER_REGISTRY = {
+    mock: MockProvider(),
+    openai: placeholderAiProvider('openai', 'OpenAI'),
+    anthropic: placeholderAiProvider('anthropic', 'Anthropic'),
+    google: placeholderAiProvider('google', 'Google'),
+    local: placeholderAiProvider('local', 'Local'),
+  };
+
+  function loadAiProviderKey() {
+    const saved = localStorage.getItem(AI_PROVIDER_KEY) || 'mock';
+    return AI_PROVIDER_REGISTRY[saved] ? saved : 'mock';
+  }
+
+  function currentAiProvider() {
+    return AI_PROVIDER_REGISTRY[loadAiProviderKey()] || AI_PROVIDER_REGISTRY.mock;
+  }
+
+  function saveAiProvider() {
+    const key = document.getElementById('aiProviderSelect')?.value || 'mock';
+    localStorage.setItem(AI_PROVIDER_KEY, AI_PROVIDER_REGISTRY[key] ? key : 'mock');
+    renderAiProviderSettings();
+    showVideoToast(`AI provider set to ${currentAiProvider().name}`);
+  }
+
+  function renderAiProviderSettings() {
+    const select = document.getElementById('aiProviderSelect');
+    const status = document.getElementById('aiProviderStatus');
+    if (!select) return;
+    const selected = loadAiProviderKey();
+    const labels = {
+      mock: 'Mock',
+      openai: 'OpenAI (coming soon)',
+      anthropic: 'Anthropic (coming soon)',
+      google: 'Google (coming soon)',
+      local: 'Local (coming soon)',
+    };
+    select.innerHTML = Object.keys(AI_PROVIDER_REGISTRY)
+      .map(key => `<option value="${key}" ${key === selected ? 'selected' : ''}>${labels[key]}</option>`)
+      .join('');
+    if (status) status.textContent = currentAiProvider().status;
+  }
+
   function renderAiTemplates() {
     const select = document.getElementById('aiGlobalTemplate');
     const grid = document.getElementById('aiTemplateGrid');
@@ -2938,6 +3022,7 @@
     const hasRealScannerData = Array.isArray(allSetups) && allSetups.length > 0;
     const usingMockRows = rows.some(row => row.isMock);
     renderAiTemplates();
+    renderAiProviderSettings();
     renderAiBrandDna();
     renderAiKnowledgeBase();
     document.getElementById('aiQueuedCount').textContent = rows.length;
@@ -2997,7 +3082,7 @@
   function produceAiEpisode(encodedTrade, templateKey = currentAiTemplate) {
     const trade = JSON.parse(decodeURIComponent(encodedTrade));
     currentAiTemplate = AI_CONTENT_TEMPLATES[templateKey] ? templateKey : currentAiTemplate;
-    currentAiPackage = buildAiContentPackage(trade, currentAiTemplate);
+    currentAiPackage = currentAiProvider().generateEpisode(trade, currentAiTemplate);
     renderAiStudio();
     renderAiPackage(currentAiPackage);
     document.getElementById('aiEpisodeStatus').textContent = 'Draft Episode';
@@ -3188,7 +3273,7 @@ This is for education and journal review only. It is not financial advice.` },
     const requestedType = document.getElementById('aiFollowUpType')?.value || 'Trade Update';
     const templateKey = document.getElementById('aiFollowUpTemplate')?.value || currentAiTemplate;
     currentAiTemplate = AI_CONTENT_TEMPLATES[templateKey] ? templateKey : currentAiTemplate;
-    const followUp = buildAiFollowUpPackage(currentAiPackage, requestedType, currentAiTemplate);
+    const followUp = currentAiProvider().generateFollowUp(currentAiPackage, requestedType, currentAiTemplate);
     currentAiPackage.followUp = followUp;
     renderAiFollowUp(followUp);
     document.getElementById('aiStoryPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -3426,7 +3511,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       setAiSection('episodes');
       return;
     }
-    currentAiPackage.visualAssets = buildAiVisualAssets(currentAiPackage);
+    currentAiPackage.visualAssets = currentAiProvider().generateVisualBriefs(currentAiPackage);
     renderAiVisualAssets(currentAiPackage.visualAssets);
     renderAiProductionPipeline(currentAiPackage);
     setAiSection('visuals');
