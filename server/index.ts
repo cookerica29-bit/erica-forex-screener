@@ -366,6 +366,10 @@ function sanitizeAiStudioSections(sections: any, fallback: AiStudioSection[]) {
   return cleaned.length ? cleaned : fallback;
 }
 
+function sanitizeAiStudioSummary(summary: any, fallback: any) {
+  return summary && typeof summary === 'object' && !Array.isArray(summary) ? summary : fallback;
+}
+
 async function openAiStudioJson(kind: 'episode' | 'followUp' | 'visualBriefs', input: any, fallback: any) {
   if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is missing');
   const response = await fetch('https://api.openai.com/v1/responses', {
@@ -413,10 +417,10 @@ async function aiStudioGenerate(kind: 'episode' | 'followUp' | 'visualBriefs', i
   try {
     const generated = await openAiStudioJson(kind, input, mock);
     if (kind === 'episode') {
-      return { provider: 'openai', usedFallback: false, result: { ...mock, ...generated, provider: 'openai', sections: sanitizeAiStudioSections(generated.sections, mock.sections) } };
+      return { provider: 'openai', usedFallback: false, result: { ...mock, ...generated, provider: 'openai', summary: sanitizeAiStudioSummary(generated.summary, mock.summary), sections: sanitizeAiStudioSections(generated.sections, mock.sections) } };
     }
     if (kind === 'followUp') {
-      return { provider: 'openai', usedFallback: false, result: { ...mock, ...generated, provider: 'openai', sections: sanitizeAiStudioSections(generated.sections, mock.sections) } };
+      return { provider: 'openai', usedFallback: false, result: { ...mock, ...generated, provider: 'openai', summary: sanitizeAiStudioSummary(generated.summary, mock.summary), sections: sanitizeAiStudioSections(generated.sections, mock.sections) } };
     }
     return { provider: 'openai', usedFallback: false, result: Array.isArray(generated) ? generated : mock };
   } catch (error: any) {
