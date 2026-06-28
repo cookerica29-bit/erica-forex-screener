@@ -38,6 +38,9 @@ const pineConfirmationAlerts = new Map<string, number>();
 const PINE_CONFIRMATION_TTL_MS = 12 * 60 * 60 * 1000;
 const PINE_CONFIRMATION_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const MIN_SCOUT_ALERT_RR = 2.0;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_AI_STUDIO_MODEL = process.env.OPENAI_AI_STUDIO_MODEL || 'gpt-4.1-mini';
+const AI_STUDIO_DISCLAIMER = 'Educational trading content only. This is not financial advice, not a signal service, and no trade outcome is guaranteed.';
 
 interface PineConfirmation {
   symbol: string;
@@ -55,6 +58,371 @@ interface PineConfirmation {
   matched: boolean;
   matchReason: string;
   scoutKey?: string;
+}
+
+type AiStudioSection = { label: string; value: string; large?: boolean };
+type AiStudioTemplate = { name: string; useCase?: string; length?: string; tone?: string; outputs?: string; angle?: string };
+type AiStudioBrand = {
+  voice?: string[] | string;
+  avoid?: string[] | string;
+  audience?: string;
+  teachingStructure?: string[];
+  signatureSegments?: string[];
+};
+type AiStudioKnowledgeItem = {
+  title?: string;
+  category?: string;
+  summary?: string;
+  details?: string;
+  example?: string;
+  status?: string;
+};
+
+function aiStudioTemplate(templateKey = 'quickTradeBreakdown', templates?: Record<string, AiStudioTemplate>) {
+  const fallback = {
+    name: 'Quick Trade Breakdown',
+    useCase: 'Fast setup explanation for a single scanner signal.',
+    length: '2-4 min',
+    tone: 'Direct, tactical, concise',
+    outputs: 'YouTube, Shorts, X, Instagram',
+    angle: 'fast setup review',
+  };
+  return templates?.[templateKey] || templates?.quickTradeBreakdown || fallback;
+}
+
+function aiStudioDirection(trade: any) {
+  const raw = String(trade?.direction || trade?.bias || trade?.trendDirection || '').toUpperCase();
+  return raw.includes('SHORT') || raw.includes('SELL') || raw.includes('BEAR') ? 'SHORT' : 'LONG';
+}
+
+function aiStudioNumber(value: any, fallback = '—') {
+  if (value === null || value === undefined || value === '') return fallback;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return Math.abs(n) >= 100 ? n.toFixed(3) : n.toFixed(5);
+}
+
+function aiStudioFoundTime(row: any) {
+  const raw = row?.scannedAt || row?.candleTime || row?.foundAt;
+  if (!raw) return 'Recent';
+  try { return new Date(raw).toLocaleString(); } catch { return String(raw); }
+}
+
+function aiStudioPairLabel(raw: any) {
+  return String(raw || 'this pair').replace('_', '/');
+}
+
+function aiStudioBrandProfile(input: AiStudioBrand = {}) {
+  const voiceList = Array.isArray(input.voice) ? input.voice : String(input.voice || 'Professional, Educational, Calm, Confident').split(',');
+  const avoidList = Array.isArray(input.avoid) ? input.avoid : String(input.avoid || 'Clickbait, Hype, False urgency, Guaranteed profit language').split(',');
+  const structure = Array.isArray(input.teachingStructure) && input.teachingStructure.length
+    ? input.teachingStructure
+    : ['Hook', 'Setup Overview', 'Scanner Analysis', 'Risk Discussion', 'Educational Lesson', 'Call To Action'];
+  const segments = Array.isArray(input.signatureSegments) && input.signatureSegments.length
+    ? input.signatureSegments
+    : ["Today's Setup", 'Why It Qualified', 'Kairos Insight', 'Risk Reminder', "Today's Lesson", "What I'll Be Watching Next"];
+  const audience = input.audience || 'Prop Firm Traders';
+  const audienceLine = audience === 'Beginner'
+    ? 'Explain terms simply and define scanner context before assuming trading knowledge.'
+    : audience === 'Advanced'
+    ? 'Keep the explanation efficient and focus on process, structure, risk, and execution quality.'
+    : audience === 'Intermediate'
+    ? 'Balance plain-English teaching with practical trading terminology.'
+    : 'Connect the lesson to patience, risk control, drawdown protection, and eval consistency.';
+  return {
+    voice: voiceList.map(v => String(v).trim()).filter(Boolean).join(', ') || 'Professional, Educational',
+    avoid: avoidList.map(v => String(v).trim()).filter(Boolean).join(', ') || 'Clickbait, Hype, False urgency, Guaranteed profit language',
+    audience,
+    structure,
+    segments,
+    audienceLine,
+  };
+}
+
+function aiStudioSignatureBlock(profile: ReturnType<typeof aiStudioBrandProfile>) {
+  return profile.segments.map(segment => {
+    if (/risk/i.test(segment)) return `${segment}: This is a review candidate, not a guaranteed trade. Risk must stay defined before entry.`;
+    if (/qualified|why/i.test(segment)) return `${segment}: It qualified because the scanner found structure, location, and a defined trade plan from available data.`;
+    if (/insight/i.test(segment)) return `${segment}: Kairos helps narrow attention, but chart confirmation still matters.`;
+    if (/watch/i.test(segment)) return `${segment}: I am watching whether price respects the planned area and whether confirmation holds.`;
+    if (/lesson/i.test(segment)) return `${segment}: The lesson is to separate a good area from a confirmed entry.`;
+    return `${segment}: Use the scanner output as a starting point for structured review.`;
+  }).join('\n');
+}
+
+function aiStudioTeachingBlock(profile: ReturnType<typeof aiStudioBrandProfile>, context: any) {
+  const map: Record<string, string> = {
+    Hook: `Hook: ${context.pair} printed a ${context.grade}-grade ${context.direction} idea, but the value is in reviewing the process, not chasing a signal.`,
+    'Setup Overview': `Setup Overview: ${context.pair} on ${context.tf} is framed as a ${context.direction} idea from ${context.location}.`,
+    'Scanner Analysis': 'Scanner Analysis: Kairos surfaced the setup using available scanner data, including grade, bias/location context, and planned levels.',
+    'Risk Discussion': `Risk Discussion: Entry ${context.entry}, SL ${context.sl}, TP ${context.tp}, planned R:R ${context.rr}. No outcome is guaranteed.`,
+    'Educational Lesson': `Educational Lesson: ${profile.audienceLine}`,
+    'Call To Action': 'Call To Action: Review the chart, journal the idea, and only act if the live setup still confirms.',
+  };
+  return profile.structure.map(section => map[section]).filter(Boolean).join('\n');
+}
+
+function aiStudioKnowledgeItems(items: AiStudioKnowledgeItem[] = []) {
+  return items.filter(item => item?.status === 'Approved').slice(0, 5);
+}
+
+function aiStudioKnowledgeBlock(items: AiStudioKnowledgeItem[] = [], context: any = {}) {
+  const approved = aiStudioKnowledgeItems(items);
+  if (!approved.length) return 'No approved Knowledge Base items are available yet.';
+  return [`Approved Knowledge References for ${context.pair || 'this episode'}:`, ...approved.map(item => {
+    const example = item.example ? ` Example: ${item.example}` : '';
+    return `- ${item.title || 'Untitled'} (${item.category || 'Knowledge'}): ${item.summary || ''}${example}`;
+  })].join('\n');
+}
+
+function aiStudioKnowledgeTitles(items: AiStudioKnowledgeItem[] = []) {
+  const titles = aiStudioKnowledgeItems(items).slice(0, 4).map(item => item.title).filter(Boolean);
+  return titles.length ? titles.join(', ') : 'No approved knowledge selected yet';
+}
+
+function aiStudioTemplateCopy(templateKey: string, template: AiStudioTemplate, context: any) {
+  const { pair, direction, sideWord, grade, location, tf, rr, entry, tp } = context;
+  const base = {
+    title: `${pair} ${grade} Setup: ${sideWord.toUpperCase()} Trade Plan from ${location}`,
+    intro: `Today I am breaking down a ${grade}-grade ${pair} scanner signal and showing how I would review it before taking action.`,
+    focus: `The scanner found a ${sideWord} ${tf} setup with location marked as ${location}. The goal is to understand trend, location, timing, and risk.`,
+    takeaway: 'The scanner is not here to replace judgment. It is here to help me find cleaner opportunities faster, then use manual confirmation before risking capital.',
+    short: `This ${pair} ${grade}-grade setup caught my attention because the scanner found ${sideWord} structure at ${location}.`,
+    social: `Scanner found a ${grade}-grade ${pair} idea. I am watching ${location} for a ${sideWord} continuation setup.`,
+  };
+  if (templateKey === 'educationalLesson') {
+    base.title = `Educational Lesson: Why ${pair} Became a ${grade} Setup`;
+    base.intro = `In this lesson, I am using ${pair} to teach how trend, location, confirmation, and risk come together in a scanner setup.`;
+    base.takeaway = 'The lesson is to understand the setup type first, then decide whether price action confirms the idea.';
+  } else if (templateKey === 'tradeJournalReview') {
+    base.title = `Trade Journal Review: ${pair} ${grade} Setup`;
+    base.intro = `This is a journal-style review of a ${pair} scanner setup, focused on decision quality instead of hype.`;
+  } else if (templateKey === 'scannerExplainer') {
+    base.title = `Scanner Explainer: Why Kairos Flagged ${pair}`;
+    base.focus = `The scanner read the trade as ${direction}, with ${location} location, an entry near ${entry}, and a target around ${tp}. This is about understanding the scanner output, not blindly following it.`;
+  } else if (templateKey === 'weeklyMarketRecap') {
+    base.title = `Weekly Market Recap: ${pair} and the Cleanest Scanner Setups`;
+  } else if (templateKey === 'propFirmChallengeUpdate') {
+    base.title = `Prop Firm Challenge Update: ${pair} Scanner Setup and Risk Plan`;
+    base.social = `Eval update: watching ${pair} ${direction}. Clean scanner idea, but the priority is risk control and journal discipline.`;
+  }
+  return { ...base, template };
+}
+
+function buildMockAiEpisode(input: any) {
+  const trade = input?.trade || {};
+  const templateKey = input?.templateKey || 'quickTradeBreakdown';
+  const template = aiStudioTemplate(templateKey, input?.templates);
+  const pair = trade.displaySymbol || aiStudioPairLabel(trade.pair || trade.symbol || 'this pair');
+  const direction = aiStudioDirection(trade);
+  const sideWord = direction === 'LONG' ? 'bullish' : 'bearish';
+  const grade = trade.setupGrade || 'A';
+  const location = trade.zone || trade.location || 'key location';
+  const tf = trade.timeframe || 'H4';
+  const rr = trade.rrRatio || '—';
+  const entry = aiStudioNumber(trade.entry);
+  const sl = aiStudioNumber(trade.sl);
+  const tp = aiStudioNumber(trade.tp1 || trade.tp);
+  const found = aiStudioFoundTime(trade);
+  const brand = aiStudioBrandProfile(input?.brand);
+  const templateCopy = aiStudioTemplateCopy(templateKey, template, { pair, direction, sideWord, grade, location, tf, rr, entry, sl, tp, found });
+  const brandContext = { pair, direction, grade, location, tf, rr, entry, sl, tp };
+  const teachingBlock = aiStudioTeachingBlock(brand, brandContext);
+  const signatureBlock = aiStudioSignatureBlock(brand);
+  const knowledgeBlock = aiStudioKnowledgeBlock(input?.knowledge, brandContext);
+  const knowledgeTitles = aiStudioKnowledgeTitles(input?.knowledge);
+  return {
+    trade: { ...trade, displaySymbol: pair },
+    templateKey,
+    templateName: template.name,
+    provider: 'mock',
+    disclaimer: AI_STUDIO_DISCLAIMER,
+    summary: {
+      pair, direction, grade, template: template.name, brandVoice: brand.voice, audience: brand.audience,
+      timeframe: tf, location, entry, sl, tp, rr, status: trade.entryStatus || trade.status || 'Ready for Review',
+    },
+    sections: [
+      { label: 'YouTube Title', value: templateCopy.title },
+      { label: 'Long-form YouTube Script', large: true, value: `Intro:\n${templateCopy.intro}\n\nBrand DNA:\nVoice: ${brand.voice}\nAudience: ${brand.audience}\nAvoid: ${brand.avoid}\n\nContext:\n${templateCopy.focus}\n\nTeaching Structure:\n${teachingBlock}\n\nApproved Knowledge Base:\n${knowledgeBlock}\n\nTrade Plan:\nDirection: ${direction}\nEntry: ${entry}\nStop loss: ${sl}\nTarget: ${tp}\nEstimated R:R: ${rr}\nFound time: ${found}\n\nReview:\nThis is the kind of signal I want to journal because it gives a clear structure to study. I would still check the live chart, confirm price behavior at the zone, and make sure the setup matches my eval risk plan before entering.\n\nSignature Segments:\n${signatureBlock}\n\nTakeaway:\n${templateCopy.takeaway}\n\nDisclaimer:\n${AI_STUDIO_DISCLAIMER}` },
+      { label: 'Shorts Script', value: `${templateCopy.short}\nThe plan is simple: entry near ${entry}, stop at ${sl}, and first target around ${tp}.\nI am not treating this as an automatic entry. I want confirmation at the zone first.\n${brand.segments.slice(0, 2).join(' / ')}: find the opportunity, explain why it qualified, then manually verify the trade.\n\n${AI_STUDIO_DISCLAIMER}` },
+      { label: 'YouTube Description', value: `In this video, I review a ${grade}-grade ${pair} forex scanner signal and walk through the trade idea, location, risk, and target plan.\n\nPair: ${pair}\nTimeframe: ${tf}\nDirection: ${direction}\nEntry: ${entry}\nStop Loss: ${sl}\nTarget: ${tp}\nR:R: ${rr}\nAudience: ${brand.audience}\nBrand Voice: ${brand.voice}\nApproved Knowledge Used: ${knowledgeTitles}\n\n${AI_STUDIO_DISCLAIMER}` },
+      { label: 'Tags', value: `forex trading, ${pair.replace('/', '')}, forex scanner, trade breakdown, prop firm trading, smart money concepts, supply and demand, trading journal` },
+      { label: 'Thumbnail Prompt', value: `Dark premium trading dashboard thumbnail showing ${pair}, ${grade} Setup, ${direction}, entry ${entry}, and a clean chart with supply/demand zones. Bold text: "${pair} ${grade} SETUP"` },
+      { label: 'X Post', value: `${pair} ${grade} setup on my scanner today.\n\nDirection: ${direction}\nLocation: ${location}\nR:R: ${rr}\n\nNot an auto-entry. The next step is chart confirmation and journal review.\n\n${AI_STUDIO_DISCLAIMER}` },
+      { label: 'Instagram Caption', value: `${templateCopy.social}\n\nEntry: ${entry}\nSL: ${sl}\nTP: ${tp}\nR:R: ${rr}\n\nScanner finds the opportunity. The chart confirms the entry.\n\n${AI_STUDIO_DISCLAIMER}` },
+      { label: 'Facebook Post', value: `${templateCopy.social} Entry ${entry}, stop ${sl}, target ${tp}, planned R:R ${rr}. This remains a review candidate, not an automatic entry. Voice: ${brand.voice}. ${AI_STUDIO_DISCLAIMER}` },
+      { label: 'LinkedIn Post', value: `${templateCopy.social} The focus is process quality, journaling, and decision consistency for ${brand.audience}. Template used: ${template.name}. ${AI_STUDIO_DISCLAIMER}` },
+    ] as AiStudioSection[],
+  };
+}
+
+function aiStudioTradeOutcome(trade: any) {
+  const raw = String(trade?.reviewResult || trade?.result || trade?.outcome || trade?.tradeResult || '').trim().toUpperCase();
+  if (['WINNER', 'WIN', 'TP', 'TP HIT', 'TAKE PROFIT'].includes(raw)) return 'TP Hit';
+  if (['STOPPED', 'STOP LOSS', 'SL', 'SL HIT', 'LOSS', 'LOSER', 'FAILED'].includes(raw)) return 'Stop Loss';
+  if (['BREAKEVEN', 'BREAK EVEN', 'BE'].includes(raw)) return 'Breakeven';
+  if (['RUNNING', 'OPEN'].includes(raw)) return 'Running';
+  return 'Unknown';
+}
+
+function aiStudioEffectiveFollowUpType(requestedType: string, trade: any) {
+  const outcome = aiStudioTradeOutcome(trade);
+  if (outcome === 'Unknown' || outcome === 'Running') return 'Trade Update';
+  if (requestedType === 'Weekly Recap' || requestedType === 'Lesson Learned' || requestedType === 'Trade Update') return requestedType;
+  if (requestedType === 'TP Hit Review' && outcome === 'TP Hit') return requestedType;
+  if (requestedType === 'Stop Loss Review' && outcome === 'Stop Loss') return requestedType;
+  if (requestedType === 'Breakeven Review' && outcome === 'Breakeven') return requestedType;
+  return 'Trade Update';
+}
+
+function buildMockAiFollowUp(input: any) {
+  const pkg = input?.package || {};
+  const trade = pkg.trade || {};
+  const summary = pkg.summary || {};
+  const requestedType = input?.requestedType || 'Trade Update';
+  const templateKey = input?.templateKey || pkg.templateKey || 'quickTradeBreakdown';
+  const template = aiStudioTemplate(templateKey, input?.templates);
+  const pair = summary.pair || trade.displaySymbol || trade.pair || 'this setup';
+  const direction = summary.direction || aiStudioDirection(trade);
+  const grade = summary.grade || trade.setupGrade || 'A';
+  const entry = summary.entry || aiStudioNumber(trade.entry);
+  const sl = summary.sl || aiStudioNumber(trade.sl);
+  const tp = summary.tp || aiStudioNumber(trade.tp1 || trade.tp);
+  const rr = summary.rr || trade.rrRatio || '—';
+  const outcome = aiStudioTradeOutcome(trade);
+  const type = aiStudioEffectiveFollowUpType(requestedType, trade);
+  const brand = aiStudioBrandProfile(input?.brand);
+  const developing = outcome === 'Unknown' || outcome === 'Running';
+  const lesson = developing
+    ? 'The lesson is to document the plan while the trade is still developing, then compare the plan against the final result later.'
+    : outcome === 'TP Hit'
+    ? 'The lesson is to review what made the setup work and whether the entry, patience, and target selection were repeatable.'
+    : outcome === 'Stop Loss'
+    ? 'The lesson is to review whether the setup failed because of direction, location, timing, or trade management.'
+    : 'The lesson is to evaluate whether risk was protected without cutting the trade too early.';
+  const teachingBlock = aiStudioTeachingBlock(brand, { pair, direction, grade, location: 'original scanner location', tf: summary.timeframe || trade.timeframe || 'scanner timeframe', rr, entry, sl, tp });
+  const signatureBlock = aiStudioSignatureBlock(brand);
+  const knowledgeBlock = aiStudioKnowledgeBlock(input?.knowledge, { pair, direction, grade, rr, entry, sl, tp });
+  const knowledgeTitles = aiStudioKnowledgeTitles(input?.knowledge);
+  return {
+    type, requestedType, outcome, developing, templateKey, templateName: template.name, provider: 'mock', disclaimer: AI_STUDIO_DISCLAIMER,
+    summary: { pair, direction, grade, template: template.name, brandVoice: brand.voice, audience: brand.audience, entry, sl, tp, rr, outcome: developing ? 'Still developing' : outcome },
+    sections: [
+      { label: 'Follow-up YouTube Title', value: `${type === 'Trade Update' ? 'Trade Update' : type}: ${pair} ${grade} Setup Review` },
+      { label: 'Follow-up Long-form Script', large: true, value: `Intro:\nThis is a follow-up episode for the ${pair} ${grade} setup from the scanner.\n\nStatus:\n${developing ? 'The trade outcome is not confirmed yet, so this follow-up is framed as a developing Trade Update.' : `Known outcome: ${outcome}.`}\n\nBrand DNA:\nVoice: ${brand.voice}\nAudience: ${brand.audience}\nAvoid: ${brand.avoid}\n\nOriginal Trade Plan:\nPair: ${pair}\nDirection: ${direction}\nEntry: ${entry}\nStop Loss: ${sl}\nTarget: ${tp}\nR:R: ${rr}\n\nStory Mode Review:\nThe goal of this follow-up is not to make the scanner look perfect. The goal is to document what happened after the original signal and turn the trade into a useful lesson.\n\nTeaching Structure:\n${teachingBlock}\n\nApproved Knowledge Base:\n${knowledgeBlock}\n\nLesson:\n${lesson}\n\nSignature Segments:\n${signatureBlock}\n\nDisclaimer:\n${AI_STUDIO_DISCLAIMER}` },
+      { label: 'Follow-up Shorts Script', value: `${pair} follow-up.\nThe original scanner idea was ${direction} from ${entry}, with stop at ${sl} and target near ${tp}.\n${developing ? 'The trade is still developing, so I am not calling this a win or loss yet.' : `The recorded outcome is: ${outcome}.`}\nThe point is simple: every setup becomes data when you review it honestly.\n${brand.segments.slice(0, 2).join(' / ')}. Template: ${template.name}.\n\n${AI_STUDIO_DISCLAIMER}` },
+      { label: 'Follow-up Description', value: `Follow-up review for the ${pair} ${grade} scanner setup.\n\nOriginal direction: ${direction}\nEntry: ${entry}\nStop Loss: ${sl}\nTarget: ${tp}\nR:R: ${rr}\nOutcome status: ${developing ? 'Still developing / unknown' : outcome}\n\nTemplate: ${template.name}\nBrand Voice: ${brand.voice}\nAudience: ${brand.audience}\nApproved Knowledge Used: ${knowledgeTitles}\n\n${AI_STUDIO_DISCLAIMER}` },
+      { label: 'Follow-up Social Post', value: `${pair} scanner follow-up:\n\nOriginal plan: ${direction}\nEntry: ${entry}\nSL: ${sl}\nTP: ${tp}\nR:R: ${rr}\n\n${developing ? 'Outcome is still developing, so this is a Trade Update, not a win/loss claim.' : `Outcome: ${outcome}.`}\n\nThe value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${template.name}\n${AI_STUDIO_DISCLAIMER}` },
+      { label: 'Lesson / Takeaway', value: `${lesson}\n\nSignature Segments:\n${signatureBlock}\n\n${AI_STUDIO_DISCLAIMER}` },
+    ] as AiStudioSection[],
+  };
+}
+
+const AI_STUDIO_VISUAL_ASSET_TYPES = ['YouTube Thumbnail', 'YouTube Short Cover', 'Chart Callout Graphic', 'Community Post Image', 'Instagram Carousel Slide', 'X Post Graphic'];
+
+function buildMockAiVisualBriefs(input: any) {
+  const pkg = input?.package || {};
+  const summary = pkg.summary || {};
+  const trade = pkg.trade || {};
+  const brand = aiStudioBrandProfile(input?.brand);
+  const context = {
+    pair: summary.pair || trade.displaySymbol || trade.pair || 'Scanner Setup',
+    direction: summary.direction || aiStudioDirection(trade),
+    grade: summary.grade || trade.setupGrade || 'A',
+    timeframe: summary.timeframe || trade.timeframe || 'H4',
+    location: summary.location || trade.location || trade.zone || 'key location',
+    entry: summary.entry || aiStudioNumber(trade.entry),
+    sl: summary.sl || aiStudioNumber(trade.sl),
+    tp: summary.tp || aiStudioNumber(trade.tp1 || trade.tp),
+    rr: summary.rr || trade.rrRatio || '—',
+    templateName: pkg.templateName || aiStudioTemplate(pkg.templateKey, input?.templates).name,
+    brandVoice: brand.voice,
+    knowledgeTitles: aiStudioKnowledgeTitles(input?.knowledge),
+  };
+  return AI_STUDIO_VISUAL_ASSET_TYPES.map(type => {
+    const headline = type === 'YouTube Thumbnail' ? `${context.pair} ${context.grade} Setup` : type === 'YouTube Short Cover' ? `${context.pair} Setup` : 'Setup Watch';
+    return {
+      type,
+      fields: [
+        { label: 'Thumbnail Concept', value: `${type} for a ${context.templateName} about ${context.pair}. Show the scanner-driven ${context.direction} idea as a structured review, not a guaranteed outcome.` },
+        { label: 'Headline Text', value: headline },
+        { label: 'Subtext', value: `${context.direction} · ${context.timeframe} · ${context.location} · ${context.rr}R` },
+        { label: 'Chart Focus', value: `Focus on planned entry ${context.entry}, stop ${context.sl}, and target ${context.tp}. Use the chart as evidence for review, not as a promise.` },
+        { label: 'Visual Style', value: 'Dark trading dashboard look, calm professional spacing, no hype or fake urgency.' },
+        { label: 'Colors / Branding Notes', value: `Use Kairos dark UI styling with blue accents and ${context.direction === 'LONG' ? 'green bullish accents' : 'red bearish accents'}. Brand voice: ${context.brandVoice}.` },
+        { label: 'Composition Notes', value: `Keep the pair and grade readable first, chart second, risk/process cue third. ${AI_STUDIO_DISCLAIMER}` },
+        { label: 'Image Generation Prompt', value: `Create a polished trading content graphic for ${context.pair} ${context.grade} ${context.direction} setup. Avoid profit guarantees, hype, cash imagery, or fake broker UI. Knowledge themes: ${context.knowledgeTitles}.` },
+        { label: 'Canva / Design Prompt', value: `Design a ${type} using Kairos scanner branding. Headline: "${headline}". Include chart/screenshot placeholder, entry/SL/TP callout, and a small risk-review note.` },
+      ],
+    };
+  });
+}
+
+function sanitizeAiStudioSections(sections: any, fallback: AiStudioSection[]) {
+  if (!Array.isArray(sections)) return fallback;
+  const cleaned = sections
+    .filter(section => section && typeof section.label === 'string' && typeof section.value === 'string')
+    .map(section => ({ label: section.label, value: `${section.value}\n\n${AI_STUDIO_DISCLAIMER}`, large: !!section.large }));
+  return cleaned.length ? cleaned : fallback;
+}
+
+async function openAiStudioJson(kind: 'episode' | 'followUp' | 'visualBriefs', input: any, fallback: any) {
+  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is missing');
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_AI_STUDIO_MODEL,
+      input: [
+        {
+          role: 'system',
+          content: [
+            'You generate editable AI Studio trading education content.',
+            'Use only the supplied trade, scanner, Brand DNA, Knowledge Base, and template data.',
+            'Do not fabricate prices, confirmations, performance, or trade outcomes.',
+            'Include disclaimer language that this is educational content, not financial advice.',
+            'Return only JSON matching the requested shape.',
+          ].join('\n'),
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({ kind, input, requiredShape: kind === 'visualBriefs' ? 'array of {type, fields:[{label,value}]}' : 'object with summary and sections:[{label,value,large}]' }),
+        },
+      ],
+      text: { format: { type: 'json_object' } },
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`OpenAI request failed (${response.status}): ${detail.slice(0, 240)}`);
+  }
+  const data = await response.json() as any;
+  const text = data.output_text || data.output?.flatMap((item: any) => item.content || []).map((part: any) => part.text || '').join('');
+  const parsed = JSON.parse(text || '{}');
+  if (kind === 'visualBriefs') return Array.isArray(parsed) ? parsed : parsed.assets || fallback;
+  return parsed && typeof parsed === 'object' ? parsed : fallback;
+}
+
+async function aiStudioGenerate(kind: 'episode' | 'followUp' | 'visualBriefs', input: any, mockBuilder: (input: any) => any) {
+  const provider = input?.provider === 'openai' ? 'openai' : 'mock';
+  const mock = mockBuilder(input);
+  if (provider !== 'openai') return { provider: 'mock', usedFallback: false, result: mock };
+  try {
+    const generated = await openAiStudioJson(kind, input, mock);
+    if (kind === 'episode') {
+      return { provider: 'openai', usedFallback: false, result: { ...mock, ...generated, provider: 'openai', sections: sanitizeAiStudioSections(generated.sections, mock.sections) } };
+    }
+    if (kind === 'followUp') {
+      return { provider: 'openai', usedFallback: false, result: { ...mock, ...generated, provider: 'openai', sections: sanitizeAiStudioSections(generated.sections, mock.sections) } };
+    }
+    return { provider: 'openai', usedFallback: false, result: Array.isArray(generated) ? generated : mock };
+  } catch (error: any) {
+    console.warn(`[AI Studio] OpenAI ${kind} fallback: ${error.message}`);
+    return { provider: 'mock', requestedProvider: 'openai', usedFallback: true, fallbackReason: error.message, result: mock };
+  }
 }
 
 // Priority pairs — pushed by Claude after each forex scan via POST /api/priority-pairs
@@ -1265,6 +1633,37 @@ app.get('/api/test-telegram', async (_req, res) => {
   });
   const data = await r.json();
   return res.json(data);
+});
+
+// ─── AI STUDIO BACKEND PROVIDERS ──────────────────────────────────────────────
+app.post('/api/ai-studio/generate-episode', async (req, res) => {
+  try {
+    const result = await aiStudioGenerate('episode', req.body || {}, buildMockAiEpisode);
+    return res.json(result);
+  } catch (error: any) {
+    console.error('[AI Studio] generate episode failed:', error.message);
+    return res.status(500).json({ error: 'Failed to generate episode' });
+  }
+});
+
+app.post('/api/ai-studio/generate-follow-up', async (req, res) => {
+  try {
+    const result = await aiStudioGenerate('followUp', req.body || {}, buildMockAiFollowUp);
+    return res.json(result);
+  } catch (error: any) {
+    console.error('[AI Studio] generate follow-up failed:', error.message);
+    return res.status(500).json({ error: 'Failed to generate follow-up' });
+  }
+});
+
+app.post('/api/ai-studio/generate-visual-briefs', async (req, res) => {
+  try {
+    const result = await aiStudioGenerate('visualBriefs', req.body || {}, buildMockAiVisualBriefs);
+    return res.json(result);
+  } catch (error: any) {
+    console.error('[AI Studio] generate visual briefs failed:', error.message);
+    return res.status(500).json({ error: 'Failed to generate visual briefs' });
+  }
 });
 
 // ─── TRAINER ──────────────────────────────────────────────────────────────────

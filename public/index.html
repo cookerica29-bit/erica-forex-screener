@@ -279,6 +279,7 @@
     .ai-package-meta { color:var(--slate-dim); font-size:10px; margin-top:3px; }
     .ai-package-badges { display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
     .ai-warning { color:#fcd34d; background:rgba(245,166,35,.08); border:1px solid rgba(245,166,35,.22); border-radius:9px; padding:9px 10px; font-size:11px; line-height:1.45; margin:10px 0 12px; }
+    .ai-warning.error { color:#fca5a5; background:rgba(255,59,92,.08); border-color:rgba(255,59,92,.24); }
     .ai-output-section { border-top:1px solid rgba(148,163,184,.09); padding-top:10px; margin-top:10px; }
     .ai-output-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:7px; }
     .ai-output-label { color:#cbd5e1; font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
@@ -1124,10 +1125,10 @@
             <div class="ai-template-name" style="margin-bottom:0;">AI Provider</div>
             <span class="ai-provider-badge">Mock</span>
           </div>
-          <div class="ai-template-use">Mock generates the current AI Studio output in-browser with no API keys. OpenAI, Anthropic, Google, and Local are future provider slots; selecting one persists the choice but safely falls back to Mock output.</div>
+          <div class="ai-template-use">Mock generates the current AI Studio output in-browser with no API keys. OpenAI runs through backend AI Studio routes so the API key never reaches the browser. Anthropic, Google, and Local remain future provider slots that safely fall back to Mock output.</div>
           <select id="aiProviderSelect" class="studio-select" onchange="saveAiProvider()" style="margin-top:8px;max-width:360px;"></select>
           <div class="ai-provider-list">
-            <span class="ai-provider-pill">OpenAI <span class="ai-provider-badge soon">Coming Soon</span></span>
+            <span class="ai-provider-pill">OpenAI <span class="ai-provider-badge">Backend</span></span>
             <span class="ai-provider-pill">Anthropic <span class="ai-provider-badge soon">Coming Soon</span></span>
             <span class="ai-provider-pill">Google <span class="ai-provider-badge soon">Coming Soon</span></span>
             <span class="ai-provider-pill">Local <span class="ai-provider-badge soon">Coming Soon</span></span>
@@ -2561,6 +2562,69 @@
     };
   }
 
+  function aiStudioRequestContext() {
+    return {
+      provider: loadAiProviderKey(),
+      brand: loadAiBrandDna(),
+      knowledge: approvedAiKnowledgeItems(),
+      templates: AI_CONTENT_TEMPLATES,
+    };
+  }
+
+  async function postAiStudio(path, payload) {
+    const response = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `AI Studio request failed (${response.status})`);
+    if (data.usedFallback) showAiProviderFallback(data.fallbackReason || 'OpenAI unavailable');
+    return data.result;
+  }
+
+  function showAiProviderFallback(reason) {
+    const message = `OpenAI was unavailable, so AI Studio used Mock output. ${reason ? `Reason: ${reason}` : ''}`;
+    showVideoToast('OpenAI unavailable - using Mock output');
+    const notice = document.getElementById('aiProviderFallbackNotice');
+    if (notice) {
+      notice.style.display = 'block';
+      notice.textContent = message;
+    }
+  }
+
+  function OpenAiProvider() {
+    return {
+      id: 'openai',
+      name: 'OpenAI',
+      status: 'Backend provider - API key stays server-side',
+      generateEpisode(trade, templateKey) {
+        return postAiStudio('/api/ai-studio/generate-episode', {
+          ...aiStudioRequestContext(),
+          provider: 'openai',
+          trade,
+          templateKey,
+        });
+      },
+      generateFollowUp(pkg, requestedType, templateKey) {
+        return postAiStudio('/api/ai-studio/generate-follow-up', {
+          ...aiStudioRequestContext(),
+          provider: 'openai',
+          package: pkg,
+          requestedType,
+          templateKey,
+        });
+      },
+      generateVisualBriefs(pkg) {
+        return postAiStudio('/api/ai-studio/generate-visual-briefs', {
+          ...aiStudioRequestContext(),
+          provider: 'openai',
+          package: pkg,
+        });
+      },
+    };
+  }
+
   function placeholderAiProvider(id, name) {
     const mock = MockProvider();
     return {
@@ -2581,7 +2645,7 @@
 
   const AI_PROVIDER_REGISTRY = {
     mock: MockProvider(),
-    openai: placeholderAiProvider('openai', 'OpenAI'),
+    openai: OpenAiProvider(),
     anthropic: placeholderAiProvider('anthropic', 'Anthropic'),
     google: placeholderAiProvider('google', 'Google'),
     local: placeholderAiProvider('local', 'Local'),
@@ -2611,7 +2675,7 @@
     const selected = loadAiProviderKey();
     const labels = {
       mock: 'Mock',
-      openai: 'OpenAI - Coming Soon',
+      openai: 'OpenAI',
       anthropic: 'Anthropic - Coming Soon',
       google: 'Google - Coming Soon',
       local: 'Local - Coming Soon',
@@ -2622,9 +2686,9 @@
     if (status) status.textContent = currentAiProvider().status;
     if (notice) {
       const provider = currentAiProvider();
-      const isMock = provider.id === 'mock';
-      notice.style.display = isMock ? 'none' : 'block';
-      notice.textContent = isMock ? '' : `${provider.name} is Coming Soon. AI Studio will use Mock output for Produce Episode, Create Follow-Up, and Create Visual Assets until API integration is added.`;
+      const isFutureProvider = !['mock', 'openai'].includes(provider.id);
+      notice.style.display = isFutureProvider ? 'block' : 'none';
+      notice.textContent = isFutureProvider ? `${provider.name} is Coming Soon. AI Studio will use Mock output for Produce Episode, Create Follow-Up, and Create Visual Assets until API integration is added.` : '';
     }
   }
 
@@ -3102,14 +3166,21 @@
       </div>`;
   }
 
-  function produceAiEpisode(encodedTrade, templateKey = currentAiTemplate) {
+  async function produceAiEpisode(encodedTrade, templateKey = currentAiTemplate) {
     const trade = JSON.parse(decodeURIComponent(encodedTrade));
     currentAiTemplate = AI_CONTENT_TEMPLATES[templateKey] ? templateKey : currentAiTemplate;
-    currentAiPackage = currentAiProvider().generateEpisode(trade, currentAiTemplate);
-    renderAiStudio();
-    renderAiPackage(currentAiPackage);
-    document.getElementById('aiEpisodeStatus').textContent = 'Draft Episode';
-    document.getElementById('aiEpisodePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const output = document.getElementById('aiEpisodeOutput');
+    if (output) output.innerHTML = '<div class="studio-empty">Generating episode...</div>';
+    try {
+      currentAiPackage = await currentAiProvider().generateEpisode(trade, currentAiTemplate);
+      renderAiStudio();
+      renderAiPackage(currentAiPackage);
+      document.getElementById('aiEpisodeStatus').textContent = 'Draft Episode';
+      document.getElementById('aiEpisodePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error) {
+      if (output) output.innerHTML = `<div class="ai-warning error"><strong>AI Studio error:</strong> ${escapeHtml(error.message || 'Episode generation failed.')}</div>`;
+      showVideoToast('Episode generation failed');
+    }
   }
 
   function aiTemplateCopy(templateKey, context) {
@@ -3288,7 +3359,7 @@ This is for education and journal review only. It is not financial advice.` },
     return 'Trade Update';
   }
 
-  function createAiFollowUp() {
+  async function createAiFollowUp() {
     if (!currentAiPackage) {
       showVideoToast('Produce an episode first');
       return;
@@ -3296,10 +3367,17 @@ This is for education and journal review only. It is not financial advice.` },
     const requestedType = document.getElementById('aiFollowUpType')?.value || 'Trade Update';
     const templateKey = document.getElementById('aiFollowUpTemplate')?.value || currentAiTemplate;
     currentAiTemplate = AI_CONTENT_TEMPLATES[templateKey] ? templateKey : currentAiTemplate;
-    const followUp = currentAiProvider().generateFollowUp(currentAiPackage, requestedType, currentAiTemplate);
-    currentAiPackage.followUp = followUp;
-    renderAiFollowUp(followUp);
-    document.getElementById('aiStoryPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const output = document.getElementById('aiStoryOutput');
+    if (output) output.innerHTML = '<div class="studio-empty">Generating follow-up...</div>';
+    try {
+      const followUp = await currentAiProvider().generateFollowUp(currentAiPackage, requestedType, currentAiTemplate);
+      currentAiPackage.followUp = followUp;
+      renderAiFollowUp(followUp);
+      document.getElementById('aiStoryPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error) {
+      if (output) output.innerHTML = `<div class="ai-warning error"><strong>AI Studio error:</strong> ${escapeHtml(error.message || 'Follow-up generation failed.')}</div>`;
+      showVideoToast('Follow-up generation failed');
+    }
   }
 
   function buildAiFollowUpPackage(pkg, requestedType, templateKey = currentAiTemplate) {
@@ -3528,17 +3606,24 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     return AI_VISUAL_ASSET_TYPES.map(type => visualAssetBrief(type, context));
   }
 
-  function createAiVisualAssets() {
+  async function createAiVisualAssets() {
     if (!currentAiPackage) {
       showVideoToast('Produce an episode first');
       setAiSection('episodes');
       return;
     }
-    currentAiPackage.visualAssets = currentAiProvider().generateVisualBriefs(currentAiPackage);
-    renderAiVisualAssets(currentAiPackage.visualAssets);
-    renderAiProductionPipeline(currentAiPackage);
-    setAiSection('visuals');
-    showVideoToast('Visual asset briefs created');
+    const output = document.getElementById('aiVisualAssetsOutput');
+    if (output) output.innerHTML = '<div class="studio-empty">Generating visual briefs...</div>';
+    try {
+      currentAiPackage.visualAssets = await currentAiProvider().generateVisualBriefs(currentAiPackage);
+      renderAiVisualAssets(currentAiPackage.visualAssets);
+      renderAiProductionPipeline(currentAiPackage);
+      setAiSection('visuals');
+      showVideoToast('Visual asset briefs created');
+    } catch (error) {
+      if (output) output.innerHTML = `<div class="ai-warning error"><strong>AI Studio error:</strong> ${escapeHtml(error.message || 'Visual brief generation failed.')}</div>`;
+      showVideoToast('Visual brief generation failed');
+    }
   }
 
   function renderAiVisualAssets(assets = []) {
