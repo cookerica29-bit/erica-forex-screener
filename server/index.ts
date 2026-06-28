@@ -393,7 +393,7 @@ async function openAiStudioJson(kind: 'episode' | 'followUp' | 'visualBriefs', i
         },
         {
           role: 'user',
-          content: JSON.stringify({ kind, input, requiredShape: kind === 'visualBriefs' ? 'array of {type, fields:[{label,value}]}' : 'object with summary and sections:[{label,value,large}]' }),
+          content: JSON.stringify({ kind, input, requiredShape: kind === 'visualBriefs' ? 'object with assets:[{type, fields:[{label,value}]}]' : 'object with summary and sections:[{label,value,large}]' }),
         },
       ],
       text: { format: { type: 'json_object' } },
@@ -406,7 +406,17 @@ async function openAiStudioJson(kind: 'episode' | 'followUp' | 'visualBriefs', i
   const data = await response.json() as any;
   const text = data.output_text || data.output?.flatMap((item: any) => item.content || []).map((part: any) => part.text || '').join('');
   const parsed = JSON.parse(text || '{}');
-  if (kind === 'visualBriefs') return Array.isArray(parsed) ? parsed : parsed.assets || fallback;
+  if (kind === 'visualBriefs') {
+    const assets = Array.isArray(parsed.assets)
+      ? parsed.assets
+      : Array.isArray(parsed.visualBriefs)
+      ? parsed.visualBriefs
+      : Array.isArray(parsed.briefs)
+      ? parsed.briefs
+      : null;
+    if (!assets) throw new Error('OpenAI visual briefs response did not include an assets array');
+    return assets;
+  }
   return parsed && typeof parsed === 'object' ? parsed : fallback;
 }
 
