@@ -2614,19 +2614,23 @@
     const state = r.entryTimingState || 'Not Ready';
     const direction = tradeDirectionForReport(r);
     const zoneState = zoneTouchStateForReport(r);
+    const activeZone = activeScoutZoneForReport(r);
+    const activeZoneRange = activeScoutZoneRangeText(r);
+    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `support/demand area around ${activeZoneRange}` : 'demand';
+    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `supply/resistance area around ${activeZoneRange}` : 'supply';
     if (zoneState === 'REJECTING') {
-      if (direction === 'SHORT') return 'Price has touched supply and bearish reaction evidence has started. Wait for entry trigger before treating this as active.';
-      if (direction === 'LONG') return 'Price has touched demand and bullish reaction evidence has started. Wait for entry trigger before treating this as active.';
+      if (direction === 'SHORT') return `Price has touched the ${supplyArea} and bearish reaction evidence has started. Wait for entry trigger before treating this as active.`;
+      if (direction === 'LONG') return `Price has touched the ${demandArea} and bullish reaction evidence has started. Wait for entry trigger before treating this as active.`;
       return 'Price has touched the zone and reaction evidence has started. Wait for entry trigger before treating this as active.';
     }
     if (zoneState === 'TESTING') {
-      if (direction === 'SHORT') return 'Current price/candle is touching supply. Wait for bearish rejection before entry.';
-      if (direction === 'LONG') return 'Current price/candle is touching demand. Wait for bullish rejection before entry.';
+      if (direction === 'SHORT') return `Current price/candle is touching the ${supplyArea}. Wait for bearish rejection before entry.`;
+      if (direction === 'LONG') return `Current price/candle is touching the ${demandArea}. Wait for bullish rejection before entry.`;
       return 'Current price/candle is touching the zone. Wait for rejection before entry.';
     }
     if (zoneState === 'APPROACHING') {
-      if (direction === 'SHORT') return 'Price is below supply and approaching the zone, but it has not touched supply yet.';
-      if (direction === 'LONG') return 'Price is above demand and approaching the zone, but it has not touched demand yet.';
+      if (direction === 'SHORT') return `Price is below the ${supplyArea} and approaching the zone, but it has not touched it yet.`;
+      if (direction === 'LONG') return `Price is above the ${demandArea} and approaching the zone, but it has not touched it yet.`;
       return 'Price is approaching the zone, but it has not touched it yet.';
     }
     if (state === 'Reaction Started') {

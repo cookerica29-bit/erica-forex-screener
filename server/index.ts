@@ -851,6 +851,12 @@ function entryTimingReasonDisplay(report: ScoutReport) {
   const demandArea = activeZone?.type === 'DEMAND' ? `support/demand area around ${activeZone.text}` : 'demand';
   const supplyArea = activeZone?.type === 'SUPPLY' ? `supply/resistance area around ${activeZone.text}` : 'supply';
   if (state === 'Reaction Started' && report.decisionLevelConfirmed === true) {
+    if (direction === 'SHORT' && activeZone?.type === 'SUPPLY') {
+      return `Price is reacting from the active ${supplyArea}. Decision level is confirmed; wait for the entry trigger before treating this as active.`;
+    }
+    if (direction === 'LONG' && activeZone?.type === 'DEMAND') {
+      return `Price is reacting from the active ${demandArea}. Decision level is confirmed; wait for the entry trigger before treating this as active.`;
+    }
     return 'Decision level is confirmed and reaction is developing. Wait for the entry trigger before treating this as active.';
   }
   if (zoneState === 'REJECTING') {
