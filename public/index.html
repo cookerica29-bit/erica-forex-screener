@@ -2513,6 +2513,31 @@
     return ['APPROACHING', 'TESTING', 'REJECTING'].includes(r.zoneTouchState) ? r.zoneTouchState : 'NONE';
   }
 
+  function activeScoutZoneForReport(r) {
+    const high = Number(r.activeZoneHigh);
+    const low = Number(r.activeZoneLow);
+    const type = r.activeZoneType === 'DEMAND' || r.activeZoneType === 'SUPPLY' ? r.activeZoneType : null;
+    if (!type || !Number.isFinite(high) || !Number.isFinite(low)) return null;
+    return {
+      type,
+      high: Math.max(high, low),
+      low: Math.min(high, low),
+    };
+  }
+
+  function formatScoutPriceForReport(r, value) {
+    if (value == null || !Number.isFinite(Number(value))) return '—';
+    const pair = String(r.pair || r.displaySymbol || '');
+    const dp = pair.includes('JPY') || pair.includes('XAU') || pair.includes('XAG') ? 3 : 5;
+    return Number(value).toFixed(dp);
+  }
+
+  function activeScoutZoneRangeText(r) {
+    const zone = activeScoutZoneForReport(r);
+    if (!zone) return '';
+    return `${formatScoutPriceForReport(r, zone.low)}-${formatScoutPriceForReport(r, zone.high)}`;
+  }
+
   function zoneTimingLabelForReport(r) {
     const direction = tradeDirectionForReport(r);
     const zoneState = zoneTouchStateForReport(r);
@@ -4385,6 +4410,10 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     const atLongZone = isLong && (locationLower.includes('demand') || locationLower.includes('support') || locationLower.includes('discount'));
     const atShortZone = isShort && (locationLower.includes('supply') || locationLower.includes('resistance') || locationLower.includes('premium'));
     const zoneState = zoneTouchStateForReport(r);
+    const activeZone = activeScoutZoneForReport(r);
+    const activeZoneRange = activeScoutZoneRangeText(r);
+    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `support/demand area around ${activeZoneRange}` : 'demand/support';
+    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `supply/resistance area around ${activeZoneRange}` : 'supply/resistance';
 
     if (timing === 'Entry Triggered') {
       const manage = evalEligible
@@ -4402,38 +4431,38 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
 
     if (atShortZone) {
       const now = zoneState === 'REJECTING'
-        ? 'Price has touched supply and bearish reaction evidence has started.'
+        ? `Price has touched the ${supplyArea} and bearish reaction evidence has started.`
         : zoneState === 'TESTING'
-        ? 'Current price/candle is testing supply.'
+        ? `Current price/candle is testing the ${supplyArea}.`
         : zoneState === 'APPROACHING'
-        ? 'Price is approaching supply from below but has not touched it yet.'
+        ? `Price is approaching the ${supplyArea} from below but has not touched it yet.`
         : 'Price is in a short-side location, but the current candle is not touching a confirmed supply zone.';
       const next = zoneState === 'REJECTING'
-        ? 'The next healthy step is bearish follow-through away from supply.'
+        ? 'The next healthy step is bearish follow-through away from that area.'
         : zoneState === 'TESTING'
-        ? 'The next healthy step is bearish rejection from inside the supply area.'
+        ? 'The next healthy step is bearish rejection from inside that area.'
         : zoneState === 'APPROACHING'
-        ? 'A push slightly higher into supply is normal before the setup is ready.'
-        : 'A push slightly higher into supply is normal before the setup is ready.';
-      return `${now} ${next} The setup is confirmed by bearish rejection and a structure shift back lower. It weakens if price accepts above supply or current timeframe flow turns bullish. ${zoneState === 'APPROACHING' ? 'Wait for the supply tap first.' : entryStatus === 'Near Entry' || timing === 'Area Reached' ? 'Wait for rejection before entry.' : 'Watch the supply area and wait.'}`;
+        ? 'A push slightly higher into that area is normal before the setup is ready.'
+        : 'A push slightly higher into that area is normal before the setup is ready.';
+      return `${now} ${next} The setup is confirmed by bearish rejection and a structure shift back lower. It weakens if price accepts above that area or current timeframe flow turns bullish. ${zoneState === 'APPROACHING' ? 'Wait for the supply tap first.' : entryStatus === 'Near Entry' || timing === 'Area Reached' ? 'Wait for rejection before entry.' : 'Watch the supply area and wait.'}`;
     }
 
     if (atLongZone) {
       const now = zoneState === 'REJECTING'
-        ? 'Price has touched demand and bullish reaction evidence has started.'
+        ? `Price has touched the ${demandArea} and bullish reaction evidence has started.`
         : zoneState === 'TESTING'
-        ? 'Current price/candle is testing demand.'
+        ? `Current price/candle is testing the ${demandArea}.`
         : zoneState === 'APPROACHING'
-        ? 'Price is approaching demand from above but has not touched it yet.'
+        ? `Price is approaching the ${demandArea} from above but has not touched it yet.`
         : 'Price is in a long-side location, but the current candle is not touching a confirmed demand zone.';
       const next = zoneState === 'REJECTING'
-        ? 'The next healthy step is bullish follow-through away from demand.'
+        ? 'The next healthy step is bullish follow-through away from that area.'
         : zoneState === 'TESTING'
-        ? 'The next healthy step is bullish rejection from inside the demand area.'
+        ? 'The next healthy step is bullish rejection from inside that area.'
         : zoneState === 'APPROACHING'
-        ? 'A move slightly lower into demand is normal development, not invalidation.'
-        : 'A move slightly lower into demand is normal development, not invalidation.';
-      return `${now} ${next} The setup is confirmed by a demand tap, bullish rejection, and a structure shift back higher. It weakens if price accepts below demand or current timeframe flow turns bearish. ${zoneState === 'APPROACHING' ? 'Wait for the demand tap first.' : entryStatus === 'Near Entry' || timing === 'Area Reached' ? 'Wait for bullish rejection before entry.' : 'Wait for the demand area.'}`;
+        ? 'A move slightly lower into that area is normal development, not invalidation.'
+        : 'A move slightly lower into that area is normal development, not invalidation.';
+      return `${now} ${next} The setup is confirmed by a demand/support tap, bullish rejection, and a structure shift back higher. It weakens if price accepts below that area or current timeframe flow turns bearish. ${zoneState === 'APPROACHING' ? 'Wait for the demand tap first.' : entryStatus === 'Near Entry' || timing === 'Area Reached' ? 'Wait for bullish rejection before entry.' : 'Wait for the demand area.'}`;
     }
 
     if (timing === 'Reaction Started') {
@@ -4605,6 +4634,12 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       phase: displayPhaseForReport(r),
     });
     const phaseDisplayShort = shortPhaseLabel(displayPhaseForReport(r));
+    const activeZone = activeScoutZoneForReport(r);
+    const activeZoneLabel = activeZone?.type === 'DEMAND' ? 'Active Demand Zone' : activeZone?.type === 'SUPPLY' ? 'Active Supply Zone' : 'Active Zone';
+    const activeZoneColor = activeZone?.type === 'DEMAND' ? 'var(--green)' : 'var(--red)';
+    const activeZoneBorder = activeZone?.type === 'DEMAND' ? 'rgba(0,255,136,0.2)' : 'rgba(255,59,92,0.2)';
+    const activeZoneAccent = activeZone?.type === 'DEMAND' ? 'rgba(0,255,136,0.5)' : 'rgba(255,59,92,0.5)';
+    const activeZoneRange = activeScoutZoneRangeText(r);
 
     return `<div class="setup-card" style="position:relative;">
       <div class="card-body">
@@ -4693,12 +4728,17 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           <div class="expected-path-text">${escapeHtml(expectedPath)}</div>
         </div>
         <div class="scout-levels">
+          ${activeZone ? `
+          <div class="scout-level-box" style="border-color:${activeZoneBorder};border-left:3px solid ${activeZoneAccent};">
+            <div class="scout-level-label">${activeZoneLabel}</div>
+            <div class="scout-level-value" style="color:${activeZoneColor}">${activeZoneRange}</div>
+          </div>` : ''}
           <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
-            <div class="scout-level-label">Nearest Supply / Resistance</div>
+            <div class="scout-level-label">Nearest Resistance</div>
             <div class="scout-level-value" style="color:var(--red)">${f(r.nearestResistance)}</div>
           </div>
           <div class="scout-level-box" style="border-color:rgba(0,255,136,0.2);border-left:3px solid rgba(0,255,136,0.5);">
-            <div class="scout-level-label">Nearest Demand / Support</div>
+            <div class="scout-level-label">Nearest Support</div>
             <div class="scout-level-value" style="color:var(--green)">${f(r.nearestSupport)}</div>
           </div>
         </div>

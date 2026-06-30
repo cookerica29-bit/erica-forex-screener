@@ -777,6 +777,20 @@ function formatScoutLevel(value: number | null) {
   return value >= 100 ? value.toFixed(3) : value.toFixed(5);
 }
 
+function activeScoutZoneRange(report: ScoutReport) {
+  const high = report.activeZoneHigh;
+  const low = report.activeZoneLow;
+  const type = report.activeZoneType === 'DEMAND' || report.activeZoneType === 'SUPPLY' ? report.activeZoneType : null;
+  if (!type || high == null || low == null) return null;
+  const zoneHigh = Math.max(high, low);
+  const zoneLow = Math.min(high, low);
+  return {
+    type,
+    label: type === 'DEMAND' ? 'Active Demand Zone' : 'Active Supply Zone',
+    text: `${formatScoutLevel(zoneLow)}-${formatScoutLevel(zoneHigh)}`,
+  };
+}
+
 function shortScoutStateText(state: string) {
   return ({
     'Entry Proven': 'Entry Ready',
@@ -833,22 +847,25 @@ function entryTimingReasonDisplay(report: ScoutReport) {
   const state = report.entryTimingState || 'Not Ready';
   const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
   const zoneState = zoneTouchStateForScout(report);
+  const activeZone = activeScoutZoneRange(report);
+  const demandArea = activeZone?.type === 'DEMAND' ? `support/demand area around ${activeZone.text}` : 'demand';
+  const supplyArea = activeZone?.type === 'SUPPLY' ? `supply/resistance area around ${activeZone.text}` : 'supply';
   if (state === 'Reaction Started' && report.decisionLevelConfirmed === true) {
     return 'Decision level is confirmed and reaction is developing. Wait for the entry trigger before treating this as active.';
   }
   if (zoneState === 'REJECTING') {
-    if (direction === 'SHORT') return 'Price has touched supply and bearish reaction evidence has started. Wait for entry trigger before treating this as active.';
-    if (direction === 'LONG') return 'Price has touched demand and bullish reaction evidence has started. Wait for entry trigger before treating this as active.';
+    if (direction === 'SHORT') return `Price has touched the ${supplyArea} and bearish reaction evidence has started. Wait for entry trigger before treating this as active.`;
+    if (direction === 'LONG') return `Price has touched the ${demandArea} and bullish reaction evidence has started. Wait for entry trigger before treating this as active.`;
     return 'Price has touched the zone and reaction evidence has started. Wait for entry trigger before treating this as active.';
   }
   if (zoneState === 'TESTING') {
-    if (direction === 'SHORT') return 'Current price/candle is touching supply. Wait for bearish rejection before entry.';
-    if (direction === 'LONG') return 'Current price/candle is touching demand. Wait for bullish rejection before entry.';
+    if (direction === 'SHORT') return `Current price/candle is touching the ${supplyArea}. Wait for bearish rejection before entry.`;
+    if (direction === 'LONG') return `Current price/candle is touching the ${demandArea}. Wait for bullish rejection before entry.`;
     return 'Current price/candle is touching the zone. Wait for rejection before entry.';
   }
   if (zoneState === 'APPROACHING') {
-    if (direction === 'SHORT') return 'Price is below supply and approaching the zone, but it has not touched supply yet.';
-    if (direction === 'LONG') return 'Price is above demand and approaching the zone, but it has not touched demand yet.';
+    if (direction === 'SHORT') return `Price is below the ${supplyArea} and approaching the zone, but it has not touched it yet.`;
+    if (direction === 'LONG') return `Price is above the ${demandArea} and approaching the zone, but it has not touched it yet.`;
     return 'Price is approaching the zone, but it has not touched it yet.';
   }
   if (state === 'Reaction Started') {
@@ -985,9 +1002,11 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const actionLine = isEntryAlert
       ? 'Next: Entry trigger started for review'
       : `Next: ${scoutState.action}`;
+    const activeZone = activeScoutZoneRange(report);
+    const activeZoneLine = activeZone ? `\n${activeZone.label}: ${activeZone.text}` : '';
     const tradePlanLines = isEntryAlert
-      ? `\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}`
-      : `\nDecision Level: ${formatScoutLevel(report.decisionLevel ?? null)}\nDecision Status: ${report.decisionLevelConfirmed ? 'Confirmed' : 'Waiting'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}`;
+      ? `${activeZoneLine}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}`
+      : `${activeZoneLine}\nDecision Level: ${formatScoutLevel(report.decisionLevel ?? null)}\nDecision Status: ${report.decisionLevelConfirmed ? 'Confirmed' : 'Waiting'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}`;
     const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nStatus: ${stateDisplay}\nInternal Grade: ${report.setupGrade || 'C'}\nDevelopment: ${setupStatus}\nZone Status: ${timingDisplayShort}\n${actionLine}\nEntry Ready: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nNow: ${report.setupTimeframeDirection}\nMarket Type: ${phaseDisplayShort}\nStructure: ${reversalText}\nLocation: ${report.zone}\nRaw Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}${tradePlanLines}\nTimeframe: ${report.timeframe}\nReason: ${entryTimingReasonDisplay(report)}\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
