@@ -976,6 +976,9 @@ export interface ScoutReport {
   activeZoneLow: number | null;
   currentCandleHigh: number | null;
   currentCandleLow: number | null;
+  decisionLevel: number | null;
+  decisionLevelConfirmed: boolean;
+  decisionLevelReason: string;
   entrySource: string;
   slSource: string;
   tp1Source: string;
@@ -1556,6 +1559,7 @@ function evaluateScoutForEval(
   setupGrade: SetupGrade,
   setupStatus: string,
   reversalConfirmed: boolean,
+  decisionLevelConfirmed: boolean,
   entryStatus: EntryStatus,
   distanceFromEntryAtr: number | null,
   entry: number | null,
@@ -1578,6 +1582,7 @@ function evaluateScoutForEval(
   if (!locationAligned) failures.push('location is not aligned with trade direction');
   if (!reversalConfirmed) failures.push('reversal is not confirmed yet');
   if (!confirmationStarted) failures.push('confirmation has not started');
+  if (!decisionLevelConfirmed) failures.push('nearest decision level has not broken yet');
   if (distanceFromEntryAtr === null || distanceFromEntryAtr > 0.25) failures.push('entry is outside Tradeable distance');
   if (entry === null || sl === null || tp1 === null) failures.push('entry, SL, or TP1 is missing');
   if (rrRatio === null || rrRatio < MIN_EVAL_RR) failures.push(`R:R is below ${MIN_EVAL_RR.toFixed(1)}`);
@@ -1591,7 +1596,7 @@ function evaluateScoutForEval(
 
   return {
     evalEligible: true,
-    evalReason: `Eval eligible: A/B setup, trend is aligned or mixed without conflict, location aligns, reversal confirmed, confirmation started, entry is Tradeable, and R:R is at least ${MIN_EVAL_RR.toFixed(1)}.`,
+    evalReason: `Eval eligible: A/B setup, trend is aligned or mixed without conflict, location aligns, reversal confirmed, confirmation started, nearest decision level broke, entry is Tradeable, and R:R is at least ${MIN_EVAL_RR.toFixed(1)}.`,
   };
 }
 
@@ -1642,6 +1647,64 @@ function evaluateTrendWatch(
   };
 }
 
+function evaluateDecisionLevelConfirmation(
+  candles: Candle[],
+  tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
+  nearestSupport: number | null,
+  nearestResistance: number | null,
+  atr: number
+) {
+  const last = candles.at(-1);
+  const prior = candles.at(-2);
+  const recent = candles.slice(-6);
+  const atrBuffer = Math.max(atr * 0.03, 0.00001);
+  if (!last || tradeDirection === 'NEUTRAL') {
+    return {
+      decisionLevel: null,
+      decisionLevelConfirmed: false,
+      decisionLevelReason: 'no trade direction is available for decision-level confirmation.',
+    };
+  }
+
+  if (tradeDirection === 'SHORT') {
+    const level = nearestSupport;
+    if (level === null) {
+      return {
+        decisionLevel: null,
+        decisionLevelConfirmed: false,
+        decisionLevelReason: 'nearest support is not available for short confirmation.',
+      };
+    }
+    const recentCloseBelow = recent.some(c => c.c < level - atrBuffer);
+    const brokeFromAbove = Boolean(prior && prior.c >= level && last.c < level - atrBuffer);
+    return {
+      decisionLevel: roundPrice(level),
+      decisionLevelConfirmed: recentCloseBelow || brokeFromAbove,
+      decisionLevelReason: recentCloseBelow || brokeFromAbove
+        ? `price recently closed below nearest support ${roundPrice(level)}.`
+        : `price has not closed below nearest support ${roundPrice(level)} yet.`,
+    };
+  }
+
+  const level = nearestResistance;
+  if (level === null) {
+    return {
+      decisionLevel: null,
+      decisionLevelConfirmed: false,
+      decisionLevelReason: 'nearest resistance is not available for long confirmation.',
+    };
+  }
+  const recentCloseAbove = recent.some(c => c.c > level + atrBuffer);
+  const brokeFromBelow = Boolean(prior && prior.c <= level && last.c > level + atrBuffer);
+  return {
+    decisionLevel: roundPrice(level),
+    decisionLevelConfirmed: recentCloseAbove || brokeFromBelow,
+    decisionLevelReason: recentCloseAbove || brokeFromBelow
+      ? `price recently closed above nearest resistance ${roundPrice(level)}.`
+      : `price has not closed above nearest resistance ${roundPrice(level)} yet.`,
+  };
+}
+
 function classifyEntryTiming(
   tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
   setupTimeframeDirection: DirectionLabel,
@@ -1649,6 +1712,8 @@ function classifyEntryTiming(
   setupGrade: SetupGrade,
   setupStatus: string,
   reversalConfirmed: boolean,
+  decisionLevelConfirmed: boolean,
+  decisionLevelReason: string,
   entryStatus: EntryStatus,
   confirmationScore: number,
   pullbackCompleted: boolean,
@@ -1679,17 +1744,19 @@ function classifyEntryTiming(
     };
   }
 
-  if (entryStatus === 'Tradeable' && reversalConfirmed && confirmationStarted) {
+  if (entryStatus === 'Tradeable' && reversalConfirmed && confirmationStarted && decisionLevelConfirmed) {
     return {
       entryTimingState: 'Entry Triggered' as EntryTimingState,
-      entryTimingReason: 'Entry trigger started: price is tradeable, reversal is confirmed, and confirmation has started.',
+      entryTimingReason: `Entry trigger started: price is tradeable, reversal is confirmed, confirmation has started, and ${decisionLevelReason}`,
     };
   }
 
   if (entryNearby && reactionStarted) {
     return {
       entryTimingState: 'Reaction Started' as EntryTimingState,
-      entryTimingReason: 'Reaction started: price is near the area and reversal/reaction evidence is developing. Wait for entry trigger.',
+      entryTimingReason: decisionLevelConfirmed
+        ? 'Reaction started: price is near the area and decision-level confirmation is developing. Wait for entry trigger.'
+        : `Reaction started: price is near the area, but ${decisionLevelReason} Wait for decision-level confirmation before entry.`,
     };
   }
 
@@ -2545,6 +2612,13 @@ export function scoutAnalyzeCandles(
     planQuality = 'Usable';
     planQualityReason = 'Plan has complete levels and at least 2R, but current timeframe flow still needs alignment.';
   }
+  const decisionLevelConfirmation = evaluateDecisionLevelConfirmation(
+    candles,
+    tradeDirection,
+    nearestSupport,
+    nearestResistance,
+    atr
+  );
   const entryTiming = classifyEntryTiming(
     tradeDirection,
     trendSetupPhase.setupTimeframeDirection,
@@ -2552,6 +2626,8 @@ export function scoutAnalyzeCandles(
     setupGrade.setupGrade,
     setupStatusForGrade,
     reversalConfirmation.reversalConfirmed,
+    decisionLevelConfirmation.decisionLevelConfirmed,
+    decisionLevelConfirmation.decisionLevelReason,
     entryDistance.entryStatus,
     trendConfirmation.confirmationScore,
     pullbackCompletion.pullbackCompleted,
@@ -2576,6 +2652,7 @@ export function scoutAnalyzeCandles(
     setupGrade.setupGrade,
     setupStatusForGrade,
     reversalConfirmation.reversalConfirmed,
+    decisionLevelConfirmation.decisionLevelConfirmed,
     entryDistance.entryStatus,
     entryDistance.distanceFromEntryAtr,
     entry,
@@ -2628,6 +2705,7 @@ export function scoutAnalyzeCandles(
     ...trendSetupPhase,
     ...entryDistance,
     ...scoutZoneTouch,
+    ...decisionLevelConfirmation,
     entrySource,
     slSource,
     tp1Source,

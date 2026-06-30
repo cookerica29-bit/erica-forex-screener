@@ -4593,6 +4593,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           <div class="setup-status-reason">SL Source: ${escapeHtml(r.slSource || 'Unknown')}</div>
           <div class="setup-status-reason">TP1 Source: ${escapeHtml(r.tp1Source || 'Unknown')}</div>
           <div class="setup-status-reason">TP2 Source: ${escapeHtml(r.tp2Source || 'Unknown')}</div>
+          <div class="setup-status-reason">Decision Level: ${f(r.decisionLevel)} · ${r.decisionLevelConfirmed ? 'Confirmed' : 'Waiting'} — ${escapeHtml(r.decisionLevelReason || 'Waiting for decision-level confirmation.')}</div>
           <div class="setup-status-reason">Plan Quality: ${escapeHtml(planQualityReason)}</div>
         </div>` : `<div class="entry-note">${escapeHtml(entryDistanceText)} Suggested Entry / SL / TP hidden until price is within 0.5 ATR.</div>`}
         <details class="diagnostics">
@@ -4683,6 +4684,14 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
               <div class="scout-level-box">
                 <div class="scout-level-label">TP1 Source</div>
                 <div class="scout-level-value">${escapeHtml(r.tp1Source || 'Unknown')}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Decision Level</div>
+                <div class="scout-level-value">${f(r.decisionLevel)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Decision Confirmed</div>
+                <div class="scout-level-value" style="color:${r.decisionLevelConfirmed ? 'var(--green)' : 'var(--gold)'}">${r.decisionLevelConfirmed ? 'Yes' : 'Waiting'}</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Daily Trend</div>
