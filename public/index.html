@@ -755,23 +755,23 @@
   <div class="stat-box"><div class="stat-value" id="s-bullish" style="color:var(--green)">—</div><div class="stat-label">Bullish</div></div>
   <div class="stat-box"><div class="stat-value" id="s-bearish" style="color:var(--red)">—</div><div class="stat-label">Bearish</div></div>
   <div class="stat-box"><div class="stat-value" id="s-mixed" style="color:var(--slate)">—</div><div class="stat-label">Mixed</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-review-now" style="color:var(--green)">—</div><div class="stat-label">Entry Proven</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-action-watch" style="color:var(--gold)">—</div><div class="stat-label">Decision Pending</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-monitor" style="color:var(--blue)">—</div><div class="stat-label">At Watch Area</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-review-now" style="color:var(--green)">—</div><div class="stat-label">Entry Ready</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-action-watch" style="color:var(--gold)">—</div><div class="stat-label">Needs Break</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-monitor" style="color:var(--blue)">—</div><div class="stat-label">Watching Zone</div></div>
   <div class="stat-box"><div class="stat-value" id="s-trend-watch" style="color:#22d3ee">—</div><div class="stat-label">Trend Watch</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-low-priority" style="color:var(--slate)">—</div><div class="stat-label">Lower Priority</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-low-priority" style="color:var(--slate)">—</div><div class="stat-label">Skip / Low</div></div>
 </div>
 
 <div class="filter-row">
   <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
   <select class="filter-select" id="actionFilter" onchange="renderSetups()" aria-label="Action filter">
-    <option value="ALL">Scout State: All</option>
-    <option value="Entry Proven">Scout State: Entry Proven</option>
-    <option value="Decision Pending">Scout State: Decision Pending</option>
-    <option value="At Watch Area">Scout State: At Watch Area</option>
-    <option value="Trend Watch">Scout State: Trend Watch</option>
-    <option value="Market Read">Scout State: Market Read</option>
-    <option value="Lower Priority">Scout State: Lower Priority</option>
+    <option value="ALL">Status: All</option>
+    <option value="Entry Proven">Status: Entry Ready</option>
+    <option value="Decision Pending">Status: Needs Break</option>
+    <option value="At Watch Area">Status: Watching Zone</option>
+    <option value="Trend Watch">Status: Trend Watch</option>
+    <option value="Market Read">Status: Observe</option>
+    <option value="Lower Priority">Status: Skip / Low</option>
   </select>
   <select class="filter-select" id="entryStatusFilter" onchange="renderSetups()" aria-label="Entry status filter">
     <option value="ALL">Decision: All</option>
@@ -794,13 +794,13 @@
     <option value="Bearish">Trend: Bearish</option>
     <option value="Mixed">Trend: Mixed</option>
   </select>
-  <select class="filter-select" id="phaseFilter" onchange="renderSetups()" aria-label="Phase filter">
-    <option value="ALL">Phase: All Phases</option>
-    <option value="Trend Move">Phase: Trend Move</option>
-    <option value="Pullback">Phase: Pullback</option>
-    <option value="Recovery">Phase: Recovery</option>
-    <option value="Reversal Forming">Phase: Reversal Forming</option>
-    <option value="Transition">Phase: Transition</option>
+  <select class="filter-select" id="phaseFilter" onchange="renderSetups()" aria-label="Market type filter">
+    <option value="ALL">Market Type: All</option>
+    <option value="Trend Move">Market Type: Trending</option>
+    <option value="Pullback">Market Type: Pullback</option>
+    <option value="Recovery">Market Type: Recovery</option>
+    <option value="Reversal Forming">Market Type: Reversal Forming</option>
+    <option value="Transition">Market Type: Choppy / Mixed</option>
   </select>
   <select class="filter-select" id="setupStatusFilter" onchange="renderSetups()" aria-label="Setup status filter">
     <option value="ALL">Development: All</option>
@@ -2369,6 +2369,62 @@
     return { value: 'Market Read', label: '⚫ MARKET READ', className: 'low-priority' };
   }
 
+  function shortScoutStateLabel(label) {
+    return ({
+      'Entry Proven': 'Entry Ready',
+      'Decision Pending': 'Needs Break',
+      'At Watch Area': 'Watching Zone',
+      'Trend Watch': 'Trend Watch',
+      'Market Read': 'Observe',
+      'Lower Priority': 'Skip / Low',
+    })[label] || label || 'Observe';
+  }
+
+  function shortActionBadgeLabel(label) {
+    return String(label || '')
+      .replace('ENTRY PROVEN', 'ENTRY READY')
+      .replace('DECISION PENDING', 'NEEDS BREAK')
+      .replace('AT WATCH AREA', 'WATCHING ZONE')
+      .replace('LOWER PRIORITY', 'SKIP / LOW')
+      .replace('MARKET READ', 'OBSERVE');
+  }
+
+  function shortActionLabel(action) {
+    return String(action || '')
+      .replace('Review the active entry plan.', 'Review the entry plan.')
+      .replace('Wait for price to confirm below nearby support.', 'Wait for a break below support.')
+      .replace('Wait for price to confirm above nearby resistance.', 'Wait for a break above resistance.')
+      .replace('Wait for a clear decision-level break.', 'Wait for a decision-level break.')
+      .replace('Watch the key levels; no entry yet.', 'Watch the zone. No entry yet.')
+      .replace('Track the trend and wait for a pullback or decision break.', 'Track trend. Wait for pullback or break.')
+      .replace('Do not force a trade.', 'Skip unless it improves.')
+      .replace('Observe only.', 'Observe only.');
+  }
+
+  function shortPhaseLabel(phase) {
+    return ({
+      'Trend Move': 'Trending',
+      'Pullback': 'Pullback',
+      'Recovery': 'Recovery',
+      'Reversal Forming': 'Reversal Forming',
+      'Transition': 'Choppy / Mixed',
+    })[phase] || phase || 'Choppy / Mixed';
+  }
+
+  function shortTimingLabel(label) {
+    return String(label || 'Waiting')
+      .replace('Entry Triggered', 'Entry Ready')
+      .replace('Rejecting Demand / Reaction Started', 'Demand Reaction')
+      .replace('Rejecting Supply / Reaction Started', 'Supply Reaction')
+      .replace('Testing Demand', 'At Demand')
+      .replace('Testing Supply', 'At Supply')
+      .replace('Approaching Demand', 'Near Demand')
+      .replace('Approaching Supply', 'Near Supply')
+      .replace('Reaction Started', 'Reaction Started')
+      .replace('Area Reached', 'At Zone')
+      .replace('Not Ready', 'Waiting');
+  }
+
   function scoutStateForReport(r) {
     const direction = tradeDirectionForReport(r);
     const timing = r.entryTimingState || 'Not Ready';
@@ -2439,20 +2495,20 @@
     const timingState = r.entryTimingState || 'Not Ready';
     const zoneLabel = zoneTimingLabelForReport(r);
     if (timingState === 'Entry Triggered' && r.decisionLevelConfirmed === true) {
-      return 'Entry Proven — Review Plan';
+      return 'Entry Ready — Review Plan';
     }
     if (timingState === 'Reaction Started') {
-      return zoneLabel ? `Decision Pending — ${zoneLabel}` : 'Decision Pending — Reaction Started';
+      return zoneLabel ? `Needs Break — ${shortTimingLabel(zoneLabel)}` : 'Needs Break — Reaction Started';
     }
     if (timingState === 'Area Reached') {
-      if (zoneLabel) return `At Watch Area — ${zoneLabel}`;
-      if (direction === 'LONG') return 'At Watch Area — Approaching Demand';
-      if (direction === 'SHORT') return 'At Watch Area — Approaching Supply';
-      return 'At Watch Area';
+      if (zoneLabel) return `Watching Zone — ${shortTimingLabel(zoneLabel)}`;
+      if (direction === 'LONG') return 'Watching Zone — Near Demand';
+      if (direction === 'SHORT') return 'Watching Zone — Near Supply';
+      return 'Watching Zone';
     }
     if (r.trendWatchEligible === true) return 'Trend Watch — Track Pullback';
-    if ((r.setupGrade || 'C') === 'C') return 'Lower Priority — Do Not Force';
-    return 'Market Read — Observe';
+    if ((r.setupGrade || 'C') === 'C') return 'Skip / Low — Needs Improvement';
+    return 'Observe';
   }
 
   function tradeDirectionForReport(r) {
@@ -2593,7 +2649,7 @@
       if (row.decisionLevelConfirmed === true) acc.DecisionConfirmed = (acc.DecisionConfirmed || 0) + 1;
       return acc;
     }, {});
-    return `Entry Proven: ${counts['Entry Proven'] || 0} | Decision Pending: ${counts['Decision Pending'] || 0} | Decision Confirmed: ${counts.DecisionConfirmed || 0} | Trend Watch: ${counts['Trend Watch'] || 0}`;
+    return `Entry Ready: ${counts['Entry Proven'] || 0} | Needs Break: ${counts['Decision Pending'] || 0} | Decision Confirmed: ${counts.DecisionConfirmed || 0} | Trend Watch: ${counts['Trend Watch'] || 0}`;
   }
 
   function matchesLocationFilter(zone, filter) {
@@ -4446,21 +4502,25 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     const evalEligible = r.evalEligible === true;
     const lowRr = !meetsMinScoutRr(r);
     const trendWatch = r.trendWatchEligible === true;
-    const evalLabel = evalEligible ? 'Entry Proven' : trendWatch ? 'Trend Watch' : 'Not Proven';
+    const evalLabel = evalEligible ? 'Entry Ready' : trendWatch ? 'Trend Watch' : 'No Entry Yet';
     const evalColor = evalEligible ? 'var(--green)' : trendWatch ? '#22d3ee' : 'var(--gold)';
     const evalReason = evalEligible
       ? (r.evalReason || 'Entry is proven and ready for review.')
       : trendWatch
         ? (r.trendWatchReason || 'Trend watch only: direction and current timeframe flow align, but entry still needs live confirmation.')
         : r.evalReason || (lowRr
-          ? 'Not proven: Scout R:R is below 2.0.'
-          : 'Not proven until trend, location, reversal, confirmation, decision level, and entry distance all align.');
+          ? 'No entry yet: Scout R:R is below 2.0.'
+          : 'No entry yet until trend, location, reversal, confirmation, decision level, and entry distance all align.');
     const proofReason = String(evalReason || '')
       .replace(/^Watch only:/, 'Not proven:')
-      .replace(/^Eval eligible:/, 'Entry proven:');
+      .replace(/^Not proven:/, 'No entry yet:')
+      .replace(/^Eval eligible:/, 'Entry ready:');
     const rawEntryTimingState = r.entryTimingState || 'Not Ready';
     const entryTimingState = entryTimingDisplayForReport(r);
+    const shortEntryTimingState = shortTimingLabel(entryTimingState);
     const scoutState = scoutStateForReport(r);
+    const scoutStatusDisplay = shortScoutStateLabel(scoutState.label);
+    const scoutActionDisplay = shortActionLabel(scoutState.action);
     const actionPriority = actionPriorityForReport(r);
     const entryTimingReason = entryTimingReasonForReport(r);
     const entryTimingColor = rawEntryTimingState === 'Entry Triggered'
@@ -4470,7 +4530,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
         : rawEntryTimingState === 'Area Reached'
           ? 'var(--gold)'
           : 'var(--slate)';
-    const entryStatusDisplay = evalEligible ? 'Entry Proven' : lowRr ? 'Lower Priority' : entryStatus === 'Tradeable' ? scoutState.label : entryStatus;
+    const entryStatusDisplay = evalEligible ? 'Entry Ready' : lowRr ? 'Skip / Low' : entryStatus === 'Tradeable' ? scoutStatusDisplay : entryStatus;
     const entryStatusDisplayCls = evalEligible ? 'eval-eligible' : lowRr ? 'low-rr' : entryStatusCls;
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
     const distancePct = Number.isFinite(Number(r.distanceFromEntryPercent)) ? Number(r.distanceFromEntryPercent) : null;
@@ -4496,6 +4556,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       displayTrend,
       phase: displayPhaseForReport(r),
     });
+    const phaseDisplayShort = shortPhaseLabel(displayPhaseForReport(r));
 
     return `<div class="setup-card" style="position:relative;">
       <div class="card-body">
@@ -4514,9 +4575,9 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             </div>
           </div>
           <div style="text-align:right;flex-shrink:0;">
-            <div class="action-badge ${actionPriority.className}">${escapeHtml(actionPriority.label)}</div>
+            <div class="action-badge ${actionPriority.className}">${escapeHtml(shortActionBadgeLabel(actionPriority.label))}</div>
             <div class="entry-status ${entryStatusDisplayCls}">${escapeHtml(entryStatusDisplay)}</div>
-            <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Scout Status</div>
+            <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Status</div>
           </div>
         </div>
         <div class="market-context">
@@ -4525,16 +4586,16 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             <div class="context-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Current Timeframe Flow</div>
+            <div class="context-label">Now</div>
             <div class="context-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Scout State</div>
-            <div class="context-value" style="color:${entryProven ? 'var(--green)' : evalColor}">${escapeHtml(scoutState.label)}</div>
+            <div class="context-label">Status</div>
+            <div class="context-value" style="color:${entryProven ? 'var(--green)' : evalColor}">${escapeHtml(scoutStatusDisplay)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Phase</div>
-            <div class="context-value">${escapeHtml(displayPhaseForReport(r))}</div>
+            <div class="context-label">Market Type</div>
+            <div class="context-value">${escapeHtml(phaseDisplayShort)}</div>
           </div>
           <div class="context-cell">
             <div class="context-label">Context</div>
@@ -4549,23 +4610,23 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             <div class="context-value" style="color:var(--blue)">${f(r.price)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Entry Distance</div>
+            <div class="context-label">Distance</div>
             <div class="context-value">${distanceAtr == null ? '—' : `${distanceAtr.toFixed(2)} ATR`}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Proof</div>
+            <div class="context-label">Entry Proof</div>
             <div class="context-value" style="color:${evalColor}">${escapeHtml(evalLabel)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Timing</div>
-            <div class="context-value" style="color:${entryTimingColor}">${escapeHtml(entryTimingState)}</div>
+            <div class="context-label">Zone Status</div>
+            <div class="context-value" style="color:${entryTimingColor}">${escapeHtml(shortEntryTimingState)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Structure Shift</div>
+            <div class="context-label">Structure</div>
             <div class="context-value" style="color:${reversalConfirmed ? 'var(--green)' : 'var(--gold)'}">${reversalIcon} ${escapeHtml(reversalLabel)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Pine Rejection</div>
+            <div class="context-label">Pine</div>
             <div class="context-value" style="color:${pineConfirmed ? 'var(--green)' : 'var(--slate)'}">${escapeHtml(pineLabel)}</div>
           </div>
         </div>
@@ -4574,9 +4635,9 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           <div class="setup-status-value">${escapeHtml(setupHeadline)}</div>
           <div class="setup-status-reason">${escapeHtml(r.setupGradeReason || setupStatusReason)}</div>
           <div class="setup-status-reason">Timing: ${escapeHtml(entryTimingReason)}</div>
-          <div class="setup-status-reason">Next Action: ${escapeHtml(scoutState.action)}</div>
+          <div class="setup-status-reason">Next: ${escapeHtml(scoutActionDisplay)}</div>
           <div class="setup-status-reason">Proof: ${escapeHtml(proofReason)}</div>
-          <div class="setup-status-reason">Structure Shift: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Structure shift detected.' : 'Waiting for structure shift.'))}</div>
+          <div class="setup-status-reason">Structure: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Structure shift detected.' : 'Waiting for structure shift.'))}</div>
           ${pineConfirmed ? `<div class="setup-status-reason">Pine: ${escapeHtml(pineConfirmation.message || pineConfirmation.rejectionType || 'Supply/demand rejection confirmed.')}</div>` : ''}
         </div>
         <div class="expected-path-box">
@@ -4632,7 +4693,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
         <details class="diagnostics">
           <summary>Details / Diagnostics</summary>
           <div class="diagnostics-body">
-            <div class="context-reason">Trend = higher-timeframe trend. Current Timeframe Flow = scanned timeframe direction. Trade Direction = Entry/SL/TP plan direction.</div>
+            <div class="context-reason">Trend = higher-timeframe direction. Now = current scanned timeframe. Status = what to do with the card.</div>
             ${mixedContextWarning}
             <div class="scout-levels" style="margin-top:8px;">
               <div class="scout-level-box">
@@ -4648,7 +4709,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
                 <div class="scout-level-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Current Timeframe Flow</div>
+                <div class="scout-level-label">Now</div>
                 <div class="scout-level-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
               </div>
               <div class="scout-level-box">
@@ -4656,27 +4717,27 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
                 <div class="scout-level-value" style="color:${gradeColor}">${escapeHtml(grade)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Phase</div>
-                <div class="scout-level-value">${escapeHtml(displayPhaseForReport(r))}</div>
+                <div class="scout-level-label">Market Type</div>
+                <div class="scout-level-value">${escapeHtml(phaseDisplayShort)}</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Development</div>
                 <div class="scout-level-value">${escapeHtml(simpleSetupStatus)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Raw Entry Status</div>
+                <div class="scout-level-label">Raw Status</div>
                 <div class="scout-level-value">${escapeHtml(entryStatusDisplay)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Proof</div>
+                <div class="scout-level-label">Entry Proof</div>
                 <div class="scout-level-value" style="color:${evalColor}">${escapeHtml(evalLabel)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Timing</div>
-                <div class="scout-level-value" style="color:${entryTimingColor}">${escapeHtml(entryTimingState)}</div>
+                <div class="scout-level-label">Zone Status</div>
+                <div class="scout-level-value" style="color:${entryTimingColor}">${escapeHtml(shortEntryTimingState)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Structure Shift</div>
+                <div class="scout-level-label">Structure</div>
                 <div class="scout-level-value" style="color:${reversalConfirmed ? 'var(--green)' : 'var(--gold)'}">${reversalIcon} ${escapeHtml(reversalLabel)}</div>
               </div>
               <div class="scout-level-box">
@@ -4691,7 +4752,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
                 <div class="scout-level-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Current Timeframe Direction</div>
+                <div class="scout-level-label">Now Direction</div>
                 <div class="scout-level-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
               </div>
               <div class="scout-level-box">
@@ -4886,21 +4947,21 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
     const scoutSnapshot = [
       `Trend: ${displayTrendForReport(report)}`,
-      `Current Timeframe Flow: ${report.setupTimeframeDirection || 'Mixed'}`,
-      `Phase: ${displayPhaseForReport(report)}`,
+      `Now: ${report.setupTimeframeDirection || 'Mixed'}`,
+      `Market Type: ${shortPhaseLabel(displayPhaseForReport(report))}`,
       `Context: ${contextLabelForReport(report)}`,
-      `Scout State: ${scoutStateForReport(report).label}`,
+      `Status: ${shortScoutStateLabel(scoutStateForReport(report).label)}`,
       `Internal Grade: ${report.setupGrade || ''}`,
       `Internal Grade Reason: ${report.setupGradeReason || ''}`,
       `Development: ${simpleSetupStatusForReport(report)}`,
       `Raw Entry Status: ${report.entryStatus || 'Waiting'}`,
       `Entry Timing: ${entryTimingDisplayForReport(report)}`,
       `Entry Timing Reason: ${entryTimingReasonForReport(report)}`,
-      `Proof: ${report.evalEligible ? 'Entry Proven' : 'Not Proven'}`,
+      `Entry Proof: ${report.evalEligible ? 'Entry Ready' : 'No Entry Yet'}`,
       `Proof Reason: ${report.evalReason || ''}`,
-      `Structure Shift: ${report.reversalConfirmed ? 'Detected' : 'Not Detected'}`,
-      `Structure Shift Reason: ${report.reversalReason || ''}`,
-      `Pine Rejection: ${report.pineConfirmation ? 'Confirmed' : 'Waiting'}`,
+      `Structure: ${report.reversalConfirmed ? 'Detected' : 'Not Detected'}`,
+      `Structure Reason: ${report.reversalReason || ''}`,
+      `Pine: ${report.pineConfirmation ? 'Confirmed' : 'Waiting'}`,
       `Pine Reason: ${report.pineConfirmation?.message || report.pineConfirmation?.rejectionType || ''}`,
       `Location: ${report.zone || 'FAIR VALUE'}`,
     ].join(' | ');
