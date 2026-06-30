@@ -910,6 +910,14 @@ function entryTimingReasonDisplay(report: ScoutReport) {
   const demandArea = activeZone?.type === 'DEMAND' ? `${zoneSource} support/demand area around ${activeZone.text}` : 'demand';
   const supplyArea = activeZone?.type === 'SUPPLY' ? `${zoneSource} supply/resistance area around ${activeZone.text}` : 'supply';
   if (state === 'Reaction Started' && report.decisionLevelConfirmed === true) {
+    if (zoneState === 'APPROACHING') {
+      if (direction === 'SHORT') {
+        return `Price is below the active ${supplyArea} and approaching it. Decision level is confirmed, but wait for a supply tap and bearish rejection before treating this as active.`;
+      }
+      if (direction === 'LONG') {
+        return `Price is above the active ${demandArea} and approaching it. Decision level is confirmed, but wait for a demand tap and bullish rejection before treating this as active.`;
+      }
+    }
     if (direction === 'SHORT' && activeZone?.type === 'SUPPLY' && report.zoneInteraction === 'SUPPLY_RECLAIM') {
       return `Price is retesting the active ${supplyArea} after trading above it. Decision level is confirmed; wait for the entry trigger before treating this as active.`;
     }
