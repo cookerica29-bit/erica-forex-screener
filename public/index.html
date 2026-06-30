@@ -759,6 +759,7 @@
   <div class="stat-box"><div class="stat-value" id="s-action-watch" style="color:var(--gold)">—</div><div class="stat-label">Needs Break</div></div>
   <div class="stat-box"><div class="stat-value" id="s-monitor" style="color:var(--blue)">—</div><div class="stat-label">Watching Zone</div></div>
   <div class="stat-box"><div class="stat-value" id="s-trend-watch" style="color:#22d3ee">—</div><div class="stat-label">Trend Watch</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-recovery-watch" style="color:#a78bfa">—</div><div class="stat-label">Recovery</div></div>
   <div class="stat-box"><div class="stat-value" id="s-low-priority" style="color:var(--slate)">—</div><div class="stat-label">Skip / Low</div></div>
 </div>
 
@@ -770,6 +771,7 @@
     <option value="Decision Pending">Status: Needs Break</option>
     <option value="At Watch Area">Status: Watching Zone</option>
     <option value="Trend Watch">Status: Trend Watch</option>
+    <option value="Counter Trend Recovery">Status: Counter Trend Recovery</option>
     <option value="Market Read">Status: Observe</option>
     <option value="Lower Priority">Status: Skip / Low</option>
   </select>
@@ -2342,6 +2344,22 @@
       (direction === 'SHORT' && r.setupTimeframeDirection === 'Bearish');
   }
 
+  function isCounterTrendRecoveryForReport(r) {
+    const direction = tradeDirectionForReport(r);
+    const tradeLabel = directionLabelFromTrade(direction);
+    const trend = displayTrendForReport(r);
+    const currentFlow = r.setupTimeframeDirection === 'Neutral' ? 'Mixed' : (r.setupTimeframeDirection || 'Mixed');
+    const timeframe = String(r.timeframe || '').toUpperCase();
+    const locationAligned = (direction === 'LONG' && (r.zone === 'DISCOUNT' || r.zone === 'FAIR VALUE')) ||
+      (direction === 'SHORT' && (r.zone === 'PREMIUM' || r.zone === 'FAIR VALUE'));
+    const counterTrend = tradeLabel !== 'Mixed' && trend !== 'Mixed' && trend !== tradeLabel;
+    const htfEnough = timeframe === 'H1' || timeframe === 'H4';
+    const flowAligned = tradeLabel !== 'Mixed' && currentFlow === tradeLabel;
+    const levelsUsable = r.entry != null && r.sl != null && r.tp1 != null && meetsMinScoutRr(r);
+    const trackable = ['Tradeable', 'Near Entry', 'Waiting', 'Too Far'].includes(r.entryStatus || 'Waiting');
+    return htfEnough && counterTrend && flowAligned && Boolean(r.reversalConfirmed) && locationAligned && levelsUsable && trackable;
+  }
+
   function actionPriorityForReport(r) {
     const grade = r.setupGrade || 'C';
     const timing = r.entryTimingState || 'Not Ready';
@@ -2356,6 +2374,9 @@
     }
     if (r.trendWatchEligible === true) {
       return { value: 'Trend Watch', label: '🔷 TREND WATCH', className: 'trend-watch' };
+    }
+    if (isCounterTrendRecoveryForReport(r)) {
+      return { value: 'Counter Trend Recovery', label: '🟣 COUNTER TREND RECOVERY', className: 'trend-watch' };
     }
     if (!meetsMinScoutRr(r)) {
       return { value: 'Lower Priority', label: '⚪ LOWER PRIORITY', className: 'low-priority' };
@@ -2375,6 +2396,7 @@
       'Decision Pending': 'Needs Break',
       'At Watch Area': 'Watching Zone',
       'Trend Watch': 'Trend Watch',
+      'Counter Trend Recovery': 'Counter Trend Recovery',
       'Market Read': 'Observe',
       'Lower Priority': 'Skip / Low',
     })[label] || label || 'Observe';
@@ -2385,6 +2407,7 @@
       .replace('ENTRY PROVEN', 'ENTRY READY')
       .replace('DECISION PENDING', 'NEEDS BREAK')
       .replace('AT WATCH AREA', 'WATCHING ZONE')
+      .replace('COUNTER TREND RECOVERY', 'COUNTER TREND RECOVERY')
       .replace('LOWER PRIORITY', 'SKIP / LOW')
       .replace('MARKET READ', 'OBSERVE');
   }
@@ -2464,6 +2487,13 @@
         action: 'Track the trend and wait for a pullback or decision break.',
       };
     }
+    if (isCounterTrendRecoveryForReport(r)) {
+      const targetZone = direction === 'LONG' ? 'supply/resistance' : direction === 'SHORT' ? 'demand/support' : 'the next opposing zone';
+      return {
+        label: 'Counter Trend Recovery',
+        action: `Track recovery into ${targetZone}. No trend-following entry.`,
+      };
+    }
     return {
       label: 'Market Read',
       action: 'Observe only.',
@@ -2507,6 +2537,11 @@
       return 'Watching Zone';
     }
     if (r.trendWatchEligible === true) return 'Trend Watch — Track Pullback';
+    if (isCounterTrendRecoveryForReport(r)) return direction === 'LONG'
+      ? 'Counter Trend Recovery — Track To Supply'
+      : direction === 'SHORT'
+      ? 'Counter Trend Recovery — Track To Demand'
+      : 'Counter Trend Recovery';
     if ((r.setupGrade || 'C') === 'C') return 'Skip / Low — Needs Improvement';
     return 'Observe';
   }
@@ -2649,7 +2684,7 @@
       if (row.decisionLevelConfirmed === true) acc.DecisionConfirmed = (acc.DecisionConfirmed || 0) + 1;
       return acc;
     }, {});
-    return `Entry Ready: ${counts['Entry Proven'] || 0} | Needs Break: ${counts['Decision Pending'] || 0} | Decision Confirmed: ${counts.DecisionConfirmed || 0} | Trend Watch: ${counts['Trend Watch'] || 0}`;
+    return `Entry Ready: ${counts['Entry Proven'] || 0} | Needs Break: ${counts['Decision Pending'] || 0} | Recovery: ${counts['Counter Trend Recovery'] || 0} | Trend Watch: ${counts['Trend Watch'] || 0}`;
   }
 
   function matchesLocationFilter(zone, filter) {
@@ -2676,6 +2711,7 @@
     document.getElementById('s-action-watch').textContent = all.filter(s => actionPriorityForReport(s).value === 'Decision Pending').length;
     document.getElementById('s-monitor').textContent = all.filter(s => actionPriorityForReport(s).value === 'At Watch Area').length;
     document.getElementById('s-trend-watch').textContent = all.filter(s => actionPriorityForReport(s).value === 'Trend Watch').length;
+    document.getElementById('s-recovery-watch').textContent = all.filter(s => actionPriorityForReport(s).value === 'Counter Trend Recovery').length;
     document.getElementById('s-low-priority').textContent = all.filter(s => actionPriorityForReport(s).value === 'Lower Priority').length;
     const main = document.getElementById('mainContent');
     if (!all.length) {
