@@ -2365,6 +2365,51 @@
     return { value: 'Low Priority', label: '⚪ LOW PRIORITY', className: 'low-priority' };
   }
 
+  function scoutStateForReport(r) {
+    const direction = tradeDirectionForReport(r);
+    const timing = r.entryTimingState || 'Not Ready';
+    const decisionConfirmed = r.decisionLevelConfirmed === true;
+    const grade = r.setupGrade || 'C';
+    if (timing === 'Entry Triggered' && decisionConfirmed) {
+      return {
+        label: 'Entry Proven',
+        action: 'Review the active entry plan.',
+      };
+    }
+    if (grade === 'C') {
+      return {
+        label: 'Lower Priority',
+        action: 'Do not force a trade.',
+      };
+    }
+    if (timing === 'Reaction Started') {
+      return {
+        label: 'Decision Pending',
+        action: direction === 'SHORT'
+          ? 'Wait for price to confirm below nearby support.'
+          : direction === 'LONG'
+          ? 'Wait for price to confirm above nearby resistance.'
+          : 'Wait for a clear decision-level break.',
+      };
+    }
+    if (timing === 'Area Reached') {
+      return {
+        label: 'At Watch Area',
+        action: 'Watch the key levels; no entry yet.',
+      };
+    }
+    if (r.trendWatchEligible === true) {
+      return {
+        label: 'Trend Watch',
+        action: 'Track the trend and wait for a pullback or decision break.',
+      };
+    }
+    return {
+      label: 'Market Read',
+      action: 'Monitor only.',
+    };
+  }
+
   function zoneTouchStateForReport(r) {
     return ['APPROACHING', 'TESTING', 'REJECTING'].includes(r.zoneTouchState) ? r.zoneTouchState : 'NONE';
   }
@@ -4428,6 +4473,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
     const rawEntryTimingState = r.entryTimingState || 'Not Ready';
     const entryTimingState = entryTimingDisplayForReport(r);
+    const scoutState = scoutStateForReport(r);
     const actionPriority = actionPriorityForReport(r);
     const entryTimingReason = entryTimingReasonForReport(r);
     const entryAction = entryActionForReport(r);
@@ -4442,18 +4488,19 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     const entryStatusDisplayCls = evalEligible ? 'eval-eligible' : lowRr ? 'low-rr' : entryStatusCls;
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
     const distancePct = Number.isFinite(Number(r.distanceFromEntryPercent)) ? Number(r.distanceFromEntryPercent) : null;
-    const showTradeLevels = r.entry != null && distanceAtr != null && distanceAtr <= 0.5;
+    const entryProven = rawEntryTimingState === 'Entry Triggered' && r.decisionLevelConfirmed === true;
+    const showTradeLevels = entryProven && r.entry != null && r.sl != null && r.tp1 != null;
     const entryDistanceText = distanceAtr == null
       ? 'No nearby actionable entry zone identified.'
       : `${distanceAtr.toFixed(2)} ATR · ${distancePct != null ? distancePct.toFixed(2) + '%' : '—'} from suggested entry`;
     const planQuality = r.planQuality || 'Weak';
     const planQualityCls = String(planQuality).toLowerCase();
     const planQualityReason = r.planQualityReason || 'Trade plan diagnostics are not available for this card.';
-    const levelPlanNote = evalEligible
+    const levelPlanNote = entryProven
       ? 'Execution levels — entry trigger is active for review.'
       : trendWatch
         ? 'Trend Watch levels only — wait for pullback, continuation, or live rejection confirmation.'
-      : 'Planning levels only — wait for rejection before entry.';
+      : 'Scout levels only — entry/SL/TP stays hidden until the decision level confirms.';
     const contextLabel = contextLabelForReport(r);
     const mixedContextWarning = isDirectionalDisagreement(r)
       ? '<div class="entry-note" style="margin:8px 0 0;">Mixed context — trade direction differs from trend/setup.</div>'
@@ -4496,8 +4543,8 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             <div class="context-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Grade</div>
-            <div class="context-value" style="color:${gradeColor}">${escapeHtml(grade)} Setup</div>
+            <div class="context-label">Scout State</div>
+            <div class="context-value" style="color:${entryProven ? 'var(--green)' : evalColor}">${escapeHtml(scoutState.label)}</div>
           </div>
           <div class="context-cell">
             <div class="context-label">Phase</div>
@@ -4541,7 +4588,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           <div class="setup-status-value">${escapeHtml(setupHeadline)}</div>
           <div class="setup-status-reason">${escapeHtml(r.setupGradeReason || setupStatusReason)}</div>
           <div class="setup-status-reason">Timing: ${escapeHtml(entryTimingReason)}</div>
-          <div class="setup-status-reason">Action: ${escapeHtml(entryAction)}</div>
+          <div class="setup-status-reason">Next Action: ${escapeHtml(scoutState.action)}</div>
           <div class="setup-status-reason">Eval: ${escapeHtml(evalReason)}</div>
           <div class="setup-status-reason">Structure Shift: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Structure shift detected.' : 'Waiting for structure shift.'))}</div>
           ${pineConfirmed ? `<div class="setup-status-reason">Pine: ${escapeHtml(pineConfirmation.message || pineConfirmation.rejectionType || 'Supply/demand rejection confirmed.')}</div>` : ''}
@@ -4595,7 +4642,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           <div class="setup-status-reason">TP2 Source: ${escapeHtml(r.tp2Source || 'Unknown')}</div>
           <div class="setup-status-reason">Decision Level: ${f(r.decisionLevel)} · ${r.decisionLevelConfirmed ? 'Confirmed' : 'Waiting'} — ${escapeHtml(r.decisionLevelReason || 'Waiting for decision-level confirmation.')}</div>
           <div class="setup-status-reason">Plan Quality: ${escapeHtml(planQualityReason)}</div>
-        </div>` : `<div class="entry-note">${escapeHtml(entryDistanceText)} Suggested Entry / SL / TP hidden until price is within 0.5 ATR.</div>`}
+        </div>` : `<div class="entry-note">${escapeHtml(levelPlanNote)} ${escapeHtml(entryDistanceText)} Decision: ${f(r.decisionLevel)} · ${r.decisionLevelConfirmed ? 'Confirmed' : 'Waiting'}.</div>`}
         <details class="diagnostics">
           <summary>Details / Diagnostics</summary>
           <div class="diagnostics-body">

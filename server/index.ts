@@ -842,6 +842,48 @@ function entryActionDisplay(report: ScoutReport) {
   return 'Wait';
 }
 
+function scoutStateDisplay(report: ScoutReport) {
+  const direction = scoutTradeDirection(report);
+  if (report.entryTimingState === 'Entry Triggered' && report.decisionLevelConfirmed === true) {
+    return {
+      state: 'Entry Proven',
+      action: 'Review the active entry plan',
+    };
+  }
+  if (report.setupGrade === 'C') {
+    return {
+      state: 'Lower Priority',
+      action: 'Do not force a trade',
+    };
+  }
+  if (report.entryTimingState === 'Reaction Started') {
+    return {
+      state: 'Decision Pending',
+      action: direction === 'SHORT'
+        ? 'Wait for price to confirm below nearby support'
+        : direction === 'LONG'
+        ? 'Wait for price to confirm above nearby resistance'
+        : 'Wait for a clear decision-level break',
+    };
+  }
+  if (report.entryTimingState === 'Area Reached') {
+    return {
+      state: 'At Watch Area',
+      action: 'Watch the key levels; no entry yet',
+    };
+  }
+  if (report.trendWatchEligible === true) {
+    return {
+      state: 'Trend Watch',
+      action: 'Track the trend and wait for a pullback or decision break',
+    };
+  }
+  return {
+    state: 'Market Read',
+    action: 'Monitor only',
+  };
+}
+
 async function notifyTradeableScoutSignals(reports: ScoutReport[], source: string) {
   const candidates = [
     ...reports.filter(isTradeableScoutSignal).map(report => ({ report, kind: 'entry' as const })),
@@ -891,11 +933,15 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const reversalText = report.reversalConfirmed ? '✅ Detected' : '❌ Not Detected';
     const isEntryAlert = kind === 'entry';
     const timingDisplay = entryTimingDisplay(report);
+    const scoutState = scoutStateDisplay(report);
     const title = isEntryAlert ? '✅ *ENTRY TRIGGERED SCOUT' : `👀 *WATCHLIST — SETUP DEVELOPING`;
     const actionLine = isEntryAlert
       ? 'Action: Entry trigger started for review'
-      : `Action: ${entryActionDisplay(report)} and wait for confirmation on your entry chart`;
-    const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nTiming: ${timingDisplay}\n${actionLine}\nEval Eligible: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nCurrent Timeframe Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nStructure Shift: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${entryTimingReasonDisplay(report)}\n→ https://erica-forex-screener-production.up.railway.app`;
+      : `Action: ${scoutState.action}`;
+    const tradePlanLines = isEntryAlert
+      ? `\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}`
+      : `\nDecision Level: ${formatScoutLevel(report.decisionLevel ?? null)}\nDecision Status: ${report.decisionLevelConfirmed ? 'Confirmed' : 'Waiting'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}`;
+    const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nScout State: ${scoutState.state}\nScout Grade: ${report.setupGrade || 'C'}\nStatus: ${setupStatus}\nTiming: ${timingDisplay}\n${actionLine}\nEval Eligible: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nCurrent Timeframe Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nStructure Shift: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}${tradePlanLines}\nTimeframe: ${report.timeframe}\nReason: ${entryTimingReasonDisplay(report)}\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
       const data = await sendTelegram(text, 'Markdown');
