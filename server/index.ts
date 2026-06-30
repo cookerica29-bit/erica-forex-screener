@@ -925,6 +925,12 @@ function entryTimingReasonDisplay(report: ScoutReport) {
     return 'Decision level is confirmed and reaction is developing. Wait for the entry trigger before treating this as active.';
   }
   if (zoneState === 'REJECTING') {
+    if (direction === 'SHORT' && report.zoneInteraction === 'SUPPLY_RECLAIM') {
+      return `Price is retesting the active ${supplyArea} after trading above it. Wait for bearish rejection before treating this as active.`;
+    }
+    if (direction === 'LONG' && report.zoneInteraction === 'DEMAND_RECLAIM') {
+      return `Price is reclaiming/retesting the active ${demandArea} after trading below it. Wait for bullish rejection before treating this as active.`;
+    }
     if (direction === 'SHORT') return `Price has touched the ${supplyArea} and bearish reaction evidence has started. Wait for entry trigger before treating this as active.`;
     if (direction === 'LONG') return `Price has touched the ${demandArea} and bullish reaction evidence has started. Wait for entry trigger before treating this as active.`;
     return 'Price has touched the zone and reaction evidence has started. Wait for entry trigger before treating this as active.';
