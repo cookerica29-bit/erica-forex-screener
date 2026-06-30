@@ -777,6 +777,41 @@ function formatScoutLevel(value: number | null) {
   return value >= 100 ? value.toFixed(3) : value.toFixed(5);
 }
 
+function shortScoutStateText(state: string) {
+  return ({
+    'Entry Proven': 'Entry Ready',
+    'Decision Pending': 'Needs Break',
+    'At Watch Area': 'Watching Zone',
+    'Trend Watch': 'Trend Watch',
+    'Counter Trend Recovery': 'Counter Trend Recovery',
+    'Market Read': 'Observe',
+    'Lower Priority': 'Skip / Low',
+  } as Record<string, string>)[state] || state || 'Observe';
+}
+
+function shortScoutPhaseText(phase: string) {
+  return ({
+    'Trend Move': 'Trending',
+    'Pullback': 'Pullback',
+    'Recovery': 'Recovery',
+    'Reversal Forming': 'Reversal Forming',
+    'Transition': 'Choppy / Mixed',
+  } as Record<string, string>)[phase] || phase || 'Choppy / Mixed';
+}
+
+function shortScoutTimingText(timing: string) {
+  return String(timing || 'Waiting')
+    .replace('Entry Triggered', 'Entry Ready')
+    .replace('Rejecting Demand / Reaction Started', 'Demand Reaction')
+    .replace('Rejecting Supply / Reaction Started', 'Supply Reaction')
+    .replace('Testing Demand', 'At Demand')
+    .replace('Testing Supply', 'At Supply')
+    .replace('Approaching Demand', 'Near Demand')
+    .replace('Approaching Supply', 'Near Supply')
+    .replace('Area Reached', 'At Zone')
+    .replace('Not Ready', 'Waiting');
+}
+
 function entryTimingDisplay(report: ScoutReport) {
   const state = report.entryTimingState || 'Not Ready';
   const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
@@ -943,14 +978,17 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const isEntryAlert = kind === 'entry';
     const timingDisplay = entryTimingDisplay(report);
     const scoutState = scoutStateDisplay(report);
+    const stateDisplay = shortScoutStateText(scoutState.state);
+    const phaseDisplayShort = shortScoutPhaseText(phaseDisplay);
+    const timingDisplayShort = shortScoutTimingText(timingDisplay);
     const title = isEntryAlert ? '✅ *ENTRY TRIGGERED SCOUT' : `👀 *WATCHLIST — SETUP DEVELOPING`;
     const actionLine = isEntryAlert
-      ? 'Action: Entry trigger started for review'
-      : `Action: ${scoutState.action}`;
+      ? 'Next: Entry trigger started for review'
+      : `Next: ${scoutState.action}`;
     const tradePlanLines = isEntryAlert
       ? `\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}`
       : `\nDecision Level: ${formatScoutLevel(report.decisionLevel ?? null)}\nDecision Status: ${report.decisionLevelConfirmed ? 'Confirmed' : 'Waiting'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}`;
-    const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nScout State: ${scoutState.state}\nScout Grade: ${report.setupGrade || 'C'}\nStatus: ${setupStatus}\nTiming: ${timingDisplay}\n${actionLine}\nEval Eligible: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nCurrent Timeframe Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nStructure Shift: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}${tradePlanLines}\nTimeframe: ${report.timeframe}\nReason: ${entryTimingReasonDisplay(report)}\n→ https://erica-forex-screener-production.up.railway.app`;
+    const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nStatus: ${stateDisplay}\nInternal Grade: ${report.setupGrade || 'C'}\nDevelopment: ${setupStatus}\nZone Status: ${timingDisplayShort}\n${actionLine}\nEntry Ready: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nNow: ${report.setupTimeframeDirection}\nMarket Type: ${phaseDisplayShort}\nStructure: ${reversalText}\nLocation: ${report.zone}\nRaw Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}${tradePlanLines}\nTimeframe: ${report.timeframe}\nReason: ${entryTimingReasonDisplay(report)}\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
       const data = await sendTelegram(text, 'Markdown');
@@ -1518,7 +1556,7 @@ async function notifyPineConfirmation(confirmation: PineConfirmation, report: Sc
   }
 
   const direction = confirmation.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
-  const text = `✅ *ENTRY TRIGGER — Pine Rejection Confirmed*\nPair: ${confirmation.displaySymbol}\nDirection: ${direction}\nTimeframe: ${confirmation.timeframe}\nGrade: ${report.setupGrade} Setup\nTrend: ${displayScoutTrend(report)}\nCurrent Timeframe Flow: ${report.setupTimeframeDirection}\nPhase: ${displayScoutPhase(report)}\nLocation: ${report.zone}\nTiming: ${entryTimingDisplay(report)}\nPine Zone: ${confirmation.zoneType}\nRejection: ${confirmation.rejectionType || 'Confirmed'}\nPrice: ${confirmation.price !== undefined ? formatScoutLevel(confirmation.price) : 'N/A'}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nReason: Scanner setup matched Pine supply/demand rejection.\nMessage: ${confirmation.message || 'Pine rejection confirmed'}\n→ https://erica-forex-screener-production.up.railway.app`;
+  const text = `✅ *ENTRY TRIGGER — Pine Rejection Confirmed*\nPair: ${confirmation.displaySymbol}\nDirection: ${direction}\nTimeframe: ${confirmation.timeframe}\nInternal Grade: ${report.setupGrade}\nTrend: ${displayScoutTrend(report)}\nNow: ${report.setupTimeframeDirection}\nMarket Type: ${shortScoutPhaseText(displayScoutPhase(report))}\nLocation: ${report.zone}\nZone Status: ${shortScoutTimingText(entryTimingDisplay(report))}\nPine Zone: ${confirmation.zoneType}\nRejection: ${confirmation.rejectionType || 'Confirmed'}\nPrice: ${confirmation.price !== undefined ? formatScoutLevel(confirmation.price) : 'N/A'}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nReason: Scanner setup matched Pine supply/demand rejection.\nMessage: ${confirmation.message || 'Pine rejection confirmed'}\n→ https://erica-forex-screener-production.up.railway.app`;
 
   const data = await sendTelegram(text, 'Markdown');
   if (data.ok) pineConfirmationAlerts.set(alertKey, now);
