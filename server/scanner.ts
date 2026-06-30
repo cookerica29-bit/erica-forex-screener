@@ -38,6 +38,8 @@ type StructureLabel = 'HH/HL' | 'LH/LL' | 'Mixed';
 type EntryStatus = 'Waiting' | 'Near Entry' | 'Tradeable' | 'Too Far';
 type SetupGrade = 'A' | 'B' | 'C';
 type EntryTimingState = 'Not Ready' | 'Area Reached' | 'Reaction Started' | 'Entry Triggered';
+type ZoneTouchState = 'NONE' | 'APPROACHING' | 'TESTING' | 'REJECTING';
+const MIN_SCOUT_TP_RR = 2.0;
 const MIN_EVAL_RR = 2.0;
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
 type PullbackStatus =
@@ -104,6 +106,8 @@ export interface Setup {
   setupGradeReason: string;
   evalEligible: boolean;
   evalReason: string;
+  trendWatchEligible: boolean;
+  trendWatchReason: string;
   entryTimingState: EntryTimingState;
   entryTimingReason: string;
   trendDirection: TrendLabel;
@@ -966,6 +970,18 @@ export interface ScoutReport {
   entryStatus: EntryStatus;
   distanceFromEntryAtr: number | null;
   distanceFromEntryPercent: number | null;
+  zoneTouchState: ZoneTouchState;
+  activeZoneType: 'DEMAND' | 'SUPPLY' | null;
+  activeZoneHigh: number | null;
+  activeZoneLow: number | null;
+  currentCandleHigh: number | null;
+  currentCandleLow: number | null;
+  entrySource: string;
+  slSource: string;
+  tp1Source: string;
+  tp2Source: string;
+  planQuality: 'Clean' | 'Usable' | 'Weak';
+  planQualityReason: string;
   // Trade levels — derived from active structure first, with EMA20 only as nearby fallback
   entry: number | null;
   sl: number | null;
@@ -1408,7 +1424,7 @@ function detectReversalConfirmation(
   if (setupTimeframeDirection === neededStructure) {
     return {
       reversalConfirmed: true,
-      reversalReason: `${neededStructure} setup timeframe structure shift is active.`,
+      reversalReason: `${neededStructure} current timeframe structure shift is active.`,
     };
   }
 
@@ -1494,7 +1510,7 @@ function gradeScoutSetup(
     return { setupGrade: 'C' as SetupGrade, setupGradeReason: reason };
   }
 
-  if (trendAligned && locationAligned && confirmationStarted) {
+  if (trendAligned && locationAligned && setupFlowAligned && confirmationStarted) {
     return {
       setupGrade: 'A' as SetupGrade,
       setupGradeReason: reversalConfirmed ? 'Trend and location align; structure shift detected.' : 'Trend and location align; confirmation has started.',
@@ -1504,7 +1520,9 @@ function gradeScoutSetup(
   if (trendAligned && locationAligned) {
     return {
       setupGrade: 'B' as SetupGrade,
-      setupGradeReason: 'Trend and location align, but pullback/reversal is still developing.',
+      setupGradeReason: setupFlowAligned
+        ? 'Trend and location align, but pullback/reversal is still developing.'
+        : 'Trend and location align, but current timeframe flow is not aligned yet.',
     };
   }
 
@@ -1512,7 +1530,7 @@ function gradeScoutSetup(
     return {
       setupGrade: 'B' as SetupGrade,
       setupGradeReason: setupFlowAligned
-        ? 'Daily trend is mixed, but short-term flow and location align for review.'
+        ? 'Daily trend is mixed, but current timeframe flow and location align for review.'
         : 'Daily trend is mixed, but location and reversal evidence are developing.',
     };
   }
@@ -1533,6 +1551,7 @@ function gradeScoutSetup(
 function evaluateScoutForEval(
   tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
   dailyTrendDirection: DirectionLabel,
+  setupTimeframeDirection: DirectionLabel,
   zone: 'PREMIUM' | 'DISCOUNT' | 'FAIR VALUE',
   setupGrade: SetupGrade,
   setupStatus: string,
@@ -1548,12 +1567,14 @@ function evaluateScoutForEval(
   const tradeTrend = tradeDirection === 'LONG' ? 'Bullish' : tradeDirection === 'SHORT' ? 'Bearish' : 'Mixed';
   const trendAligned = tradeTrend !== 'Mixed' && dailyTrendDirection === tradeTrend;
   const trendAcceptable = trendAligned || (tradeTrend !== 'Mixed' && dailyTrendDirection === 'Neutral');
+  const setupFlowAligned = tradeTrend !== 'Mixed' && setupTimeframeDirection === tradeTrend;
   const locationAligned = (tradeDirection === 'LONG' && zone === 'DISCOUNT') || (tradeDirection === 'SHORT' && zone === 'PREMIUM');
   const confirmationStarted = ['Early Confirmation', 'Strong Confirmation', 'Trend Resumption Confirmed'].includes(setupStatus);
 
   if (!['A', 'B'].includes(setupGrade)) failures.push('setup is not A or B grade');
   if (entryStatus !== 'Tradeable') failures.push('entry is not close enough');
   if (!trendAcceptable) failures.push('Daily trend conflicts with trade direction');
+  if (!setupFlowAligned) failures.push('current timeframe flow is not aligned with trade direction');
   if (!locationAligned) failures.push('location is not aligned with trade direction');
   if (!reversalConfirmed) failures.push('reversal is not confirmed yet');
   if (!confirmationStarted) failures.push('confirmation has not started');
@@ -1574,8 +1595,56 @@ function evaluateScoutForEval(
   };
 }
 
+function evaluateTrendWatch(
+  tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
+  dailyTrendDirection: DirectionLabel,
+  h4TrendDirection: DirectionLabel,
+  setupTimeframeDirection: DirectionLabel,
+  entryStatus: EntryStatus,
+  entry: number | null,
+  sl: number | null,
+  tp1: number | null,
+  rrRatio: number | null,
+  evalEligible: boolean
+) {
+  const tradeTrend = tradeDirection === 'LONG' ? 'Bullish' : tradeDirection === 'SHORT' ? 'Bearish' : 'Mixed';
+  const higherTimeframeAligned = tradeTrend !== 'Mixed' && (dailyTrendDirection === tradeTrend || h4TrendDirection === tradeTrend);
+  const setupFlowAligned = tradeTrend !== 'Mixed' && setupTimeframeDirection === tradeTrend;
+  const entryTrackable = ['Tradeable', 'Near Entry', 'Waiting'].includes(entryStatus);
+  const levelsReady = entry !== null && sl !== null && tp1 !== null;
+  const rrReady = rrRatio !== null && rrRatio >= MIN_SCOUT_TP_RR;
+
+  if (evalEligible) {
+    return {
+      trendWatchEligible: false,
+      trendWatchReason: 'Eval eligible setup; no separate trend-watch label needed.',
+    };
+  }
+
+  const failures: string[] = [];
+  if (tradeDirection === 'NEUTRAL') failures.push('trade direction is neutral');
+  if (!higherTimeframeAligned) failures.push('Daily/H4 trend is not aligned with trade direction');
+  if (!setupFlowAligned) failures.push('current timeframe flow is not aligned');
+  if (!entryTrackable) failures.push('entry is too far away');
+  if (!levelsReady) failures.push('entry, SL, or TP1 is missing');
+  if (!rrReady) failures.push(`R:R is below ${MIN_SCOUT_TP_RR.toFixed(1)}`);
+
+  if (failures.length) {
+    return {
+      trendWatchEligible: false,
+      trendWatchReason: `Not trend watch: ${failures.join('; ')}.`,
+    };
+  }
+
+  return {
+    trendWatchEligible: true,
+    trendWatchReason: `Trend Watch: ${tradeTrend} Daily/H4 context and ${setupTimeframeDirection} current timeframe flow align. Watch for pullback, continuation, or live rejection confirmation before any entry.`,
+  };
+}
+
 function classifyEntryTiming(
   tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
+  setupTimeframeDirection: DirectionLabel,
   zone: 'PREMIUM' | 'DISCOUNT' | 'FAIR VALUE',
   setupGrade: SetupGrade,
   setupStatus: string,
@@ -1588,6 +1657,8 @@ function classifyEntryTiming(
   sl: number | null,
   tp1: number | null
 ) {
+  const tradeTrend = tradeDirection === 'LONG' ? 'Bullish' : tradeDirection === 'SHORT' ? 'Bearish' : 'Mixed';
+  const setupFlowAligned = tradeTrend !== 'Mixed' && setupTimeframeDirection === tradeTrend;
   const locationAligned = (tradeDirection === 'LONG' && zone === 'DISCOUNT') || (tradeDirection === 'SHORT' && zone === 'PREMIUM');
   const entryNearby = entryStatus === 'Tradeable' || entryStatus === 'Near Entry';
   const levelsReady = entry !== null && sl !== null && tp1 !== null;
@@ -1598,6 +1669,13 @@ function classifyEntryTiming(
     return {
       entryTimingState: 'Not Ready' as EntryTimingState,
       entryTimingReason: 'Not ready: trade direction, location, grade, or trade levels are not aligned.',
+    };
+  }
+
+  if (!setupFlowAligned && ['Tradeable', 'Near Entry', 'Waiting'].includes(entryStatus)) {
+    return {
+      entryTimingState: 'Area Reached' as EntryTimingState,
+      entryTimingReason: 'Area reached: location is valid, but current timeframe flow is not aligned yet.',
     };
   }
 
@@ -1625,6 +1703,73 @@ function classifyEntryTiming(
   return {
     entryTimingState: 'Not Ready' as EntryTimingState,
     entryTimingReason: 'Not ready: price is too far from the actionable area.',
+  };
+}
+
+function nearestScoutZoneTouch(
+  structures: TrainerStructures,
+  tradeDirection: 'LONG' | 'SHORT' | 'NEUTRAL',
+  candle: Candle,
+  atr: number,
+  reactionStarted: boolean,
+  entryStatus: EntryStatus
+) {
+  const activeZoneType = tradeDirection === 'LONG' ? 'DEMAND' : tradeDirection === 'SHORT' ? 'SUPPLY' : null;
+  if (!activeZoneType) {
+    return {
+      zoneTouchState: 'NONE' as ZoneTouchState,
+      activeZoneType,
+      activeZoneHigh: null,
+      activeZoneLow: null,
+      currentCandleHigh: roundPrice(candle.h),
+      currentCandleLow: roundPrice(candle.l),
+    };
+  }
+
+  const zones = activeZoneType === 'DEMAND' ? structures.demandZones : structures.supplyZones;
+  const atrSafe = Math.max(atr, Math.abs(candle.c) * 0.0001, 0.00001);
+  const zone = zones
+    .slice(-6)
+    .map(z => ({ high: Math.max(z.obHigh, z.obLow), low: Math.min(z.obHigh, z.obLow) }))
+    .sort((a, b) => {
+      const distanceA = candle.c > a.high ? candle.c - a.high : candle.c < a.low ? a.low - candle.c : 0;
+      const distanceB = candle.c > b.high ? candle.c - b.high : candle.c < b.low ? b.low - candle.c : 0;
+      return distanceA - distanceB;
+    })[0] ?? null;
+
+  if (!zone) {
+    return {
+      zoneTouchState: 'NONE' as ZoneTouchState,
+      activeZoneType,
+      activeZoneHigh: null,
+      activeZoneLow: null,
+      currentCandleHigh: roundPrice(candle.h),
+      currentCandleLow: roundPrice(candle.l),
+    };
+  }
+
+  const candleOverlapsZone = candle.l <= zone.high && candle.h >= zone.low;
+  const priceAboveDemand = activeZoneType === 'DEMAND' && candle.c > zone.high;
+  const priceBelowSupply = activeZoneType === 'SUPPLY' && candle.c < zone.low;
+  const closeEnoughToApproach = entryStatus !== 'Too Far' || (
+    activeZoneType === 'DEMAND'
+      ? candle.c - zone.high <= 1.25 * atrSafe
+      : zone.low - candle.c <= 1.25 * atrSafe
+  );
+  const approachingZone = !candleOverlapsZone && closeEnoughToApproach && (priceAboveDemand || priceBelowSupply);
+  const zoneTouchState: ZoneTouchState = candleOverlapsZone
+    ? reactionStarted ? 'REJECTING' : 'TESTING'
+    : approachingZone
+    ? 'APPROACHING'
+    : 'NONE';
+
+  return {
+    zoneTouchState,
+    activeZoneType,
+    activeZoneHigh: roundPrice(zone.high),
+    activeZoneLow: roundPrice(zone.low),
+    currentCandleHigh: roundPrice(candle.h),
+    currentCandleLow: roundPrice(candle.l),
   };
 }
 
@@ -1821,10 +1966,10 @@ function buildTrendSetupPhase(
       : trendDirection === 'Mixed / Transition'
       ? `${trendLabelA} or ${trendLabelB} is neutral/mixed.`
       : isPullbackAgainstTrend
-      ? `${setupTimeframeDirection} setup timeframe is moving against ${trendDirection} higher-timeframe trend.`
+      ? `${setupTimeframeDirection} current timeframe flow is moving against ${trendDirection} higher-timeframe trend.`
       : trendSetupAligned
-      ? `${setupTimeframeDirection} setup timeframe agrees with ${trendDirection} higher-timeframe trend.`
-      : 'Trend or setup timeframe is neutral/mixed.',
+      ? `${setupTimeframeDirection} current timeframe flow agrees with ${trendDirection} higher-timeframe trend.`
+      : 'Trend or current timeframe flow is neutral/mixed.',
     trendSetupAligned,
     isPullbackAgainstTrend,
   };
@@ -2315,60 +2460,65 @@ export function scoutAnalyzeCandles(
   let tp1: number | null = null;
   let tp2: number | null = null;
   let rrRatio: number | null = null;
+  let entrySource = 'No trade direction';
+  let slSource = 'No stop level';
+  let tp1Source = 'No target';
+  let tp2Source = 'No extended target';
 
   if (finalBias !== 'NEUTRAL') {
     const isLong = finalBias === 'BULLISH';
     entry = nearestActiveZoneEntry(candles, finalBias, price, atr, ema20, nearestSupport, nearestResistance);
+    entrySource = isLong
+      ? entry === nearestSupport
+        ? 'Nearest support swing'
+        : entry === ema20
+        ? 'EMA20 fallback'
+        : 'Nearest demand / pullback zone'
+      : entry === nearestResistance
+      ? 'Nearest resistance swing'
+      : entry === ema20
+      ? 'EMA20 fallback'
+      : 'Nearest supply / pullback zone';
 
     if (isLong) {
       const slBase = nearestSupport ?? (entry - 2 * atr);
       sl = roundPrice(Math.min(slBase, entry - atr) - 0.3 * atr);
+      slSource = nearestSupport !== null ? 'Below nearest support with ATR buffer' : 'ATR fallback below entry';
       const risk = Math.abs(entry - sl);
-      // Extended target: first swing high giving >= 2R (current TP behavior).
-      const minTp = entry + Math.max(atr, 2 * risk);
+      const minTp = entry + MIN_SCOUT_TP_RR * risk;
       console.log(`[scout-v2] ${pair} LONG risk=${risk.toFixed(5)} minTp=${minTp.toFixed(5)}`);
-      const firstOpposingTarget = swingHighs
-        .filter(s => s.price > entry && s.price <= minTp)
+      const validTargets = swingHighs
+        .filter(s => s.price >= minTp)
         .sort((a, b) => a.price - b.price)[0]?.price;
-      const extendedTpCandidates = swingHighs
-        .filter(s => s.price > minTp)
+      const tp1Raw = validTargets ?? minTp;
+      const extendedTp = swingHighs
+        .filter(s => s.price > tp1Raw)
         .sort((a, b) => a.price - b.price);
-      const extendedTp1 = extendedTpCandidates[0]?.price;
-      const extendedTp2 = extendedTpCandidates[1]?.price;
-      tp1 = firstOpposingTarget
-        ? roundPrice(firstOpposingTarget)
-        : extendedTp1
-        ? roundPrice(extendedTp1)
-        : roundPrice(entry + 2 * risk);
-      tp2 = firstOpposingTarget && extendedTp1
-        ? roundPrice(extendedTp1)
-        : extendedTp2
-        ? roundPrice(extendedTp2)
-        : roundPrice(entry + 3 * risk);
+      tp1 = roundPrice(tp1Raw);
+      tp1Source = validTargets ? 'Next valid swing high at or above 2R' : '2R fallback target';
+      tp2 = extendedTp[0]?.price
+        ? roundPrice(extendedTp[0].price)
+        : roundPrice(entry + Math.max((MIN_SCOUT_TP_RR + 1) * risk, (tp1Raw - entry) + risk));
+      tp2Source = extendedTp[0]?.price ? 'Next swing high beyond TP1' : 'Extended R fallback beyond TP1';
     } else {
       const slBase = nearestResistance ?? (entry + 2 * atr);
       sl = roundPrice(Math.max(slBase, entry + atr) + 0.3 * atr);
+      slSource = nearestResistance !== null ? 'Above nearest resistance with ATR buffer' : 'ATR fallback above entry';
       const risk = Math.abs(entry - sl);
-      // Extended target: first swing low giving >= 2R (current TP behavior).
-      const minTp = entry - Math.max(atr, 2 * risk);
-      const firstOpposingTarget = swingLows
-        .filter(s => s.price < entry && s.price >= minTp)
+      const minTp = entry - MIN_SCOUT_TP_RR * risk;
+      const validTargets = swingLows
+        .filter(s => s.price <= minTp)
         .sort((a, b) => b.price - a.price)[0]?.price;
-      const extendedTpCandidates = swingLows
-        .filter(s => s.price < minTp)
+      const tp1Raw = validTargets ?? minTp;
+      const extendedTp = swingLows
+        .filter(s => s.price < tp1Raw)
         .sort((a, b) => b.price - a.price);
-      const extendedTp1 = extendedTpCandidates[0]?.price;
-      const extendedTp2 = extendedTpCandidates[1]?.price;
-      tp1 = firstOpposingTarget
-        ? roundPrice(firstOpposingTarget)
-        : extendedTp1
-        ? roundPrice(extendedTp1)
-        : roundPrice(entry - 2 * risk);
-      tp2 = firstOpposingTarget && extendedTp1
-        ? roundPrice(extendedTp1)
-        : extendedTp2
-        ? roundPrice(extendedTp2)
-        : roundPrice(entry - 3 * risk);
+      tp1 = roundPrice(tp1Raw);
+      tp1Source = validTargets ? 'Next valid swing low at or below 2R' : '2R fallback target';
+      tp2 = extendedTp[0]?.price
+        ? roundPrice(extendedTp[0].price)
+        : roundPrice(entry - Math.max((MIN_SCOUT_TP_RR + 1) * risk, (entry - tp1Raw) + risk));
+      tp2Source = extendedTp[0]?.price ? 'Next swing low beyond TP1' : 'Extended R fallback beyond TP1';
     }
 
     if (entry !== null && sl !== null && tp1 !== null) {
@@ -2378,8 +2528,26 @@ export function scoutAnalyzeCandles(
     }
   }
   const entryDistance = classifyEntryDistance(price, entry, atr);
+  const tradeTrendForPlan = tradeDirection === 'LONG' ? 'Bullish' : tradeDirection === 'SHORT' ? 'Bearish' : 'Mixed';
+  const setupFlowAlignedForPlan = tradeTrendForPlan !== 'Mixed' && trendSetupPhase.setupTimeframeDirection === tradeTrendForPlan;
+  const levelsReadyForPlan = entry !== null && sl !== null && tp1 !== null;
+  const rrReadyForPlan = rrRatio !== null && rrRatio >= MIN_SCOUT_TP_RR;
+  const usedFallbackTarget = tp1Source.includes('fallback');
+  let planQuality: ScoutReport['planQuality'] = 'Weak';
+  let planQualityReason = 'Trade plan is incomplete or below the Scout R:R threshold.';
+  if (levelsReadyForPlan && rrReadyForPlan && setupFlowAlignedForPlan && !usedFallbackTarget) {
+    planQuality = 'Clean';
+    planQualityReason = 'Plan has aligned current timeframe flow, complete levels, structural TP1, and at least 2R.';
+  } else if (levelsReadyForPlan && rrReadyForPlan && setupFlowAlignedForPlan) {
+    planQuality = 'Usable';
+    planQualityReason = 'Plan has aligned current timeframe flow and at least 2R, but TP1 uses a fallback target.';
+  } else if (levelsReadyForPlan && rrReadyForPlan) {
+    planQuality = 'Usable';
+    planQualityReason = 'Plan has complete levels and at least 2R, but current timeframe flow still needs alignment.';
+  }
   const entryTiming = classifyEntryTiming(
     tradeDirection,
+    trendSetupPhase.setupTimeframeDirection,
     zone,
     setupGrade.setupGrade,
     setupStatusForGrade,
@@ -2392,9 +2560,18 @@ export function scoutAnalyzeCandles(
     sl,
     tp1
   );
+  const scoutZoneTouch = nearestScoutZoneTouch(
+    computeStructures(candles.slice(-120), 4),
+    tradeDirection,
+    candles[candles.length - 1],
+    atr,
+    entryTiming.entryTimingState === 'Reaction Started' || entryTiming.entryTimingState === 'Entry Triggered',
+    entryDistance.entryStatus
+  );
   const evalEligibility = evaluateScoutForEval(
     tradeDirection,
     trendSetupPhase.dailyTrendDirection,
+    trendSetupPhase.setupTimeframeDirection,
     zone,
     setupGrade.setupGrade,
     setupStatusForGrade,
@@ -2405,6 +2582,18 @@ export function scoutAnalyzeCandles(
     sl,
     tp1,
     rrRatio
+  );
+  const trendWatch = evaluateTrendWatch(
+    tradeDirection,
+    trendSetupPhase.dailyTrendDirection,
+    trendSetupPhase.h4TrendDirection,
+    trendSetupPhase.setupTimeframeDirection,
+    entryDistance.entryStatus,
+    entry,
+    sl,
+    tp1,
+    rrRatio,
+    evalEligibility.evalEligible
   );
 
   return {
@@ -2434,9 +2623,17 @@ export function scoutAnalyzeCandles(
     ...reversalConfirmation,
     ...setupGrade,
     ...evalEligibility,
+    ...trendWatch,
     ...entryTiming,
     ...trendSetupPhase,
     ...entryDistance,
+    ...scoutZoneTouch,
+    entrySource,
+    slSource,
+    tp1Source,
+    tp2Source,
+    planQuality,
+    planQualityReason,
     entry,
     sl,
     tp1,

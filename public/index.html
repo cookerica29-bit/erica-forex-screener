@@ -520,6 +520,7 @@
     .action-badge.review-now { color:var(--green); border-color:rgba(0,255,136,0.5); background:rgba(0,255,136,0.12); }
     .action-badge.watch { color:var(--gold); border-color:rgba(245,166,35,0.42); background:rgba(245,166,35,0.1); }
     .action-badge.monitor { color:var(--blue); border-color:rgba(96,165,250,0.42); background:rgba(96,165,250,0.1); }
+    .action-badge.trend-watch { color:#22d3ee; border-color:rgba(34,211,238,0.38); background:rgba(34,211,238,0.08); }
     .action-badge.low-priority { color:var(--slate-dim); border-color:rgba(148,163,184,0.22); background:rgba(148,163,184,0.04); }
     .entry-note { font-size:10px; color:var(--slate-dim); line-height:1.35; padding:7px 9px; border:1px solid rgba(148,163,184,0.08); border-radius:8px; background:rgba(148,163,184,0.035); margin-top:8px; }
     .setup-status-box { margin:10px 0; padding:9px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.1); background:rgba(148,163,184,0.035); }
@@ -536,6 +537,15 @@
     .setup-status-box.strong .setup-status-value { color:var(--blue); }
     .setup-status-box.confirmed .setup-status-value { color:var(--green); }
     .setup-status-reason { font-size:10px; color:var(--slate-dim); line-height:1.35; margin-top:3px; }
+    .expected-path-box { margin:8px 0 10px; padding:9px 10px; border-radius:8px; border:1px solid rgba(96,165,250,0.16); background:rgba(96,165,250,0.04); }
+    .expected-path-label { font-size:8px; color:var(--blue); text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin-bottom:4px; }
+    .expected-path-text { font-size:11px; color:var(--slate); line-height:1.42; }
+    .plan-diagnostics-box { margin:8px 0 10px; padding:9px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.1); background:rgba(148,163,184,0.035); }
+    .plan-diagnostics-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:6px; }
+    .plan-quality { font-size:9px; padding:3px 8px; border-radius:99px; border:1px solid rgba(148,163,184,0.24); font-weight:900; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+    .plan-quality.clean { color:var(--green); border-color:rgba(0,255,136,0.4); background:rgba(0,255,136,0.08); }
+    .plan-quality.usable { color:var(--blue); border-color:rgba(96,165,250,0.4); background:rgba(96,165,250,0.08); }
+    .plan-quality.weak { color:var(--gold); border-color:rgba(245,166,35,0.35); background:rgba(245,166,35,0.08); }
     .scout-structure { margin-top:8px; padding:8px 10px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; gap:4px; }
     .scout-struct-row { display:flex; align-items:center; gap:8px; }
     .scout-struct-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.05em; min-width:42px; }
@@ -748,6 +758,7 @@
   <div class="stat-box"><div class="stat-value" id="s-review-now" style="color:var(--green)">—</div><div class="stat-label">Review Now</div></div>
   <div class="stat-box"><div class="stat-value" id="s-action-watch" style="color:var(--gold)">—</div><div class="stat-label">Watch</div></div>
   <div class="stat-box"><div class="stat-value" id="s-monitor" style="color:var(--blue)">—</div><div class="stat-label">Monitor</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-trend-watch" style="color:#22d3ee">—</div><div class="stat-label">Trend Watch</div></div>
   <div class="stat-box"><div class="stat-value" id="s-low-priority" style="color:var(--slate)">—</div><div class="stat-label">Low Priority</div></div>
 </div>
 
@@ -758,6 +769,7 @@
     <option value="Review Now">Action: Review Now</option>
     <option value="Watch">Action: Watch</option>
     <option value="Monitor">Action: Monitor</option>
+    <option value="Trend Watch">Action: Trend Watch</option>
     <option value="Low Priority">Action: Low Priority</option>
   </select>
   <select class="filter-select" id="entryStatusFilter" onchange="renderSetups()" aria-label="Entry status filter">
@@ -2323,10 +2335,19 @@
     return Number.isFinite(Number(r.rrRatio)) && Number(r.rrRatio) >= 2.0;
   }
 
+  function setupFlowAlignedForReport(r) {
+    const direction = tradeDirectionForReport(r);
+    return (direction === 'LONG' && r.setupTimeframeDirection === 'Bullish') ||
+      (direction === 'SHORT' && r.setupTimeframeDirection === 'Bearish');
+  }
+
   function actionPriorityForReport(r) {
     const grade = r.setupGrade || 'C';
     const timing = r.entryTimingState || 'Not Ready';
     if (!meetsMinScoutRr(r)) {
+      return { value: 'Low Priority', label: '⚪ LOW PRIORITY', className: 'low-priority' };
+    }
+    if (!setupFlowAlignedForReport(r)) {
       return { value: 'Low Priority', label: '⚪ LOW PRIORITY', className: 'low-priority' };
     }
     if (grade === 'A' && timing === 'Entry Triggered') {
@@ -2338,7 +2359,30 @@
     if (grade === 'B' && (timing === 'Entry Triggered' || timing === 'Reaction Started' || timing === 'Area Reached')) {
       return { value: 'Monitor', label: '🔵 MONITOR', className: 'monitor' };
     }
+    if (r.trendWatchEligible === true) {
+      return { value: 'Trend Watch', label: '🔷 TREND WATCH', className: 'trend-watch' };
+    }
     return { value: 'Low Priority', label: '⚪ LOW PRIORITY', className: 'low-priority' };
+  }
+
+  function zoneTouchStateForReport(r) {
+    return ['APPROACHING', 'TESTING', 'REJECTING'].includes(r.zoneTouchState) ? r.zoneTouchState : 'NONE';
+  }
+
+  function zoneTimingLabelForReport(r) {
+    const direction = tradeDirectionForReport(r);
+    const zoneState = zoneTouchStateForReport(r);
+    if (direction === 'LONG') {
+      if (zoneState === 'REJECTING') return 'Rejecting Demand / Reaction Started';
+      if (zoneState === 'TESTING') return 'Testing Demand';
+      if (zoneState === 'APPROACHING') return 'Approaching Demand';
+    }
+    if (direction === 'SHORT') {
+      if (zoneState === 'REJECTING') return 'Rejecting Supply / Reaction Started';
+      if (zoneState === 'TESTING') return 'Testing Supply';
+      if (zoneState === 'APPROACHING') return 'Approaching Supply';
+    }
+    return '';
   }
 
   function setupHeadlineForReport(r) {
@@ -2347,13 +2391,17 @@
     const timingState = r.entryTimingState || 'Not Ready';
     if (grade === 'A') {
       if (timingState === 'Area Reached') {
+        const zoneLabel = zoneTimingLabelForReport(r);
+        if (zoneLabel) return `A Setup — ${zoneLabel}`;
         if (direction === 'LONG') return 'A Setup — Approaching Demand';
         if (direction === 'SHORT') return 'A Setup — Approaching Supply';
         return 'A Setup — Approaching Zone';
       }
       if (timingState === 'Reaction Started') {
-        if (direction === 'LONG') return 'A Setup — Wait for Bullish Rejection';
-        if (direction === 'SHORT') return 'A Setup — Wait for Bearish Rejection';
+        const zoneLabel = zoneTimingLabelForReport(r);
+        if (zoneLabel) return `A Setup — ${zoneLabel}`;
+        if (direction === 'LONG') return 'A Setup — Reaction Started';
+        if (direction === 'SHORT') return 'A Setup — Reaction Started';
         return 'A Setup — Wait for Rejection';
       }
       return `A Setup — ${simpleSetupStatusForReport(r)}`;
@@ -2373,10 +2421,13 @@
   function entryTimingDisplayForReport(r) {
     const state = r.entryTimingState || 'Not Ready';
     const direction = tradeDirectionForReport(r);
+    if (state === 'Entry Triggered') return 'Entry Triggered';
+    const zoneLabel = zoneTimingLabelForReport(r);
+    if (zoneLabel) return zoneLabel;
     if (state === 'Reaction Started') {
-      if (direction === 'SHORT') return 'Testing Supply';
-      if (direction === 'LONG') return 'Testing Demand';
-      return 'Testing Zone';
+      if (direction === 'SHORT') return 'Reaction Started';
+      if (direction === 'LONG') return 'Reaction Started';
+      return 'Reaction Started';
     }
     if (state === 'Area Reached') {
       if (direction === 'SHORT') return 'Approaching Supply';
@@ -2389,10 +2440,26 @@
   function entryTimingReasonForReport(r) {
     const state = r.entryTimingState || 'Not Ready';
     const direction = tradeDirectionForReport(r);
+    const zoneState = zoneTouchStateForReport(r);
+    if (zoneState === 'REJECTING') {
+      if (direction === 'SHORT') return 'Price has touched supply and bearish reaction evidence has started. Wait for entry trigger before treating this as active.';
+      if (direction === 'LONG') return 'Price has touched demand and bullish reaction evidence has started. Wait for entry trigger before treating this as active.';
+      return 'Price has touched the zone and reaction evidence has started. Wait for entry trigger before treating this as active.';
+    }
+    if (zoneState === 'TESTING') {
+      if (direction === 'SHORT') return 'Current price/candle is touching supply. Wait for bearish rejection before entry.';
+      if (direction === 'LONG') return 'Current price/candle is touching demand. Wait for bullish rejection before entry.';
+      return 'Current price/candle is touching the zone. Wait for rejection before entry.';
+    }
+    if (zoneState === 'APPROACHING') {
+      if (direction === 'SHORT') return 'Price is below supply and approaching the zone, but it has not touched supply yet.';
+      if (direction === 'LONG') return 'Price is above demand and approaching the zone, but it has not touched demand yet.';
+      return 'Price is approaching the zone, but it has not touched it yet.';
+    }
     if (state === 'Reaction Started') {
-      if (direction === 'SHORT') return 'Price is testing supply; wait for bearish rejection before treating this as an entry.';
-      if (direction === 'LONG') return 'Price is testing demand; wait for bullish rejection before treating this as an entry.';
-      return 'Price is testing the zone; wait for rejection before treating this as an entry.';
+      if (direction === 'SHORT') return 'Reaction evidence is developing, but current price is not overlapping supply. Do not treat this as a supply test yet.';
+      if (direction === 'LONG') return 'Reaction evidence is developing, but current price is not overlapping demand. Do not treat this as a demand test yet.';
+      return 'Reaction evidence is developing, but price is not overlapping the zone.';
     }
     if (state === 'Area Reached') {
       if (direction === 'SHORT') return 'Price may be moving toward supply above; wait for a supply tap/rejection before entry.';
@@ -2494,9 +2561,10 @@
       const status = ['Tradeable', 'Near Entry', 'Waiting', 'Too Far'].includes(row.entryStatus) ? row.entryStatus : 'Unknown';
       acc[status] = (acc[status] || 0) + 1;
       if (row.evalEligible === true) acc.EvalEligible = (acc.EvalEligible || 0) + 1;
+      if (actionPriorityForReport(row).value === 'Trend Watch') acc.TrendWatch = (acc.TrendWatch || 0) + 1;
       return acc;
     }, {});
-    return `Eval Eligible: ${counts.EvalEligible || 0} | Tradeable: ${counts.Tradeable || 0} | Near Entry: ${counts['Near Entry'] || 0} | Waiting: ${counts.Waiting || 0} | Too Far: ${counts['Too Far'] || 0}`;
+    return `Eval Eligible: ${counts.EvalEligible || 0} | Trend Watch: ${counts.TrendWatch || 0} | Tradeable: ${counts.Tradeable || 0} | Near Entry: ${counts['Near Entry'] || 0} | Waiting: ${counts.Waiting || 0} | Too Far: ${counts['Too Far'] || 0}`;
   }
 
   function matchesLocationFilter(zone, filter) {
@@ -2522,6 +2590,7 @@
     document.getElementById('s-review-now').textContent = all.filter(s => actionPriorityForReport(s).value === 'Review Now').length;
     document.getElementById('s-action-watch').textContent = all.filter(s => actionPriorityForReport(s).value === 'Watch').length;
     document.getElementById('s-monitor').textContent = all.filter(s => actionPriorityForReport(s).value === 'Monitor').length;
+    document.getElementById('s-trend-watch').textContent = all.filter(s => actionPriorityForReport(s).value === 'Trend Watch').length;
     document.getElementById('s-low-priority').textContent = all.filter(s => actionPriorityForReport(s).value === 'Low Priority').length;
     const main = document.getElementById('mainContent');
     if (!all.length) {
@@ -4162,6 +4231,97 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  function expectedPathForScoutReport(r, context = {}) {
+    const direction = context.tradeDirection || tradeDirectionForReport(r);
+    const isLong = direction === 'LONG';
+    const isShort = direction === 'SHORT';
+    const location = String(r.zone || 'fair value');
+    const locationLower = location.toLowerCase();
+    const timing = r.entryTimingState || 'Not Ready';
+    const entryStatus = r.entryStatus || 'Waiting';
+    const trend = context.displayTrend || r.dailyTrendDirection || r.trendDirection || 'Mixed';
+    const flow = r.setupTimeframeDirection || 'Neutral';
+    const phase = context.phase || displayPhaseForReport(r);
+    const structureShift = Boolean(r.reversalConfirmed);
+    const evalEligible = r.evalEligible === true;
+    const rr = Number.isFinite(Number(r.rrRatio)) ? Number(r.rrRatio) : null;
+    const lowRr = rr != null && rr < 2;
+    const zoneName = isLong ? 'demand/support' : isShort ? 'supply/resistance' : 'the planned area';
+    const rejectionName = isLong ? 'bullish rejection' : isShort ? 'bearish rejection' : 'clear rejection';
+    const oppositeZone = isLong ? 'demand/support' : isShort ? 'supply/resistance' : 'the planned area';
+    const atLongZone = isLong && (locationLower.includes('demand') || locationLower.includes('support') || locationLower.includes('discount'));
+    const atShortZone = isShort && (locationLower.includes('supply') || locationLower.includes('resistance') || locationLower.includes('premium'));
+    const zoneState = zoneTouchStateForReport(r);
+
+    if (timing === 'Entry Triggered') {
+      const manage = evalEligible
+        ? 'Manage according to the trade plan.'
+        : lowRr
+          ? 'Because R:R is weak, treat it as watch-only unless the plan improves.'
+          : 'Review the setup before taking action.';
+      return `Entry conditions are active. Price has reached the planned area and structure confirmation has started. The trade is confirmed by ${rejectionName} and a valid structure shift. The setup weakens if price moves through ${oppositeZone} without rejection or R:R no longer supports the plan. ${manage}`;
+    }
+
+    if (r.setupGrade === 'C') {
+      const locationText = location === 'fair value' ? 'the current area' : location.toLowerCase();
+      return `This is a lower-priority setup. Price is still developing around ${locationText}, but the card is not showing a clean ready state yet. A healthy setup would need price to reach the planned ${zoneName}, hold that area, and show ${rejectionName} with a structure shift. It weakens if price moves away from the plan, R:R stays weak, or eval eligibility does not improve. Do not force an entry right now.`;
+    }
+
+    if (atShortZone) {
+      const now = zoneState === 'REJECTING'
+        ? 'Price has touched supply and bearish reaction evidence has started.'
+        : zoneState === 'TESTING'
+        ? 'Current price/candle is testing supply.'
+        : zoneState === 'APPROACHING'
+        ? 'Price is approaching supply from below but has not touched it yet.'
+        : 'Price is in a short-side location, but the current candle is not touching a confirmed supply zone.';
+      const next = zoneState === 'REJECTING'
+        ? 'The next healthy step is bearish follow-through away from supply.'
+        : zoneState === 'TESTING'
+        ? 'The next healthy step is bearish rejection from inside the supply area.'
+        : zoneState === 'APPROACHING'
+        ? 'A push slightly higher into supply is normal before the setup is ready.'
+        : 'A push slightly higher into supply is normal before the setup is ready.';
+      return `${now} ${next} The setup is confirmed by bearish rejection and a structure shift back lower. It weakens if price accepts above supply or current timeframe flow turns bullish. ${zoneState === 'APPROACHING' ? 'Wait for the supply tap first.' : entryStatus === 'Near Entry' || timing === 'Area Reached' ? 'Wait for rejection before entry.' : 'Watch the supply area and wait.'}`;
+    }
+
+    if (atLongZone) {
+      const now = zoneState === 'REJECTING'
+        ? 'Price has touched demand and bullish reaction evidence has started.'
+        : zoneState === 'TESTING'
+        ? 'Current price/candle is testing demand.'
+        : zoneState === 'APPROACHING'
+        ? 'Price is approaching demand from above but has not touched it yet.'
+        : 'Price is in a long-side location, but the current candle is not touching a confirmed demand zone.';
+      const next = zoneState === 'REJECTING'
+        ? 'The next healthy step is bullish follow-through away from demand.'
+        : zoneState === 'TESTING'
+        ? 'The next healthy step is bullish rejection from inside the demand area.'
+        : zoneState === 'APPROACHING'
+        ? 'A move slightly lower into demand is normal development, not invalidation.'
+        : 'A move slightly lower into demand is normal development, not invalidation.';
+      return `${now} ${next} The setup is confirmed by a demand tap, bullish rejection, and a structure shift back higher. It weakens if price accepts below demand or current timeframe flow turns bearish. ${zoneState === 'APPROACHING' ? 'Wait for the demand tap first.' : entryStatus === 'Near Entry' || timing === 'Area Reached' ? 'Wait for bullish rejection before entry.' : 'Wait for the demand area.'}`;
+    }
+
+    if (timing === 'Reaction Started') {
+      return `Price has reached ${zoneName} and an early reaction is starting. The next healthy step is follow-through in the ${isLong ? 'long' : isShort ? 'short' : 'planned'} direction. The setup is confirmed by ${rejectionName} plus a structure shift. It weakens if the reaction fails or price moves away from the planned area. Wait for confirmation before entry.`;
+    }
+
+    if (timing === 'Area Reached' || entryStatus === 'Near Entry') {
+      return `Price is close to ${zoneName}. A final tap or small overshoot is normal while the setup develops. The setup is confirmed by ${rejectionName} and a structure shift. It weakens if price accepts beyond the zone or R:R drops below the plan. Wait for rejection before entry.`;
+    }
+
+    if (entryStatus === 'Too Far') {
+      return `Price is still away from the planned ${zoneName}. The healthy path is for price to pull back toward the entry area while ${trend} trend and ${flow} current timeframe flow stay aligned. Confirmation comes only after price reaches the area and shows ${rejectionName}. It weakens if the phase shifts away from ${phase} or the setup loses grade/eval quality. Do nothing right now except monitor.`;
+    }
+
+    if (!structureShift) {
+      return `Price is still developing near ${zoneName}. The next healthy step is a cleaner reaction from the planned area. Confirmation requires ${rejectionName} and a structure shift. The setup weakens if price moves through the zone without reaction or the entry distance expands. Wait for structure before entry.`;
+    }
+
+    return `Price is developing around ${zoneName}. The next healthy step is continuation in the ${isLong ? 'long' : isShort ? 'short' : 'planned'} direction after the pullback. Confirmation comes from ${rejectionName}, structure shift, and acceptable R:R. It weakens if price rejects the plan area in the opposite direction. Wait for the setup to become clear before acting.`;
+  }
+
   function renderScoutCard(r) {
     const tradeDirection = tradeDirectionForReport(r);
     const scoutDirection = scoutDirectionForReport(r);
@@ -4256,13 +4416,16 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     const gradeColor = grade === 'A' ? 'var(--green)' : grade === 'B' ? 'var(--blue)' : 'var(--gold)';
     const evalEligible = r.evalEligible === true;
     const lowRr = !meetsMinScoutRr(r);
-    const evalLabel = evalEligible ? 'Eval Eligible' : 'Watch Only';
-    const evalColor = evalEligible ? 'var(--green)' : 'var(--gold)';
-    const evalReason = r.evalReason || (evalEligible
-      ? 'Confirmed A setup is eligible for eval consideration.'
-      : lowRr
-        ? 'Watch only: Scout R:R is below 2.0.'
-        : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
+    const trendWatch = r.trendWatchEligible === true;
+    const evalLabel = evalEligible ? 'Eval Eligible' : trendWatch ? 'Trend Watch' : 'Watch Only';
+    const evalColor = evalEligible ? 'var(--green)' : trendWatch ? '#22d3ee' : 'var(--gold)';
+    const evalReason = evalEligible
+      ? (r.evalReason || 'Confirmed A setup is eligible for eval consideration.')
+      : trendWatch
+        ? (r.trendWatchReason || 'Trend watch only: direction and current timeframe flow align, but entry still needs live confirmation.')
+        : r.evalReason || (lowRr
+          ? 'Watch only: Scout R:R is below 2.0.'
+          : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
     const rawEntryTimingState = r.entryTimingState || 'Not Ready';
     const entryTimingState = entryTimingDisplayForReport(r);
     const actionPriority = actionPriorityForReport(r);
@@ -4283,13 +4446,23 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     const entryDistanceText = distanceAtr == null
       ? 'No nearby actionable entry zone identified.'
       : `${distanceAtr.toFixed(2)} ATR · ${distancePct != null ? distancePct.toFixed(2) + '%' : '—'} from suggested entry`;
+    const planQuality = r.planQuality || 'Weak';
+    const planQualityCls = String(planQuality).toLowerCase();
+    const planQualityReason = r.planQualityReason || 'Trade plan diagnostics are not available for this card.';
     const levelPlanNote = evalEligible
       ? 'Execution levels — entry trigger is active for review.'
+      : trendWatch
+        ? 'Trend Watch levels only — wait for pullback, continuation, or live rejection confirmation.'
       : 'Planning levels only — wait for rejection before entry.';
     const contextLabel = contextLabelForReport(r);
     const mixedContextWarning = isDirectionalDisagreement(r)
       ? '<div class="entry-note" style="margin:8px 0 0;">Mixed context — trade direction differs from trend/setup.</div>'
       : '';
+    const expectedPath = expectedPathForScoutReport(r, {
+      tradeDirection,
+      displayTrend,
+      phase: displayPhaseForReport(r),
+    });
 
     return `<div class="setup-card" style="position:relative;">
       <div class="card-body">
@@ -4319,7 +4492,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             <div class="context-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Short-term Flow</div>
+            <div class="context-label">Current Timeframe Flow</div>
             <div class="context-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
           </div>
           <div class="context-cell">
@@ -4373,6 +4546,10 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           <div class="setup-status-reason">Structure Shift: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Structure shift detected.' : 'Waiting for structure shift.'))}</div>
           ${pineConfirmed ? `<div class="setup-status-reason">Pine: ${escapeHtml(pineConfirmation.message || pineConfirmation.rejectionType || 'Supply/demand rejection confirmed.')}</div>` : ''}
         </div>
+        <div class="expected-path-box">
+          <div class="expected-path-label">EXPECTED PATH</div>
+          <div class="expected-path-text">${escapeHtml(expectedPath)}</div>
+        </div>
         <div class="scout-levels">
           <div class="scout-level-box" style="border-color:rgba(255,59,92,0.2);border-left:3px solid rgba(255,59,92,0.5);">
             <div class="scout-level-label">Nearest Supply / Resistance</div>
@@ -4406,11 +4583,22 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             <div class="scout-level-label">R:R</div>
             <div class="scout-level-value" style="color:${r.rrRatio != null && r.rrRatio >= 2.0 ? 'var(--green)' : 'var(--slate)'};font-size:12px;">${r.rrRatio != null ? r.rrRatio.toFixed(2) + 'R' : '—'}</div>
           </div>
+        </div>
+        <div class="plan-diagnostics-box">
+          <div class="plan-diagnostics-head">
+            <div class="setup-status-label">Trade Plan Diagnostics</div>
+            <span class="plan-quality ${planQualityCls}">${escapeHtml(planQuality)}</span>
+          </div>
+          <div class="setup-status-reason">Entry Source: ${escapeHtml(r.entrySource || 'Unknown')}</div>
+          <div class="setup-status-reason">SL Source: ${escapeHtml(r.slSource || 'Unknown')}</div>
+          <div class="setup-status-reason">TP1 Source: ${escapeHtml(r.tp1Source || 'Unknown')}</div>
+          <div class="setup-status-reason">TP2 Source: ${escapeHtml(r.tp2Source || 'Unknown')}</div>
+          <div class="setup-status-reason">Plan Quality: ${escapeHtml(planQualityReason)}</div>
         </div>` : `<div class="entry-note">${escapeHtml(entryDistanceText)} Suggested Entry / SL / TP hidden until price is within 0.5 ATR.</div>`}
         <details class="diagnostics">
           <summary>Details / Diagnostics</summary>
           <div class="diagnostics-body">
-            <div class="context-reason">Trend = current Daily trend. Setup TF = scanned timeframe direction. Trade Direction = Entry/SL/TP plan direction.</div>
+            <div class="context-reason">Trend = higher-timeframe trend. Current Timeframe Flow = scanned timeframe direction. Trade Direction = Entry/SL/TP plan direction.</div>
             ${mixedContextWarning}
             <div class="scout-levels" style="margin-top:8px;">
               <div class="scout-level-box">
@@ -4426,7 +4614,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
                 <div class="scout-level-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Short-term Flow</div>
+                <div class="scout-level-label">Current Timeframe Flow</div>
                 <div class="scout-level-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
               </div>
               <div class="scout-level-box">
@@ -4469,7 +4657,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
                 <div class="scout-level-value" style="color:${contextColor(displayTrend)}">${escapeHtml(displayTrend)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Setup TF Direction</div>
+                <div class="scout-level-label">Current Timeframe Direction</div>
                 <div class="scout-level-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
               </div>
               <div class="scout-level-box">
@@ -4479,6 +4667,22 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
               <div class="scout-level-box">
                 <div class="scout-level-label">Entry Plan Direction</div>
                 <div class="scout-level-value" style="color:${contextColor(directionLabelFromTrade(entryPlanDirection))}">${escapeHtml(entryPlanDirectionDisplay)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Plan Quality</div>
+                <div class="scout-level-value">${escapeHtml(planQuality)}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">Entry Source</div>
+                <div class="scout-level-value">${escapeHtml(r.entrySource || 'Unknown')}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">SL Source</div>
+                <div class="scout-level-value">${escapeHtml(r.slSource || 'Unknown')}</div>
+              </div>
+              <div class="scout-level-box">
+                <div class="scout-level-label">TP1 Source</div>
+                <div class="scout-level-value">${escapeHtml(r.tp1Source || 'Unknown')}</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Daily Trend</div>
@@ -4640,7 +4844,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
     const scoutSnapshot = [
       `Trend: ${displayTrendForReport(report)}`,
-      `Setup TF: ${report.setupTimeframeDirection || 'Mixed'}`,
+      `Current Timeframe Flow: ${report.setupTimeframeDirection || 'Mixed'}`,
       `Phase: ${displayPhaseForReport(report)}`,
       `Context: ${contextLabelForReport(report)}`,
       `Grade: ${report.setupGrade || ''}`,
@@ -5981,21 +6185,21 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       structure: [
         `Format: ${setup.videoLength || 'Short 2-4 min'} for ${(setup.platforms || ['YouTube']).join(', ')}.`,
         'Introduce the problem: too many pairs, too much noise, and inconsistent review.',
-        'Explain the scanner framework: Daily trend, short-term flow, premium/discount location, entry status, setup grade, and confirmation.',
+        'Explain the scanner framework: Daily trend, current timeframe flow, premium/discount location, entry status, setup grade, and confirmation.',
         'Show how A/B/C grades separate confirmed pullbacks, wait setups, and caution setups.',
         'Explain the journal: tracking direction, entry timing, outcome, and review notes.',
         'Close with honest limitations and the testing plan before trusting the data.',
       ],
       scenes: [
         'Dashboard opening shot with Scanner tab visible.',
-        'Close-up of a Scout card showing Trend, Short-term Flow, Location, Grade, and Confirmation.',
+        'Close-up of a Scout card showing Trend, Current Timeframe Flow, Location, Grade, and Confirmation.',
         'Journal tab showing how forex trades are reviewed after the fact.',
         'Analytics tab showing how the data will be compared over 50-100 trades.',
         'Closing screen: this is a review workflow, not an auto-trading promise.',
       ],
       talkingPoints: [
         'The scanner was built to narrow attention, not to guarantee wins.',
-        'It checks Daily trend direction, short-term flow, premium/discount location, setup grade, confirmation status, and entry distance.',
+        'It checks Daily trend direction, current timeframe flow, premium/discount location, setup grade, confirmation status, and entry distance.',
         'A Setup means trend and location line up and confirmation has started.',
         'B Setup means the area is interesting but patience is needed.',
         'C Setup means mixed context, counter-trend, or unclear location.',
@@ -6050,7 +6254,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       structure: [
         `Format: ${setup.videoLength || 'Short 2-4 min'} for ${(setup.platforms || ['YouTube']).join(', ')}.`,
         `Set context: ${type} using ${trades.length} selected trade${trades.length === 1 ? '' : 's'}.`,
-        'Review the scanner snapshot: trend, short-term flow, phase, location, setup grade, and entry status.',
+        'Review the scanner snapshot: trend, current timeframe flow, phase, location, setup grade, and entry status.',
         'Compare confirmation status against the actual entry timing.',
         'Walk through the outcome and journal notes without hindsight bias.',
         'Summarize what should be repeated, avoided, or tested next.',
@@ -6071,14 +6275,14 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       talkingPoints: [
         trades.length ? `Selected trades: ${summaries.join(' ')}` : `This ${type.toLowerCase()} is a workflow explanation, not a trade call.`,
         trades.length ? `Grade mix: ${mix}.` : 'The goal is to make the scanner easier to use without making the rules messy.',
-        'Trend shows the larger direction; short-term flow shows what price was doing near the entry.',
+        'Trend shows the larger direction; current timeframe flow shows what price was doing on the scanned timeframe near the entry.',
         'Location matters because longs in discount and shorts in premium should behave differently.',
         'Confirmation is tracked separately so a good area is not confused with an entry trigger.',
         'Entry quality labels help separate scanner direction from timing mistakes.',
         'The goal is not to prove the scanner is perfect. The goal is to collect evidence and improve the workflow.',
       ],
       thumbnail: `${type}: ${pairs}`,
-      description: `A ${type.toLowerCase()} using logged forex scanner trades: ${pairs}. I review trend, short-term flow, location, setup grade, confirmation status, entry timing, and journal results to understand what the scanner is doing well and what still needs testing.`,
+      description: `A ${type.toLowerCase()} using logged forex scanner trades: ${pairs}. I review trend, current timeframe flow, location, setup grade, confirmation status, entry timing, and journal results to understand what the scanner is doing well and what still needs testing.`,
     };
   }
 
