@@ -39,6 +39,7 @@ type EntryStatus = 'Waiting' | 'Near Entry' | 'Tradeable' | 'Too Far';
 type SetupGrade = 'A' | 'B' | 'C';
 type EntryTimingState = 'Not Ready' | 'Area Reached' | 'Reaction Started' | 'Entry Triggered';
 type ZoneTouchState = 'NONE' | 'APPROACHING' | 'TESTING' | 'REJECTING';
+type ZoneInteraction = 'NONE' | 'FRESH_TEST' | 'DEMAND_RECLAIM' | 'SUPPLY_RECLAIM';
 const MIN_SCOUT_TP_RR = 2.0;
 const MIN_EVAL_RR = 2.0;
 type MomentumLabel = 'Strong Bullish' | 'Bullish' | 'Neutral / Mixed' | 'Bearish' | 'Strong Bearish';
@@ -976,6 +977,7 @@ export interface ScoutReport {
   activeZoneLow: number | null;
   currentCandleHigh: number | null;
   currentCandleLow: number | null;
+  zoneInteraction: ZoneInteraction;
   decisionLevel: number | null;
   decisionLevelConfirmed: boolean;
   decisionLevelReason: string;
@@ -1779,7 +1781,8 @@ function nearestScoutZoneTouch(
   candle: Candle,
   atr: number,
   reactionStarted: boolean,
-  entryStatus: EntryStatus
+  entryStatus: EntryStatus,
+  recentCandles: Candle[] = []
 ) {
   const activeZoneType = tradeDirection === 'LONG' ? 'DEMAND' : tradeDirection === 'SHORT' ? 'SUPPLY' : null;
   if (!activeZoneType) {
@@ -1790,6 +1793,7 @@ function nearestScoutZoneTouch(
       activeZoneLow: null,
       currentCandleHigh: roundPrice(candle.h),
       currentCandleLow: roundPrice(candle.l),
+      zoneInteraction: 'NONE' as ZoneInteraction,
     };
   }
 
@@ -1812,10 +1816,14 @@ function nearestScoutZoneTouch(
       activeZoneLow: null,
       currentCandleHigh: roundPrice(candle.h),
       currentCandleLow: roundPrice(candle.l),
+      zoneInteraction: 'NONE' as ZoneInteraction,
     };
   }
 
   const candleOverlapsZone = candle.l <= zone.high && candle.h >= zone.low;
+  const recentBeforeCurrent = recentCandles.filter(c => c.t !== candle.t).slice(-6);
+  const recentlyClosedBelowDemand = activeZoneType === 'DEMAND' && recentBeforeCurrent.some(c => c.c < zone.low);
+  const recentlyClosedAboveSupply = activeZoneType === 'SUPPLY' && recentBeforeCurrent.some(c => c.c > zone.high);
   const priceAboveDemand = activeZoneType === 'DEMAND' && candle.c > zone.high;
   const priceBelowSupply = activeZoneType === 'SUPPLY' && candle.c < zone.low;
   const closeEnoughToApproach = entryStatus !== 'Too Far' || (
@@ -1829,6 +1837,13 @@ function nearestScoutZoneTouch(
     : approachingZone
     ? 'APPROACHING'
     : 'NONE';
+  const zoneInteraction: ZoneInteraction = candleOverlapsZone && recentlyClosedBelowDemand
+    ? 'DEMAND_RECLAIM'
+    : candleOverlapsZone && recentlyClosedAboveSupply
+    ? 'SUPPLY_RECLAIM'
+    : candleOverlapsZone
+    ? 'FRESH_TEST'
+    : 'NONE';
 
   return {
     zoneTouchState,
@@ -1837,6 +1852,7 @@ function nearestScoutZoneTouch(
     activeZoneLow: roundPrice(zone.low),
     currentCandleHigh: roundPrice(candle.h),
     currentCandleLow: roundPrice(candle.l),
+    zoneInteraction,
   };
 }
 
@@ -2642,7 +2658,8 @@ export function scoutAnalyzeCandles(
     candles[candles.length - 1],
     atr,
     entryTiming.entryTimingState === 'Reaction Started' || entryTiming.entryTimingState === 'Entry Triggered',
-    entryDistance.entryStatus
+    entryDistance.entryStatus,
+    candles.slice(-8)
   );
   const evalEligibility = evaluateScoutForEval(
     tradeDirection,

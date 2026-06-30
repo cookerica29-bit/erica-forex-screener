@@ -719,11 +719,13 @@ function zoneTimingLabelForScout(report: ScoutReport) {
   const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
   const zoneState = zoneTouchStateForScout(report);
   if (direction === 'LONG') {
+    if (report.zoneInteraction === 'DEMAND_RECLAIM') return 'Demand Reclaim / Retest';
     if (zoneState === 'REJECTING') return 'Rejecting Demand / Reaction Started';
     if (zoneState === 'TESTING') return 'Testing Demand';
     if (zoneState === 'APPROACHING') return 'Approaching Demand';
   }
   if (direction === 'SHORT') {
+    if (report.zoneInteraction === 'SUPPLY_RECLAIM') return 'Supply Reclaim / Retest';
     if (zoneState === 'REJECTING') return 'Rejecting Supply / Reaction Started';
     if (zoneState === 'TESTING') return 'Testing Supply';
     if (zoneState === 'APPROACHING') return 'Approaching Supply';
@@ -816,6 +818,8 @@ function shortScoutPhaseText(phase: string) {
 function shortScoutTimingText(timing: string) {
   return String(timing || 'Waiting')
     .replace('Entry Triggered', 'Entry Ready')
+    .replace('Demand Reclaim / Retest', 'Demand Reclaim')
+    .replace('Supply Reclaim / Retest', 'Supply Reclaim')
     .replace('Rejecting Demand / Reaction Started', 'Demand Reaction')
     .replace('Rejecting Supply / Reaction Started', 'Supply Reaction')
     .replace('Testing Demand', 'At Demand')
@@ -851,6 +855,12 @@ function entryTimingReasonDisplay(report: ScoutReport) {
   const demandArea = activeZone?.type === 'DEMAND' ? `support/demand area around ${activeZone.text}` : 'demand';
   const supplyArea = activeZone?.type === 'SUPPLY' ? `supply/resistance area around ${activeZone.text}` : 'supply';
   if (state === 'Reaction Started' && report.decisionLevelConfirmed === true) {
+    if (direction === 'SHORT' && activeZone?.type === 'SUPPLY' && report.zoneInteraction === 'SUPPLY_RECLAIM') {
+      return `Price is retesting the active ${supplyArea} after trading above it. Decision level is confirmed; wait for the entry trigger before treating this as active.`;
+    }
+    if (direction === 'LONG' && activeZone?.type === 'DEMAND' && report.zoneInteraction === 'DEMAND_RECLAIM') {
+      return `Price is reclaiming/retesting the active ${demandArea} after trading below it. Decision level is confirmed; wait for the entry trigger before treating this as active.`;
+    }
     if (direction === 'SHORT' && activeZone?.type === 'SUPPLY') {
       return `Price is reacting from the active ${supplyArea}. Decision level is confirmed; wait for the entry trigger before treating this as active.`;
     }

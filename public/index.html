@@ -2440,6 +2440,8 @@
   function shortTimingLabel(label) {
     return String(label || 'Waiting')
       .replace('Entry Triggered', 'Entry Ready')
+      .replace('Demand Reclaim / Retest', 'Demand Reclaim')
+      .replace('Supply Reclaim / Retest', 'Supply Reclaim')
       .replace('Rejecting Demand / Reaction Started', 'Demand Reaction')
       .replace('Rejecting Supply / Reaction Started', 'Supply Reaction')
       .replace('Testing Demand', 'At Demand')
@@ -2542,11 +2544,13 @@
     const direction = tradeDirectionForReport(r);
     const zoneState = zoneTouchStateForReport(r);
     if (direction === 'LONG') {
+      if (r.zoneInteraction === 'DEMAND_RECLAIM') return 'Demand Reclaim / Retest';
       if (zoneState === 'REJECTING') return 'Rejecting Demand / Reaction Started';
       if (zoneState === 'TESTING') return 'Testing Demand';
       if (zoneState === 'APPROACHING') return 'Approaching Demand';
     }
     if (direction === 'SHORT') {
+      if (r.zoneInteraction === 'SUPPLY_RECLAIM') return 'Supply Reclaim / Retest';
       if (zoneState === 'REJECTING') return 'Rejecting Supply / Reaction Started';
       if (zoneState === 'TESTING') return 'Testing Supply';
       if (zoneState === 'APPROACHING') return 'Approaching Supply';
@@ -2619,6 +2623,8 @@
     const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `support/demand area around ${activeZoneRange}` : 'demand';
     const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `supply/resistance area around ${activeZoneRange}` : 'supply';
     if (zoneState === 'REJECTING') {
+      if (direction === 'SHORT' && r.zoneInteraction === 'SUPPLY_RECLAIM') return `Price is retesting the active ${supplyArea} after trading above it. Wait for bearish rejection before treating this as active.`;
+      if (direction === 'LONG' && r.zoneInteraction === 'DEMAND_RECLAIM') return `Price is reclaiming/retesting the active ${demandArea} after trading below it. Wait for bullish rejection before treating this as active.`;
       if (direction === 'SHORT') return `Price has touched the ${supplyArea} and bearish reaction evidence has started. Wait for entry trigger before treating this as active.`;
       if (direction === 'LONG') return `Price has touched the ${demandArea} and bullish reaction evidence has started. Wait for entry trigger before treating this as active.`;
       return 'Price has touched the zone and reaction evidence has started. Wait for entry trigger before treating this as active.';
@@ -4435,7 +4441,9 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
 
     if (atShortZone) {
       const now = zoneState === 'REJECTING'
-        ? `Price has touched the ${supplyArea} and bearish reaction evidence has started.`
+        ? r.zoneInteraction === 'SUPPLY_RECLAIM'
+          ? `Price is retesting the ${supplyArea} after trading above it.`
+          : `Price has touched the ${supplyArea} and bearish reaction evidence has started.`
         : zoneState === 'TESTING'
         ? `Current price/candle is testing the ${supplyArea}.`
         : zoneState === 'APPROACHING'
@@ -4453,7 +4461,9 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
 
     if (atLongZone) {
       const now = zoneState === 'REJECTING'
-        ? `Price has touched the ${demandArea} and bullish reaction evidence has started.`
+        ? r.zoneInteraction === 'DEMAND_RECLAIM'
+          ? `Price is reclaiming/retesting the ${demandArea} after trading below it.`
+          : `Price has touched the ${demandArea} and bullish reaction evidence has started.`
         : zoneState === 'TESTING'
         ? `Current price/candle is testing the ${demandArea}.`
         : zoneState === 'APPROACHING'
