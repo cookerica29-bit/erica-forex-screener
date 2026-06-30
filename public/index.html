@@ -2516,12 +2516,25 @@
   }
 
   function activeScoutZoneForReport(r) {
+    const pineZone = r.pineZone || null;
+    const pineHigh = Number(pineZone?.zoneHigh);
+    const pineLow = Number(pineZone?.zoneLow);
+    const pineType = pineZone?.zoneType === 'DEMAND' || pineZone?.zoneType === 'SUPPLY' ? pineZone.zoneType : null;
+    if (pineType && Number.isFinite(pineHigh) && Number.isFinite(pineLow)) {
+      return {
+        type: pineType,
+        source: 'PINE',
+        high: Math.max(pineHigh, pineLow),
+        low: Math.min(pineHigh, pineLow),
+      };
+    }
     const high = Number(r.activeZoneHigh);
     const low = Number(r.activeZoneLow);
     const type = r.activeZoneType === 'DEMAND' || r.activeZoneType === 'SUPPLY' ? r.activeZoneType : null;
     if (!type || !Number.isFinite(high) || !Number.isFinite(low)) return null;
     return {
       type,
+      source: 'SCANNER',
       high: Math.max(high, low),
       low: Math.min(high, low),
     };
@@ -2620,8 +2633,9 @@
     const zoneState = zoneTouchStateForReport(r);
     const activeZone = activeScoutZoneForReport(r);
     const activeZoneRange = activeScoutZoneRangeText(r);
-    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `scanner support/demand area around ${activeZoneRange}` : 'demand';
-    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `scanner supply/resistance area around ${activeZoneRange}` : 'supply';
+    const zoneSource = activeZone?.source === 'PINE' ? 'Pine indicator' : 'scanner';
+    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `${zoneSource} support/demand area around ${activeZoneRange}` : 'demand';
+    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `${zoneSource} supply/resistance area around ${activeZoneRange}` : 'supply';
     if (zoneState === 'REJECTING') {
       if (direction === 'SHORT' && r.zoneInteraction === 'SUPPLY_RECLAIM') return `Price is retesting the active ${supplyArea} after trading above it. Wait for bearish rejection before treating this as active.`;
       if (direction === 'LONG' && r.zoneInteraction === 'DEMAND_RECLAIM') return `Price is reclaiming/retesting the active ${demandArea} after trading below it. Wait for bullish rejection before treating this as active.`;
@@ -4422,8 +4436,9 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     const zoneState = zoneTouchStateForReport(r);
     const activeZone = activeScoutZoneForReport(r);
     const activeZoneRange = activeScoutZoneRangeText(r);
-    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `scanner support/demand area around ${activeZoneRange}` : 'demand/support';
-    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `scanner supply/resistance area around ${activeZoneRange}` : 'supply/resistance';
+    const zoneSource = activeZone?.source === 'PINE' ? 'Pine indicator' : 'scanner';
+    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `${zoneSource} support/demand area around ${activeZoneRange}` : 'demand/support';
+    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `${zoneSource} supply/resistance area around ${activeZoneRange}` : 'supply/resistance';
 
     if (timing === 'Entry Triggered') {
       const manage = evalEligible
@@ -4584,8 +4599,10 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     const reversalLabel = reversalConfirmed ? 'Detected' : 'Not Detected';
     const reversalIcon = reversalConfirmed ? '✅' : '❌';
     const pineConfirmation = r.pineConfirmation || null;
+    const pineZone = r.pineZone || null;
     const pineConfirmed = Boolean(pineConfirmation && pineConfirmation.matched !== false);
-    const pineLabel = pineConfirmed ? '✅ Confirmed' : 'Waiting';
+    const pineZoneSynced = Boolean(pineZone && pineZone.zoneHigh != null && pineZone.zoneLow != null);
+    const pineLabel = pineConfirmed ? '✅ Confirmed' : pineZoneSynced ? 'Zone Synced' : 'Waiting';
     const setupHeadline = setupHeadlineForReport(r);
     const simpleSetupStatus = simpleSetupStatusForReport(r);
     const grade = r.setupGrade || 'C';
@@ -4649,7 +4666,9 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     });
     const phaseDisplayShort = shortPhaseLabel(displayPhaseForReport(r));
     const activeZone = activeScoutZoneForReport(r);
-    const activeZoneLabel = activeZone?.type === 'DEMAND' ? 'Active Scanner Demand Zone' : activeZone?.type === 'SUPPLY' ? 'Active Scanner Supply Zone' : 'Active Scanner Zone';
+    const activeZoneLabel = activeZone?.source === 'PINE'
+      ? activeZone.type === 'DEMAND' ? 'Pine Indicator Demand Zone' : 'Pine Indicator Supply Zone'
+      : activeZone?.type === 'DEMAND' ? 'Active Scanner Demand Zone' : activeZone?.type === 'SUPPLY' ? 'Active Scanner Supply Zone' : 'Active Scanner Zone';
     const activeZoneColor = activeZone?.type === 'DEMAND' ? 'var(--green)' : 'var(--red)';
     const activeZoneBorder = activeZone?.type === 'DEMAND' ? 'rgba(0,255,136,0.2)' : 'rgba(255,59,92,0.2)';
     const activeZoneAccent = activeZone?.type === 'DEMAND' ? 'rgba(0,255,136,0.5)' : 'rgba(255,59,92,0.5)';

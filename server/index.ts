@@ -37,6 +37,8 @@ const pineConfirmations = new Map<string, PineConfirmation>();
 const pineConfirmationAlerts = new Map<string, number>();
 const PINE_CONFIRMATION_TTL_MS = 12 * 60 * 60 * 1000;
 const PINE_CONFIRMATION_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+const pineZones = new Map<string, PineZone>();
+const PINE_ZONE_TTL_MS = 24 * 60 * 60 * 1000;
 const MIN_SCOUT_ALERT_RR = 2.0;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_AI_STUDIO_MODEL = process.env.OPENAI_AI_STUDIO_MODEL || 'gpt-4.1-mini';
@@ -58,6 +60,21 @@ interface PineConfirmation {
   matched: boolean;
   matchReason: string;
   scoutKey?: string;
+}
+
+interface PineZone {
+  symbol: string;
+  displaySymbol: string;
+  timeframe: string;
+  direction: 'LONG' | 'SHORT';
+  zoneType: 'DEMAND' | 'SUPPLY';
+  zoneHigh: number;
+  zoneLow: number;
+  price?: number;
+  message: string;
+  receivedAt: string;
+  sourceTime?: string;
+  source: 'TradingView/Pine';
 }
 
 type AiStudioSection = { label: string; value: string; large?: boolean };
@@ -629,13 +646,32 @@ function pineConfirmationKey(symbol: string, timeframe: string, direction: 'LONG
   return `${scoutKey(symbol, timeframe)}|${direction}`;
 }
 
+function pineZoneKey(symbol: string, timeframe: string, direction: 'LONG' | 'SHORT') {
+  return pineConfirmationKey(symbol, timeframe, direction);
+}
+
+function directionFromZoneType(zoneType: PineConfirmation['zoneType']) {
+  if (zoneType === 'DEMAND') return 'LONG' as const;
+  if (zoneType === 'SUPPLY') return 'SHORT' as const;
+  return null;
+}
+
 function cleanupPineConfirmations(now = Date.now()) {
   for (const [key, confirmation] of pineConfirmations) {
     if (now - Date.parse(confirmation.receivedAt) > PINE_CONFIRMATION_TTL_MS) pineConfirmations.delete(key);
   }
+  for (const [key, zone] of pineZones) {
+    if (now - Date.parse(zone.receivedAt) > PINE_ZONE_TTL_MS) pineZones.delete(key);
+  }
   for (const [key, alertedAt] of pineConfirmationAlerts) {
     if (now - alertedAt > PINE_CONFIRMATION_ALERT_COOLDOWN_MS) pineConfirmationAlerts.delete(key);
   }
+}
+
+function pineZoneForReport(report: ScoutReport) {
+  const direction = report.tradeDirection === 'LONG' || report.tradeDirection === 'SHORT' ? report.tradeDirection : null;
+  if (!direction) return null;
+  return pineZones.get(pineZoneKey(report.pair, report.timeframe, direction)) || null;
 }
 
 function enrichScoutReports(reports: ScoutReport[]) {
@@ -644,7 +680,8 @@ function enrichScoutReports(reports: ScoutReport[]) {
     const direction = report.tradeDirection === 'LONG' || report.tradeDirection === 'SHORT' ? report.tradeDirection : null;
     if (!direction) return report;
     const confirmation = pineConfirmations.get(pineConfirmationKey(report.pair, report.timeframe, direction));
-    return confirmation ? { ...report, pineConfirmation: confirmation } : report;
+    const pineZone = pineZones.get(pineZoneKey(report.pair, report.timeframe, direction));
+    return confirmation || pineZone ? { ...report, pineConfirmation: confirmation, pineZone } : report;
   });
 }
 
@@ -780,6 +817,22 @@ function formatScoutLevel(value: number | null) {
 }
 
 function activeScoutZoneRange(report: ScoutReport) {
+  const pineZone = (report as any).pineZone || pineZoneForReport(report);
+  if (
+    pineZone &&
+    (pineZone.zoneType === 'DEMAND' || pineZone.zoneType === 'SUPPLY') &&
+    pineZone.zoneHigh != null &&
+    pineZone.zoneLow != null
+  ) {
+    const zoneHigh = Math.max(pineZone.zoneHigh, pineZone.zoneLow);
+    const zoneLow = Math.min(pineZone.zoneHigh, pineZone.zoneLow);
+    return {
+      type: pineZone.zoneType,
+      source: 'PINE' as const,
+      label: pineZone.zoneType === 'DEMAND' ? 'Pine Indicator Demand Zone' : 'Pine Indicator Supply Zone',
+      text: `${formatScoutLevel(zoneLow)}-${formatScoutLevel(zoneHigh)}`,
+    };
+  }
   const high = report.activeZoneHigh;
   const low = report.activeZoneLow;
   const type = report.activeZoneType === 'DEMAND' || report.activeZoneType === 'SUPPLY' ? report.activeZoneType : null;
@@ -788,6 +841,7 @@ function activeScoutZoneRange(report: ScoutReport) {
   const zoneLow = Math.min(high, low);
   return {
     type,
+    source: 'SCANNER' as const,
     label: type === 'DEMAND' ? 'Active Scanner Demand Zone' : 'Active Scanner Supply Zone',
     text: `${formatScoutLevel(zoneLow)}-${formatScoutLevel(zoneHigh)}`,
   };
@@ -852,8 +906,9 @@ function entryTimingReasonDisplay(report: ScoutReport) {
   const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
   const zoneState = zoneTouchStateForScout(report);
   const activeZone = activeScoutZoneRange(report);
-  const demandArea = activeZone?.type === 'DEMAND' ? `scanner support/demand area around ${activeZone.text}` : 'demand';
-  const supplyArea = activeZone?.type === 'SUPPLY' ? `scanner supply/resistance area around ${activeZone.text}` : 'supply';
+  const zoneSource = activeZone?.source === 'PINE' ? 'Pine indicator' : 'scanner';
+  const demandArea = activeZone?.type === 'DEMAND' ? `${zoneSource} support/demand area around ${activeZone.text}` : 'demand';
+  const supplyArea = activeZone?.type === 'SUPPLY' ? `${zoneSource} supply/resistance area around ${activeZone.text}` : 'supply';
   if (state === 'Reaction Started' && report.decisionLevelConfirmed === true) {
     if (direction === 'SHORT' && activeZone?.type === 'SUPPLY' && report.zoneInteraction === 'SUPPLY_RECLAIM') {
       return `Price is retesting the active ${supplyArea} after trading above it. Decision level is confirmed; wait for the entry trigger before treating this as active.`;
@@ -1284,7 +1339,7 @@ app.post('/api/scan', async (req, res) => {
 // ── Scout API ──────────────────────────────────────────────────────────────────
 app.get('/api/scout', (_req, res) => {
   const reports = enrichScoutReports(latestScoutResults);
-  res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()) });
+  res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
 });
 
 app.post('/api/scout', async (req, res) => {
@@ -1298,7 +1353,7 @@ app.post('/api/scout', async (req, res) => {
     await notifyTradeableScoutSignals(latestScoutResults, 'manual scout scan');
     lastScanTime = new Date().toISOString();
     const reports = enrichScoutReports(latestScoutResults);
-    res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()) });
+    res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -1591,7 +1646,10 @@ async function notifyPineConfirmation(confirmation: PineConfirmation, report: Sc
   }
 
   const direction = confirmation.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
-  const text = `✅ *ENTRY TRIGGER — Pine Rejection Confirmed*\nPair: ${confirmation.displaySymbol}\nDirection: ${direction}\nTimeframe: ${confirmation.timeframe}\nInternal Grade: ${report.setupGrade}\nTrend: ${displayScoutTrend(report)}\nNow: ${report.setupTimeframeDirection}\nMarket Type: ${shortScoutPhaseText(displayScoutPhase(report))}\nLocation: ${report.zone}\nZone Status: ${shortScoutTimingText(entryTimingDisplay(report))}\nPine Indicator Zone: ${confirmation.zoneType}\nRejection: ${confirmation.rejectionType || 'Confirmed'}\nPrice: ${confirmation.price !== undefined ? formatScoutLevel(confirmation.price) : 'N/A'}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nReason: Scanner setup matched a TradingView/Pine supply-demand rejection.\nMessage: ${confirmation.message || 'Pine rejection confirmed'}\n→ https://erica-forex-screener-production.up.railway.app`;
+  const pineZoneRange = confirmation.zoneHigh != null && confirmation.zoneLow != null
+    ? `${formatScoutLevel(Math.min(confirmation.zoneHigh, confirmation.zoneLow))}-${formatScoutLevel(Math.max(confirmation.zoneHigh, confirmation.zoneLow))}`
+    : 'N/A';
+  const text = `✅ *ENTRY TRIGGER — Pine Rejection Confirmed*\nPair: ${confirmation.displaySymbol}\nDirection: ${direction}\nTimeframe: ${confirmation.timeframe}\nInternal Grade: ${report.setupGrade}\nTrend: ${displayScoutTrend(report)}\nNow: ${report.setupTimeframeDirection}\nMarket Type: ${shortScoutPhaseText(displayScoutPhase(report))}\nLocation: ${report.zone}\nZone Status: ${shortScoutTimingText(entryTimingDisplay(report))}\nPine Indicator Zone: ${confirmation.zoneType} ${pineZoneRange}\nRejection: ${confirmation.rejectionType || 'Confirmed'}\nPrice: ${confirmation.price !== undefined ? formatScoutLevel(confirmation.price) : 'N/A'}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nReason: Scanner setup matched a TradingView/Pine supply-demand rejection.\nMessage: ${confirmation.message || 'Pine rejection confirmed'}\n→ https://erica-forex-screener-production.up.railway.app`;
 
   const data = await sendTelegram(text, 'Markdown');
   if (data.ok) pineConfirmationAlerts.set(alertKey, now);
@@ -1612,19 +1670,21 @@ app.post('/api/tradingview-confirmation', async (req, res) => {
     }
 
     const { symbol, displaySymbol } = normalizeTradingViewScoutSymbol(body.symbol || body.ticker || body.pair);
-    const direction = normalizeDirection(body.direction || body.action || body.side);
     const timeframe = normalizeTimeframe(body.timeframe || body.interval);
     const zoneType = normalizeZoneType(body.zoneType || body.zone_type || body.zone || body.location);
+    const direction = normalizeDirection(body.direction || body.action || body.side) || directionFromZoneType(zoneType);
     const price = toNumber(body.price || body.close);
     const zoneHigh = toNumber(body.zoneHigh || body.zone_high || body.supplyHigh || body.demandHigh);
     const zoneLow = toNumber(body.zoneLow || body.zone_low || body.supplyLow || body.demandLow);
-    const rejectionType = String(body.rejectionType || body.rejection_type || body.event || 'Supply/Demand rejection').trim();
-    const message = String(body.message || body.note || `${zoneType} rejection confirmed`).slice(0, 300);
+    const eventName = String(body.rejectionType || body.rejection_type || body.event || body.type || '').trim();
+    const isZoneOnlyUpdate = /zone[_\s-]*(update|sync|created|active)/i.test(eventName) || String(body.mode || '').toLowerCase() === 'zone';
+    const rejectionType = isZoneOnlyUpdate ? 'Zone update' : String(eventName || 'Supply/Demand rejection').trim();
+    const message = String(body.message || body.note || (isZoneOnlyUpdate ? `${zoneType} zone synced from Pine` : `${zoneType} rejection confirmed`)).slice(0, 300);
     const sourceTime = body.time || body.timestamp ? String(body.time || body.timestamp) : undefined;
 
     if (!symbol || !direction || !timeframe || zoneType === 'UNKNOWN') {
       return res.status(400).json({
-        error: 'TradingView confirmation must include symbol, timeframe, direction, and zoneType supply/demand',
+        error: 'TradingView confirmation must include symbol, timeframe, and zoneType supply/demand. Direction can be sent directly or inferred from zoneType.',
         received: {
           symbol: Boolean(symbol),
           timeframe: Boolean(timeframe),
@@ -1635,6 +1695,38 @@ app.post('/api/tradingview-confirmation', async (req, res) => {
     }
 
     cleanupPineConfirmations();
+    const hasPineZone = zoneHigh != null && zoneLow != null && (zoneType === 'DEMAND' || zoneType === 'SUPPLY');
+    const receivedAt = new Date().toISOString();
+    let pineZone: PineZone | undefined;
+    if (hasPineZone) {
+      pineZone = {
+        symbol,
+        displaySymbol,
+        timeframe,
+        direction,
+        zoneType,
+        zoneHigh,
+        zoneLow,
+        price,
+        message,
+        receivedAt,
+        sourceTime,
+        source: 'TradingView/Pine',
+      };
+      pineZones.set(pineZoneKey(symbol, timeframe, direction), pineZone);
+    }
+
+    if (isZoneOnlyUpdate) {
+      return res.json({
+        success: true,
+        matched: false,
+        matchReason: 'Pine indicator zone stored. No rejection confirmation was processed.',
+        zoneStored: Boolean(pineZone),
+        confirmationStored: false,
+        pineZone,
+      });
+    }
+
     const report = findScoutForPineConfirmation(symbol, timeframe, direction);
     const confirmation: PineConfirmation = {
       symbol,
@@ -1647,7 +1739,7 @@ app.post('/api/tradingview-confirmation', async (req, res) => {
       zoneHigh,
       zoneLow,
       message,
-      receivedAt: new Date().toISOString(),
+      receivedAt,
       sourceTime,
       matched: Boolean(report),
       matchReason: report
@@ -1666,8 +1758,10 @@ app.post('/api/tradingview-confirmation', async (req, res) => {
       success: true,
       matched: Boolean(report),
       matchReason: confirmation.matchReason,
+      zoneStored: Boolean(pineZone),
       telegram,
       confirmation,
+      pineZone,
     });
   } catch (e: any) {
     console.error('[TradingView] Confirmation failed:', e.message);
