@@ -2620,8 +2620,8 @@
     const zoneState = zoneTouchStateForReport(r);
     const activeZone = activeScoutZoneForReport(r);
     const activeZoneRange = activeScoutZoneRangeText(r);
-    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `support/demand area around ${activeZoneRange}` : 'demand';
-    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `supply/resistance area around ${activeZoneRange}` : 'supply';
+    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `scanner support/demand area around ${activeZoneRange}` : 'demand';
+    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `scanner supply/resistance area around ${activeZoneRange}` : 'supply';
     if (zoneState === 'REJECTING') {
       if (direction === 'SHORT' && r.zoneInteraction === 'SUPPLY_RECLAIM') return `Price is retesting the active ${supplyArea} after trading above it. Wait for bearish rejection before treating this as active.`;
       if (direction === 'LONG' && r.zoneInteraction === 'DEMAND_RECLAIM') return `Price is reclaiming/retesting the active ${demandArea} after trading below it. Wait for bullish rejection before treating this as active.`;
@@ -4422,8 +4422,8 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     const zoneState = zoneTouchStateForReport(r);
     const activeZone = activeScoutZoneForReport(r);
     const activeZoneRange = activeScoutZoneRangeText(r);
-    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `support/demand area around ${activeZoneRange}` : 'demand/support';
-    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `supply/resistance area around ${activeZoneRange}` : 'supply/resistance';
+    const demandArea = activeZone?.type === 'DEMAND' && activeZoneRange ? `scanner support/demand area around ${activeZoneRange}` : 'demand/support';
+    const supplyArea = activeZone?.type === 'SUPPLY' && activeZoneRange ? `scanner supply/resistance area around ${activeZoneRange}` : 'supply/resistance';
 
     if (timing === 'Entry Triggered') {
       const manage = evalEligible
@@ -4649,7 +4649,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     });
     const phaseDisplayShort = shortPhaseLabel(displayPhaseForReport(r));
     const activeZone = activeScoutZoneForReport(r);
-    const activeZoneLabel = activeZone?.type === 'DEMAND' ? 'Active Demand Zone' : activeZone?.type === 'SUPPLY' ? 'Active Supply Zone' : 'Active Zone';
+    const activeZoneLabel = activeZone?.type === 'DEMAND' ? 'Active Scanner Demand Zone' : activeZone?.type === 'SUPPLY' ? 'Active Scanner Supply Zone' : 'Active Scanner Zone';
     const activeZoneColor = activeZone?.type === 'DEMAND' ? 'var(--green)' : 'var(--red)';
     const activeZoneBorder = activeZone?.type === 'DEMAND' ? 'rgba(0,255,136,0.2)' : 'rgba(255,59,92,0.2)';
     const activeZoneAccent = activeZone?.type === 'DEMAND' ? 'rgba(0,255,136,0.5)' : 'rgba(255,59,92,0.5)';
@@ -5443,7 +5443,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       const hasTrend  = !!d.trend;
       const hasBOS    = d.bosLevel > 0;
       const hasOB     = d.obHigh != null;
-      const hasMomentum = false; // reached near-miss = passed trend+BOS, failed at/after OB
+      const hasMomentum = false; // reached near-miss = passed trend+BOS, failed at/after scanner zone
       const dirColor  = isLong ? 'var(--green)' : 'var(--red)';
       const dirLabel  = isLong ? '↑ LONG' : '↓ SHORT';
       const cardBorder = hardBlocked ? 'rgba(255,59,92,0.28)' : 'rgba(148,163,184,0.2)';
@@ -5451,7 +5451,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
         ? '<span class="badge" style="color:var(--red);border-color:rgba(255,59,92,0.45);background:rgba(255,59,92,0.08)">BLOCKED</span>'
         : '<span class="badge developing">WATCHLIST</span>';
       const rsiStr    = d.rsi != null ? `RSI ${Number(d.rsi).toFixed(1)}` : '';
-      const obStr     = hasOB ? `OB ${fmt(d.obLow, nm.pair)} – ${fmt(d.obHigh, nm.pair)}` : '';
+      const obStr     = hasOB ? `Scanner zone ${fmt(d.obLow, nm.pair)} – ${fmt(d.obHigh, nm.pair)}` : '';
       const bosStr    = hasBOS ? `BOS @ ${fmt(d.bosLevel, nm.pair)}` : '';
       const htfStr    = d.htfTrend ? `HTF: ${d.htfTrend}` : '';
       const metaLine  = [bosStr, obStr, rsiStr, htfStr].filter(Boolean).join(' · ');
@@ -5494,7 +5494,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           ${chk(hasTrend,  'Trend confirmed')}
           ${chk(hasBOS,    'BOS confirmed')}
           ${chk(htfAligned, 'HTF aligned')}
-          ${chk(hasOB,     hardBlocked ? 'Setup allowed' : 'Order block found')}
+          ${chk(hasOB,     hardBlocked ? 'Setup allowed' : 'Scanner zone found')}
         </div>
         <div style="font-size:10px;color:rgba(255,59,92,0.75);background:rgba(255,59,92,0.05);border:1px solid rgba(255,59,92,0.15);border-radius:5px;padding:5px 8px;">✗ ${nm.reason}</div>
         ${metaLine ? `<div style="font-size:9px;color:var(--slate-dim);margin-top:6px;line-height:1.6">${metaLine}</div>` : ''}

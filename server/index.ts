@@ -788,7 +788,7 @@ function activeScoutZoneRange(report: ScoutReport) {
   const zoneLow = Math.min(high, low);
   return {
     type,
-    label: type === 'DEMAND' ? 'Active Demand Zone' : 'Active Supply Zone',
+    label: type === 'DEMAND' ? 'Active Scanner Demand Zone' : 'Active Scanner Supply Zone',
     text: `${formatScoutLevel(zoneLow)}-${formatScoutLevel(zoneHigh)}`,
   };
 }
@@ -852,8 +852,8 @@ function entryTimingReasonDisplay(report: ScoutReport) {
   const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
   const zoneState = zoneTouchStateForScout(report);
   const activeZone = activeScoutZoneRange(report);
-  const demandArea = activeZone?.type === 'DEMAND' ? `support/demand area around ${activeZone.text}` : 'demand';
-  const supplyArea = activeZone?.type === 'SUPPLY' ? `supply/resistance area around ${activeZone.text}` : 'supply';
+  const demandArea = activeZone?.type === 'DEMAND' ? `scanner support/demand area around ${activeZone.text}` : 'demand';
+  const supplyArea = activeZone?.type === 'SUPPLY' ? `scanner supply/resistance area around ${activeZone.text}` : 'supply';
   if (state === 'Reaction Started' && report.decisionLevelConfirmed === true) {
     if (direction === 'SHORT' && activeZone?.type === 'SUPPLY' && report.zoneInteraction === 'SUPPLY_RECLAIM') {
       return `Price is retesting the active ${supplyArea} after trading above it. Decision level is confirmed; wait for the entry trigger before treating this as active.`;
@@ -1591,7 +1591,7 @@ async function notifyPineConfirmation(confirmation: PineConfirmation, report: Sc
   }
 
   const direction = confirmation.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
-  const text = `✅ *ENTRY TRIGGER — Pine Rejection Confirmed*\nPair: ${confirmation.displaySymbol}\nDirection: ${direction}\nTimeframe: ${confirmation.timeframe}\nInternal Grade: ${report.setupGrade}\nTrend: ${displayScoutTrend(report)}\nNow: ${report.setupTimeframeDirection}\nMarket Type: ${shortScoutPhaseText(displayScoutPhase(report))}\nLocation: ${report.zone}\nZone Status: ${shortScoutTimingText(entryTimingDisplay(report))}\nPine Zone: ${confirmation.zoneType}\nRejection: ${confirmation.rejectionType || 'Confirmed'}\nPrice: ${confirmation.price !== undefined ? formatScoutLevel(confirmation.price) : 'N/A'}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nReason: Scanner setup matched Pine supply/demand rejection.\nMessage: ${confirmation.message || 'Pine rejection confirmed'}\n→ https://erica-forex-screener-production.up.railway.app`;
+  const text = `✅ *ENTRY TRIGGER — Pine Rejection Confirmed*\nPair: ${confirmation.displaySymbol}\nDirection: ${direction}\nTimeframe: ${confirmation.timeframe}\nInternal Grade: ${report.setupGrade}\nTrend: ${displayScoutTrend(report)}\nNow: ${report.setupTimeframeDirection}\nMarket Type: ${shortScoutPhaseText(displayScoutPhase(report))}\nLocation: ${report.zone}\nZone Status: ${shortScoutTimingText(entryTimingDisplay(report))}\nPine Indicator Zone: ${confirmation.zoneType}\nRejection: ${confirmation.rejectionType || 'Confirmed'}\nPrice: ${confirmation.price !== undefined ? formatScoutLevel(confirmation.price) : 'N/A'}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nReason: Scanner setup matched a TradingView/Pine supply-demand rejection.\nMessage: ${confirmation.message || 'Pine rejection confirmed'}\n→ https://erica-forex-screener-production.up.railway.app`;
 
   const data = await sendTelegram(text, 'Markdown');
   if (data.ok) pineConfirmationAlerts.set(alertKey, now);

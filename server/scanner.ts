@@ -875,7 +875,7 @@ export function computeStructures(candles: Candle[], margin = 5): TrainerStructu
   bosEvents.sort((a, b)   => a.time - b.time);
   chochEvents.sort((a, b) => a.time - b.time);
 
-  // Order blocks: last opposing candle before each BOS (limit 4 zones per side to keep chart clean)
+  // Backend-estimated zones from the last opposing candle before each BOS.
   const supplyZones: TrainerStructures['supplyZones'] = [];
   const demandZones: TrainerStructures['demandZones'] = [];
 
@@ -884,14 +884,14 @@ export function computeStructures(candles: Candle[], margin = 5): TrainerStructu
     if (bosIdx < 2) continue;
     if (bos.type === 'bearish' && supplyZones.length < 4) {
       for (let i = bosIdx - 1; i >= Math.max(0, bosIdx - 8); i--) {
-        if (candles[i].c > candles[i].o) { // last bullish candle before bearish BOS = supply OB
+        if (candles[i].c > candles[i].o) { // backend-estimated supply zone
           supplyZones.push({ time: toTs(candles[i].t), obHigh: candles[i].h, obLow: candles[i].l });
           break;
         }
       }
     } else if (bos.type === 'bullish' && demandZones.length < 4) {
       for (let i = bosIdx - 1; i >= Math.max(0, bosIdx - 8); i--) {
-        if (candles[i].c < candles[i].o) { // last bearish candle before bullish BOS = demand OB
+        if (candles[i].c < candles[i].o) { // backend-estimated demand zone
           demandZones.push({ time: toTs(candles[i].t), obHigh: candles[i].h, obLow: candles[i].l });
           break;
         }
