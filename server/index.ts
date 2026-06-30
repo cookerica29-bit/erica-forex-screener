@@ -709,6 +709,28 @@ function simpleScoutStatus(report: ScoutReport) {
   return 'Still Pulling Back';
 }
 
+function zoneTouchStateForScout(report: ScoutReport) {
+  return ['APPROACHING', 'TESTING', 'REJECTING'].includes(String(report.zoneTouchState || ''))
+    ? String(report.zoneTouchState)
+    : 'NONE';
+}
+
+function zoneTimingLabelForScout(report: ScoutReport) {
+  const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
+  const zoneState = zoneTouchStateForScout(report);
+  if (direction === 'LONG') {
+    if (zoneState === 'REJECTING') return 'Rejecting Demand / Reaction Started';
+    if (zoneState === 'TESTING') return 'Testing Demand';
+    if (zoneState === 'APPROACHING') return 'Approaching Demand';
+  }
+  if (direction === 'SHORT') {
+    if (zoneState === 'REJECTING') return 'Rejecting Supply / Reaction Started';
+    if (zoneState === 'TESTING') return 'Testing Supply';
+    if (zoneState === 'APPROACHING') return 'Approaching Supply';
+  }
+  return '';
+}
+
 function tradeableSignalAlertKey(report: ScoutReport, kind = 'entry') {
   return [
     kind,
@@ -758,10 +780,11 @@ function formatScoutLevel(value: number | null) {
 function entryTimingDisplay(report: ScoutReport) {
   const state = report.entryTimingState || 'Not Ready';
   const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
+  if (state === 'Entry Triggered') return 'Entry Triggered';
+  const zoneLabel = zoneTimingLabelForScout(report);
+  if (zoneLabel) return zoneLabel;
   if (state === 'Reaction Started') {
-    if (direction === 'SHORT') return 'Testing Supply';
-    if (direction === 'LONG') return 'Testing Demand';
-    return 'Testing Zone';
+    return 'Reaction Started';
   }
   if (state === 'Area Reached') {
     if (direction === 'SHORT') return 'Approaching Supply';
@@ -774,10 +797,26 @@ function entryTimingDisplay(report: ScoutReport) {
 function entryTimingReasonDisplay(report: ScoutReport) {
   const state = report.entryTimingState || 'Not Ready';
   const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
+  const zoneState = zoneTouchStateForScout(report);
+  if (zoneState === 'REJECTING') {
+    if (direction === 'SHORT') return 'Price has touched supply and bearish reaction evidence has started. Wait for entry trigger before treating this as active.';
+    if (direction === 'LONG') return 'Price has touched demand and bullish reaction evidence has started. Wait for entry trigger before treating this as active.';
+    return 'Price has touched the zone and reaction evidence has started. Wait for entry trigger before treating this as active.';
+  }
+  if (zoneState === 'TESTING') {
+    if (direction === 'SHORT') return 'Current price/candle is touching supply. Wait for bearish rejection before entry.';
+    if (direction === 'LONG') return 'Current price/candle is touching demand. Wait for bullish rejection before entry.';
+    return 'Current price/candle is touching the zone. Wait for rejection before entry.';
+  }
+  if (zoneState === 'APPROACHING') {
+    if (direction === 'SHORT') return 'Price is below supply and approaching the zone, but it has not touched supply yet.';
+    if (direction === 'LONG') return 'Price is above demand and approaching the zone, but it has not touched demand yet.';
+    return 'Price is approaching the zone, but it has not touched it yet.';
+  }
   if (state === 'Reaction Started') {
-    if (direction === 'SHORT') return 'Price is testing supply; wait for bearish rejection before treating this as an entry.';
-    if (direction === 'LONG') return 'Price is testing demand; wait for bullish rejection before treating this as an entry.';
-    return 'Price is testing the zone; wait for rejection before treating this as an entry.';
+    if (direction === 'SHORT') return 'Reaction evidence is developing, but current price is not overlapping supply. Do not treat this as a supply test yet.';
+    if (direction === 'LONG') return 'Reaction evidence is developing, but current price is not overlapping demand. Do not treat this as a demand test yet.';
+    return 'Reaction evidence is developing, but price is not overlapping the zone.';
   }
   if (state === 'Area Reached') {
     if (direction === 'SHORT') return 'Price may be moving toward supply above; wait for a supply tap/rejection before entry.';
@@ -852,10 +891,10 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const reversalText = report.reversalConfirmed ? '✅ Detected' : '❌ Not Detected';
     const isEntryAlert = kind === 'entry';
     const timingDisplay = entryTimingDisplay(report);
-    const title = isEntryAlert ? '✅ *ENTRY TRIGGERED SCOUT' : `👀 *WATCHLIST — CLEAN TREND OPPORTUNITY`;
+    const title = isEntryAlert ? '✅ *ENTRY TRIGGERED SCOUT' : `👀 *WATCHLIST — SETUP DEVELOPING`;
     const actionLine = isEntryAlert
       ? 'Action: Entry trigger started for review'
-      : `Action: ${entryActionDisplay(report)} on your entry chart`;
+      : `Action: ${entryActionDisplay(report)} and wait for confirmation on your entry chart`;
     const text = `${title} — ${report.displaySymbol}*\nPair: ${report.displaySymbol}\nGrade: ${report.setupGrade || 'C'} Setup\nStatus: ${setupStatus}\nTiming: ${timingDisplay}\n${actionLine}\nEval Eligible: ${report.evalEligible ? 'YES' : 'NO'}\nDirection: ${direction}\nTrend: ${trendDisplay}\nCurrent Timeframe Flow: ${report.setupTimeframeDirection}\nPhase: ${phaseDisplay}\nStructure Shift: ${reversalText}\nLocation: ${report.zone}\nEntry Status: ${report.entryStatus}\nCurrent Price: ${formatScoutLevel(report.price)}\nEntry: ${formatScoutLevel(report.entry)}\nSL: ${formatScoutLevel(report.sl)}\nTP1: ${formatScoutLevel(report.tp1)}\nR:R: ${report.rrRatio ?? 'N/A'}\nSupport: ${formatScoutLevel(report.nearestSupport)}\nResistance: ${formatScoutLevel(report.nearestResistance)}\nTimeframe: ${report.timeframe}\nReason: ${entryTimingReasonDisplay(report)}\n→ https://erica-forex-screener-production.up.railway.app`;
 
     try {
