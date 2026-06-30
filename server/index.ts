@@ -798,6 +798,9 @@ function entryTimingReasonDisplay(report: ScoutReport) {
   const state = report.entryTimingState || 'Not Ready';
   const direction = report.tradeDirection || (report.bias === 'BULLISH' ? 'LONG' : report.bias === 'BEARISH' ? 'SHORT' : 'NEUTRAL');
   const zoneState = zoneTouchStateForScout(report);
+  if (state === 'Reaction Started' && report.decisionLevelConfirmed === true) {
+    return 'Decision level is confirmed and reaction is developing. Wait for the entry trigger before treating this as active.';
+  }
   if (zoneState === 'REJECTING') {
     if (direction === 'SHORT') return 'Price has touched supply and bearish reaction evidence has started. Wait for entry trigger before treating this as active.';
     if (direction === 'LONG') return 'Price has touched demand and bullish reaction evidence has started. Wait for entry trigger before treating this as active.';
@@ -857,6 +860,12 @@ function scoutStateDisplay(report: ScoutReport) {
     };
   }
   if (report.entryTimingState === 'Reaction Started') {
+    if (report.decisionLevelConfirmed === true) {
+      return {
+        state: 'At Watch Area',
+        action: 'Decision level confirmed; wait for entry trigger',
+      };
+    }
     return {
       state: 'Decision Pending',
       action: direction === 'SHORT'

@@ -2367,6 +2367,9 @@
       return { value: 'Entry Proven', label: '🟢 ENTRY PROVEN', className: 'review-now' };
     }
     if (timing === 'Reaction Started') {
+      if (r.decisionLevelConfirmed === true) {
+        return { value: 'At Watch Area', label: '🔵 WATCHING ZONE', className: 'monitor' };
+      }
       return { value: 'Decision Pending', label: '🟡 DECISION PENDING', className: 'watch' };
     }
     if (timing === 'Area Reached') {
@@ -2466,6 +2469,12 @@
       };
     }
     if (timing === 'Reaction Started') {
+      if (decisionConfirmed) {
+        return {
+          label: 'At Watch Area',
+          action: 'Decision level confirmed. Wait for entry trigger.',
+        };
+      }
       return {
         label: 'Decision Pending',
         action: direction === 'SHORT'
@@ -2528,6 +2537,9 @@
       return 'Entry Ready — Review Plan';
     }
     if (timingState === 'Reaction Started') {
+      if (r.decisionLevelConfirmed === true) {
+        return zoneLabel ? `Watching Zone — ${shortTimingLabel(zoneLabel)}` : 'Watching Zone — Reaction Started';
+      }
       return zoneLabel ? `Needs Break — ${shortTimingLabel(zoneLabel)}` : 'Needs Break — Reaction Started';
     }
     if (timingState === 'Area Reached') {
