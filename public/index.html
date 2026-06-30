@@ -755,37 +755,38 @@
   <div class="stat-box"><div class="stat-value" id="s-bullish" style="color:var(--green)">—</div><div class="stat-label">Bullish</div></div>
   <div class="stat-box"><div class="stat-value" id="s-bearish" style="color:var(--red)">—</div><div class="stat-label">Bearish</div></div>
   <div class="stat-box"><div class="stat-value" id="s-mixed" style="color:var(--slate)">—</div><div class="stat-label">Mixed</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-review-now" style="color:var(--green)">—</div><div class="stat-label">Review Now</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-action-watch" style="color:var(--gold)">—</div><div class="stat-label">Watch</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-monitor" style="color:var(--blue)">—</div><div class="stat-label">Monitor</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-review-now" style="color:var(--green)">—</div><div class="stat-label">Entry Proven</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-action-watch" style="color:var(--gold)">—</div><div class="stat-label">Decision Pending</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-monitor" style="color:var(--blue)">—</div><div class="stat-label">At Watch Area</div></div>
   <div class="stat-box"><div class="stat-value" id="s-trend-watch" style="color:#22d3ee">—</div><div class="stat-label">Trend Watch</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-low-priority" style="color:var(--slate)">—</div><div class="stat-label">Low Priority</div></div>
+  <div class="stat-box"><div class="stat-value" id="s-low-priority" style="color:var(--slate)">—</div><div class="stat-label">Lower Priority</div></div>
 </div>
 
 <div class="filter-row">
   <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
   <select class="filter-select" id="actionFilter" onchange="renderSetups()" aria-label="Action filter">
-    <option value="ALL">Action: All</option>
-    <option value="Review Now">Action: Review Now</option>
-    <option value="Watch">Action: Watch</option>
-    <option value="Monitor">Action: Monitor</option>
-    <option value="Trend Watch">Action: Trend Watch</option>
-    <option value="Low Priority">Action: Low Priority</option>
+    <option value="ALL">Scout State: All</option>
+    <option value="Entry Proven">Scout State: Entry Proven</option>
+    <option value="Decision Pending">Scout State: Decision Pending</option>
+    <option value="At Watch Area">Scout State: At Watch Area</option>
+    <option value="Trend Watch">Scout State: Trend Watch</option>
+    <option value="Market Read">Scout State: Market Read</option>
+    <option value="Lower Priority">Scout State: Lower Priority</option>
   </select>
   <select class="filter-select" id="entryStatusFilter" onchange="renderSetups()" aria-label="Entry status filter">
-    <option value="ALL">Actionability: All Setups</option>
-    <option value="EVAL">Actionability: Eval Eligible</option>
-    <option value="WATCH">Actionability: Watch Only</option>
+    <option value="ALL">Decision: All</option>
+    <option value="DECISION_CONFIRMED">Decision: Confirmed</option>
+    <option value="DECISION_WAITING">Decision: Waiting</option>
     <option value="Tradeable">Raw Entry: Tradeable</option>
     <option value="Near Entry">Raw Entry: Near Entry</option>
     <option value="Waiting">Raw Entry: Waiting</option>
     <option value="Too Far">Raw Entry: Too Far</option>
   </select>
   <select class="filter-select" id="gradeFilter" onchange="renderSetups()" aria-label="Setup grade filter">
-    <option value="ALL">Grade: All Grades</option>
-    <option value="A">Grade: A Setup</option>
-    <option value="B">Grade: B Setup</option>
-    <option value="C">Grade: C Setup</option>
+    <option value="ALL">Internal Grade: All</option>
+    <option value="A">Internal Grade: A</option>
+    <option value="B">Internal Grade: B</option>
+    <option value="C">Internal Grade: C</option>
   </select>
   <select class="filter-select" id="trendFilter" onchange="renderSetups()" aria-label="Trend filter">
     <option value="ALL">Trend: All Trends</option>
@@ -802,12 +803,12 @@
     <option value="Transition">Phase: Transition</option>
   </select>
   <select class="filter-select" id="setupStatusFilter" onchange="renderSetups()" aria-label="Setup status filter">
-    <option value="ALL">Setup Status: All Setup Statuses</option>
-    <option value="Pullback Active">Setup Status: Pullback Active</option>
-    <option value="Pullback Complete">Setup Status: Pullback Complete</option>
-    <option value="Early Confirmation">Setup Status: Early Confirmation</option>
-    <option value="Strong Confirmation">Setup Status: Strong Confirmation</option>
-    <option value="Trend Resumption Confirmed">Setup Status: Trend Resumption Confirmed</option>
+    <option value="ALL">Development: All</option>
+    <option value="Pullback Active">Development: Pullback Active</option>
+    <option value="Pullback Complete">Development: Pullback Complete</option>
+    <option value="Early Confirmation">Development: Early Confirmation</option>
+    <option value="Strong Confirmation">Development: Strong Confirmation</option>
+    <option value="Trend Resumption Confirmed">Development: Trend Resumption Confirmed</option>
   </select>
   <select class="filter-select" id="locationFilter" onchange="renderSetups()" aria-label="Location filter">
     <option value="ALL">Location: All Locations</option>
@@ -2278,9 +2279,9 @@
     const location = document.getElementById('locationFilter')?.value || 'ALL';
     return allSetups.filter(x => {
       if (action !== 'ALL' && actionPriorityForReport(x).value !== action) return false;
-      if (entryStatus === 'EVAL' && x.evalEligible !== true) return false;
-      if (entryStatus === 'WATCH' && x.evalEligible === true) return false;
-      if (!['ALL', 'EVAL', 'WATCH'].includes(entryStatus) && x.entryStatus !== entryStatus) return false;
+      if (entryStatus === 'DECISION_CONFIRMED' && x.decisionLevelConfirmed !== true) return false;
+      if (entryStatus === 'DECISION_WAITING' && x.decisionLevelConfirmed === true) return false;
+      if (!['ALL', 'DECISION_CONFIRMED', 'DECISION_WAITING'].includes(entryStatus) && x.entryStatus !== entryStatus) return false;
       if (grade !== 'ALL' && (x.setupGrade || 'C') !== grade) return false;
       if (trend !== 'ALL' && displayTrendForReport(x) !== trend) return false;
       if (phase !== 'ALL' && displayPhaseForReport(x) !== phase) return false;
@@ -2344,25 +2345,28 @@
   function actionPriorityForReport(r) {
     const grade = r.setupGrade || 'C';
     const timing = r.entryTimingState || 'Not Ready';
-    if (!meetsMinScoutRr(r)) {
-      return { value: 'Low Priority', label: '⚪ LOW PRIORITY', className: 'low-priority' };
+    if (timing === 'Entry Triggered' && r.decisionLevelConfirmed === true) {
+      return { value: 'Entry Proven', label: '🟢 ENTRY PROVEN', className: 'review-now' };
     }
-    if (!setupFlowAlignedForReport(r)) {
-      return { value: 'Low Priority', label: '⚪ LOW PRIORITY', className: 'low-priority' };
+    if (timing === 'Reaction Started') {
+      return { value: 'Decision Pending', label: '🟡 DECISION PENDING', className: 'watch' };
     }
-    if (grade === 'A' && timing === 'Entry Triggered') {
-      return { value: 'Review Now', label: '🟢 REVIEW NOW', className: 'review-now' };
-    }
-    if (grade === 'A' && (timing === 'Reaction Started' || timing === 'Area Reached')) {
-      return { value: 'Watch', label: '🟡 WATCH', className: 'watch' };
-    }
-    if (grade === 'B' && (timing === 'Entry Triggered' || timing === 'Reaction Started' || timing === 'Area Reached')) {
-      return { value: 'Monitor', label: '🔵 MONITOR', className: 'monitor' };
+    if (timing === 'Area Reached') {
+      return { value: 'At Watch Area', label: '🔵 AT WATCH AREA', className: 'monitor' };
     }
     if (r.trendWatchEligible === true) {
       return { value: 'Trend Watch', label: '🔷 TREND WATCH', className: 'trend-watch' };
     }
-    return { value: 'Low Priority', label: '⚪ LOW PRIORITY', className: 'low-priority' };
+    if (!meetsMinScoutRr(r)) {
+      return { value: 'Lower Priority', label: '⚪ LOWER PRIORITY', className: 'low-priority' };
+    }
+    if (!setupFlowAlignedForReport(r)) {
+      return { value: 'Lower Priority', label: '⚪ LOWER PRIORITY', className: 'low-priority' };
+    }
+    if (grade === 'C') {
+      return { value: 'Lower Priority', label: '⚪ LOWER PRIORITY', className: 'low-priority' };
+    }
+    return { value: 'Market Read', label: '⚫ MARKET READ', className: 'low-priority' };
   }
 
   function scoutStateForReport(r) {
@@ -2406,7 +2410,7 @@
     }
     return {
       label: 'Market Read',
-      action: 'Monitor only.',
+      action: 'Observe only.',
     };
   }
 
@@ -2431,28 +2435,24 @@
   }
 
   function setupHeadlineForReport(r) {
-    const grade = r.setupGrade || 'C';
     const direction = tradeDirectionForReport(r);
     const timingState = r.entryTimingState || 'Not Ready';
-    if (grade === 'A') {
-      if (timingState === 'Area Reached') {
-        const zoneLabel = zoneTimingLabelForReport(r);
-        if (zoneLabel) return `A Setup — ${zoneLabel}`;
-        if (direction === 'LONG') return 'A Setup — Approaching Demand';
-        if (direction === 'SHORT') return 'A Setup — Approaching Supply';
-        return 'A Setup — Approaching Zone';
-      }
-      if (timingState === 'Reaction Started') {
-        const zoneLabel = zoneTimingLabelForReport(r);
-        if (zoneLabel) return `A Setup — ${zoneLabel}`;
-        if (direction === 'LONG') return 'A Setup — Reaction Started';
-        if (direction === 'SHORT') return 'A Setup — Reaction Started';
-        return 'A Setup — Wait for Rejection';
-      }
-      return `A Setup — ${simpleSetupStatusForReport(r)}`;
+    const zoneLabel = zoneTimingLabelForReport(r);
+    if (timingState === 'Entry Triggered' && r.decisionLevelConfirmed === true) {
+      return 'Entry Proven — Review Plan';
     }
-    if (grade === 'B') return 'B Setup — Wait';
-    return 'C Setup — Counter-trend';
+    if (timingState === 'Reaction Started') {
+      return zoneLabel ? `Decision Pending — ${zoneLabel}` : 'Decision Pending — Reaction Started';
+    }
+    if (timingState === 'Area Reached') {
+      if (zoneLabel) return `At Watch Area — ${zoneLabel}`;
+      if (direction === 'LONG') return 'At Watch Area — Approaching Demand';
+      if (direction === 'SHORT') return 'At Watch Area — Approaching Supply';
+      return 'At Watch Area';
+    }
+    if (r.trendWatchEligible === true) return 'Trend Watch — Track Pullback';
+    if ((r.setupGrade || 'C') === 'C') return 'Lower Priority — Do Not Force';
+    return 'Market Read — Observe';
   }
 
   function tradeDirectionForReport(r) {
@@ -2512,23 +2512,6 @@
       return r.entryTimingReason || 'Area reached, but entry confirmation has not started.';
     }
     return r.entryTimingReason || 'Waiting for price to reach the area and show reaction evidence.';
-  }
-
-  function entryActionForReport(r) {
-    const state = r.entryTimingState || 'Not Ready';
-    const direction = tradeDirectionForReport(r);
-    if (state === 'Entry Triggered') return 'Entry trigger active';
-    if (state === 'Reaction Started') {
-      if (direction === 'SHORT') return 'Wait for Bearish Rejection';
-      if (direction === 'LONG') return 'Wait for Bullish Rejection';
-      return 'Wait for Rejection';
-    }
-    if (state === 'Area Reached') {
-      if (direction === 'SHORT') return 'Watch Supply';
-      if (direction === 'LONG') return 'Watch Demand';
-      return 'Watch Zone';
-    }
-    return 'Wait';
   }
 
   function scoutDirectionForReport(r) {
@@ -2605,11 +2588,12 @@
     const counts = rows.reduce((acc, row) => {
       const status = ['Tradeable', 'Near Entry', 'Waiting', 'Too Far'].includes(row.entryStatus) ? row.entryStatus : 'Unknown';
       acc[status] = (acc[status] || 0) + 1;
-      if (row.evalEligible === true) acc.EvalEligible = (acc.EvalEligible || 0) + 1;
-      if (actionPriorityForReport(row).value === 'Trend Watch') acc.TrendWatch = (acc.TrendWatch || 0) + 1;
+      const state = actionPriorityForReport(row).value;
+      acc[state] = (acc[state] || 0) + 1;
+      if (row.decisionLevelConfirmed === true) acc.DecisionConfirmed = (acc.DecisionConfirmed || 0) + 1;
       return acc;
     }, {});
-    return `Eval Eligible: ${counts.EvalEligible || 0} | Trend Watch: ${counts.TrendWatch || 0} | Tradeable: ${counts.Tradeable || 0} | Near Entry: ${counts['Near Entry'] || 0} | Waiting: ${counts.Waiting || 0} | Too Far: ${counts['Too Far'] || 0}`;
+    return `Entry Proven: ${counts['Entry Proven'] || 0} | Decision Pending: ${counts['Decision Pending'] || 0} | Decision Confirmed: ${counts.DecisionConfirmed || 0} | Trend Watch: ${counts['Trend Watch'] || 0}`;
   }
 
   function matchesLocationFilter(zone, filter) {
@@ -2632,11 +2616,11 @@
     document.getElementById('s-bullish').textContent = all.filter(s => displayTrendForReport(s) === 'Bullish').length || '—';
     document.getElementById('s-bearish').textContent = all.filter(s => displayTrendForReport(s) === 'Bearish').length || '—';
     document.getElementById('s-mixed').textContent = all.filter(s => displayTrendForReport(s) === 'Mixed').length || '—';
-    document.getElementById('s-review-now').textContent = all.filter(s => actionPriorityForReport(s).value === 'Review Now').length;
-    document.getElementById('s-action-watch').textContent = all.filter(s => actionPriorityForReport(s).value === 'Watch').length;
-    document.getElementById('s-monitor').textContent = all.filter(s => actionPriorityForReport(s).value === 'Monitor').length;
+    document.getElementById('s-review-now').textContent = all.filter(s => actionPriorityForReport(s).value === 'Entry Proven').length;
+    document.getElementById('s-action-watch').textContent = all.filter(s => actionPriorityForReport(s).value === 'Decision Pending').length;
+    document.getElementById('s-monitor').textContent = all.filter(s => actionPriorityForReport(s).value === 'At Watch Area').length;
     document.getElementById('s-trend-watch').textContent = all.filter(s => actionPriorityForReport(s).value === 'Trend Watch').length;
-    document.getElementById('s-low-priority').textContent = all.filter(s => actionPriorityForReport(s).value === 'Low Priority').length;
+    document.getElementById('s-low-priority').textContent = all.filter(s => actionPriorityForReport(s).value === 'Lower Priority').length;
     const main = document.getElementById('mainContent');
     if (!all.length) {
       const scanLabel = priorityPairsActive ? `${currentScanLabel()}: ${PAIRS.map(makePairLabel).join(', ')}` : currentScanLabel();
@@ -4462,21 +4446,23 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     const evalEligible = r.evalEligible === true;
     const lowRr = !meetsMinScoutRr(r);
     const trendWatch = r.trendWatchEligible === true;
-    const evalLabel = evalEligible ? 'Eval Eligible' : trendWatch ? 'Trend Watch' : 'Watch Only';
+    const evalLabel = evalEligible ? 'Entry Proven' : trendWatch ? 'Trend Watch' : 'Not Proven';
     const evalColor = evalEligible ? 'var(--green)' : trendWatch ? '#22d3ee' : 'var(--gold)';
     const evalReason = evalEligible
-      ? (r.evalReason || 'Confirmed A setup is eligible for eval consideration.')
+      ? (r.evalReason || 'Entry is proven and ready for review.')
       : trendWatch
         ? (r.trendWatchReason || 'Trend watch only: direction and current timeframe flow align, but entry still needs live confirmation.')
         : r.evalReason || (lowRr
-          ? 'Watch only: Scout R:R is below 2.0.'
-          : 'Watch only until trend, location, reversal, confirmation, and entry distance all align.');
+          ? 'Not proven: Scout R:R is below 2.0.'
+          : 'Not proven until trend, location, reversal, confirmation, decision level, and entry distance all align.');
+    const proofReason = String(evalReason || '')
+      .replace(/^Watch only:/, 'Not proven:')
+      .replace(/^Eval eligible:/, 'Entry proven:');
     const rawEntryTimingState = r.entryTimingState || 'Not Ready';
     const entryTimingState = entryTimingDisplayForReport(r);
     const scoutState = scoutStateForReport(r);
     const actionPriority = actionPriorityForReport(r);
     const entryTimingReason = entryTimingReasonForReport(r);
-    const entryAction = entryActionForReport(r);
     const entryTimingColor = rawEntryTimingState === 'Entry Triggered'
       ? 'var(--green)'
       : rawEntryTimingState === 'Reaction Started'
@@ -4484,7 +4470,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
         : rawEntryTimingState === 'Area Reached'
           ? 'var(--gold)'
           : 'var(--slate)';
-    const entryStatusDisplay = evalEligible ? 'Eval Eligible' : lowRr ? 'Low R:R' : entryStatus === 'Tradeable' ? setupHeadline : entryStatus;
+    const entryStatusDisplay = evalEligible ? 'Entry Proven' : lowRr ? 'Lower Priority' : entryStatus === 'Tradeable' ? scoutState.label : entryStatus;
     const entryStatusDisplayCls = evalEligible ? 'eval-eligible' : lowRr ? 'low-rr' : entryStatusCls;
     const distanceAtr = Number.isFinite(Number(r.distanceFromEntryAtr)) ? Number(r.distanceFromEntryAtr) : null;
     const distancePct = Number.isFinite(Number(r.distanceFromEntryPercent)) ? Number(r.distanceFromEntryPercent) : null;
@@ -4530,7 +4516,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           <div style="text-align:right;flex-shrink:0;">
             <div class="action-badge ${actionPriority.className}">${escapeHtml(actionPriority.label)}</div>
             <div class="entry-status ${entryStatusDisplayCls}">${escapeHtml(entryStatusDisplay)}</div>
-            <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Entry Status</div>
+            <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Scout Status</div>
           </div>
         </div>
         <div class="market-context">
@@ -4567,7 +4553,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             <div class="context-value">${distanceAtr == null ? '—' : `${distanceAtr.toFixed(2)} ATR`}</div>
           </div>
           <div class="context-cell">
-            <div class="context-label">Eval</div>
+            <div class="context-label">Proof</div>
             <div class="context-value" style="color:${evalColor}">${escapeHtml(evalLabel)}</div>
           </div>
           <div class="context-cell">
@@ -4584,12 +4570,12 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           </div>
         </div>
         <div class="setup-status-box ${setupStatusCls}">
-          <div class="setup-status-label">Setup</div>
+          <div class="setup-status-label">Scout Read</div>
           <div class="setup-status-value">${escapeHtml(setupHeadline)}</div>
           <div class="setup-status-reason">${escapeHtml(r.setupGradeReason || setupStatusReason)}</div>
           <div class="setup-status-reason">Timing: ${escapeHtml(entryTimingReason)}</div>
           <div class="setup-status-reason">Next Action: ${escapeHtml(scoutState.action)}</div>
-          <div class="setup-status-reason">Eval: ${escapeHtml(evalReason)}</div>
+          <div class="setup-status-reason">Proof: ${escapeHtml(proofReason)}</div>
           <div class="setup-status-reason">Structure Shift: ${escapeHtml(r.reversalReason || (reversalConfirmed ? 'Structure shift detected.' : 'Waiting for structure shift.'))}</div>
           ${pineConfirmed ? `<div class="setup-status-reason">Pine: ${escapeHtml(pineConfirmation.message || pineConfirmation.rejectionType || 'Supply/demand rejection confirmed.')}</div>` : ''}
         </div>
@@ -4633,7 +4619,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
         </div>
         <div class="plan-diagnostics-box">
           <div class="plan-diagnostics-head">
-            <div class="setup-status-label">Trade Plan Diagnostics</div>
+            <div class="setup-status-label">Entry Plan Diagnostics</div>
             <span class="plan-quality ${planQualityCls}">${escapeHtml(planQuality)}</span>
           </div>
           <div class="setup-status-reason">Entry Source: ${escapeHtml(r.entrySource || 'Unknown')}</div>
@@ -4666,23 +4652,23 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
                 <div class="scout-level-value" style="color:${contextColor(setupTfDirection)}">${escapeHtml(setupTfDirection)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Grade</div>
-                <div class="scout-level-value" style="color:${gradeColor}">${escapeHtml(grade)} Setup</div>
+                <div class="scout-level-label">Internal Grade</div>
+                <div class="scout-level-value" style="color:${gradeColor}">${escapeHtml(grade)}</div>
               </div>
               <div class="scout-level-box">
                 <div class="scout-level-label">Phase</div>
                 <div class="scout-level-value">${escapeHtml(displayPhaseForReport(r))}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Setup Status</div>
+                <div class="scout-level-label">Development</div>
                 <div class="scout-level-value">${escapeHtml(simpleSetupStatus)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Entry Status</div>
+                <div class="scout-level-label">Raw Entry Status</div>
                 <div class="scout-level-value">${escapeHtml(entryStatusDisplay)}</div>
               </div>
               <div class="scout-level-box">
-                <div class="scout-level-label">Eval</div>
+                <div class="scout-level-label">Proof</div>
                 <div class="scout-level-value" style="color:${evalColor}">${escapeHtml(evalLabel)}</div>
               </div>
               <div class="scout-level-box">
@@ -4903,14 +4889,15 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       `Current Timeframe Flow: ${report.setupTimeframeDirection || 'Mixed'}`,
       `Phase: ${displayPhaseForReport(report)}`,
       `Context: ${contextLabelForReport(report)}`,
-      `Grade: ${report.setupGrade || ''}`,
-      `Grade Reason: ${report.setupGradeReason || ''}`,
-      `Setup Status: ${simpleSetupStatusForReport(report)}`,
-      `Entry Status: ${report.entryStatus || 'Waiting'}`,
+      `Scout State: ${scoutStateForReport(report).label}`,
+      `Internal Grade: ${report.setupGrade || ''}`,
+      `Internal Grade Reason: ${report.setupGradeReason || ''}`,
+      `Development: ${simpleSetupStatusForReport(report)}`,
+      `Raw Entry Status: ${report.entryStatus || 'Waiting'}`,
       `Entry Timing: ${entryTimingDisplayForReport(report)}`,
       `Entry Timing Reason: ${entryTimingReasonForReport(report)}`,
-      `Eval Eligible: ${report.evalEligible ? 'Yes' : 'No'}`,
-      `Eval Reason: ${report.evalReason || ''}`,
+      `Proof: ${report.evalEligible ? 'Entry Proven' : 'Not Proven'}`,
+      `Proof Reason: ${report.evalReason || ''}`,
       `Structure Shift: ${report.reversalConfirmed ? 'Detected' : 'Not Detected'}`,
       `Structure Shift Reason: ${report.reversalReason || ''}`,
       `Pine Rejection: ${report.pineConfirmation ? 'Confirmed' : 'Waiting'}`,
