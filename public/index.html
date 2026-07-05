@@ -587,13 +587,18 @@
     .developing-circle-inner { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; line-height:1; }
     .developing-reason { border:1px solid rgba(148,163,184,0.12); border-radius:10px; padding:9px 10px; background:rgba(148,163,184,0.045); min-width:0; }
     .developing-reason-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin-bottom:5px; }
-    .developing-reason-text { font-size:12px; color:var(--slate); line-height:1.35; }
+    .developing-reason-text { font-size:12px; color:var(--slate); line-height:1.35; display:flex; gap:7px; align-items:flex-start; }
+    .developing-check-icon { color:var(--slate-dim); font-size:13px; line-height:1.1; flex:0 0 auto; }
     .developing-levels { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; margin-top:8px; }
     .developing-level { border:1px solid rgba(148,163,184,0.1); border-radius:7px; padding:6px; background:rgba(148,163,184,0.035); min-width:0; }
     .developing-level-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
     .developing-level-value { font-size:11px; color:var(--slate); font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .developing-next { margin-top:7px; font-size:10px; color:var(--slate-dim); line-height:1.3; }
+    .developing-next strong { color:var(--slate); font-weight:900; }
     .developing-path { margin-top:9px; font-size:10px; color:var(--slate-dim); line-height:1.42; border:1px solid rgba(96,165,250,0.12); border-radius:9px; padding:8px 9px; background:rgba(96,165,250,0.035); }
     .developing-path-label { font-size:8px; color:var(--blue); text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin-bottom:4px; }
+    .developing-bullets { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:3px; }
+    .developing-bullets li { color:var(--slate-dim); line-height:1.35; }
     .developing-guide { margin-top:12px; padding:10px; border:1px solid rgba(148,163,184,0.1); border-radius:10px; background:rgba(2,6,23,0.22); }
     .developing-guide-title { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin-bottom:7px; }
     .developing-guide-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
@@ -2872,16 +2877,53 @@
   }
 
   function shortDevelopingExpectation(r, state) {
-    if (state.label === 'SKIP') return 'This setup has a major conflict. Do not trade this one right now.';
-    if ((r.entryStatus || '') === 'Too Far') return 'Price is still too far from entry. Wait for it to move closer before considering a trade.';
+    if (state.label === 'SKIP') return [
+      'This setup has a major conflict.',
+      'Do not trade this one right now.'
+    ];
+    if ((r.entryStatus || '') === 'Too Far') return [
+      'Price is still too far from entry.',
+      'Wait for it to move closer.'
+    ];
     const direction = tradeDirectionForReport(r);
     if (direction === 'SHORT') {
-      return 'Price may move slightly higher first. Wait for rejection near the supply area. If price breaks above that area, skip the trade.';
+      return [
+        'Price may move slightly higher first.',
+        'Wait for rejection near supply.',
+        'If price breaks above, skip this trade.'
+      ];
     }
     if (direction === 'LONG') {
-      return 'Price may move slightly lower first. Wait for buyers to defend the support area. If price breaks below that area, skip the trade.';
+      return [
+        'Price may move slightly lower first.',
+        'Wait for buyers to defend support.',
+        'If price breaks below, skip this trade.'
+      ];
     }
-    return 'Price is still developing. Wait for the setup to become clear before considering a trade.';
+    return [
+      'Price is still developing.',
+      'Wait for the setup to become clear.'
+    ];
+  }
+
+  function developingCircleSubtext(state) {
+    if (state.label === 'ENTER NOW') return 'ready';
+    if (state.label === 'ALMOST READY') return '1 step left';
+    if (state.label === 'WAIT') return 'developing';
+    if (state.label === 'SKIP') return 'skip';
+    return '';
+  }
+
+  function nextMilestoneFromReason(reason) {
+    if (/^Close below /i.test(reason)) return reason;
+    if (/^Close above /i.test(reason)) return reason;
+    if (/too far|closer/i.test(reason)) return 'Price closer to entry';
+    if (/flow/i.test(reason)) return 'Flow aligns';
+    if (/rejection|confirmation/i.test(reason)) return 'Rejection candle';
+    if (/decision/i.test(reason)) return 'Decision level confirms';
+    if (/R:R/i.test(reason)) return 'Better R:R';
+    if (/location/i.test(reason)) return 'Correct location';
+    return reason;
   }
 
   function renderDevelopingSetups(rows) {
@@ -2939,6 +2981,8 @@
     const reason = conversationalDevelopingReason(developingReasonForReport(r, state));
     const expectation = shortDevelopingExpectation(r, state);
     const pathLabel = state.label === 'SKIP' ? 'Rejection Reason' : 'What To Expect';
+    const circleSubtext = developingCircleSubtext(state);
+    const nextMilestone = nextMilestoneFromReason(reason);
     return `
       <article class="developing-card">
         <div class="developing-card-head">
@@ -2955,12 +2999,12 @@
           <div class="developing-circle ${state.className}" style="--progress-pct:${state.progress}%;">
             <div class="developing-circle-inner">
               <div class="developing-percent">${state.progress}%</div>
-              <div class="developing-percent-label">Ready</div>
+              ${circleSubtext ? `<div class="developing-percent-label">${escapeHtml(circleSubtext)}</div>` : ''}
             </div>
           </div>
           <div class="developing-reason">
             <div class="developing-reason-label">Waiting For</div>
-            <div class="developing-reason-text">${escapeHtml(reason)}</div>
+            <div class="developing-reason-text"><span class="developing-check-icon">○</span><span>${escapeHtml(reason)}</span></div>
           </div>
         </div>
         <div class="developing-levels">
@@ -2969,9 +3013,10 @@
           <div class="developing-level"><div class="developing-level-label">TP</div><div class="developing-level-value">${f(r.tp1)}</div></div>
           <div class="developing-level"><div class="developing-level-label">R:R</div><div class="developing-level-value">${r.rrRatio != null ? Number(r.rrRatio).toFixed(2) + 'R' : '—'}</div></div>
         </div>
+        <div class="developing-next"><strong>Next milestone:</strong> ${escapeHtml(nextMilestone)}</div>
         <div class="developing-path">
           <div class="developing-path-label">${pathLabel}</div>
-          ${escapeHtml(expectation)}
+          <ul class="developing-bullets">${expectation.map(line => `<li>• ${escapeHtml(line)}</li>`).join('')}</ul>
         </div>
       </article>`;
   }
