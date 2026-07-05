@@ -20,6 +20,7 @@ app.use(express.text({ type: 'text/plain' }));
 
 let latestSetups: Setup[] = [];
 let latestScoutResults: ScoutReport[] = [];
+let latestScoutDiagnostics: ScoutDiagnosticsReport | null = null;
 let latestScalpResults: ScalpReport[] = [];
 let latestTrendResults: TrendScanResult | null = null;
 let lastTrendScanTime: string | null = null;
@@ -32,6 +33,7 @@ let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
 const tradeableSignalAlerts = new Map<string, number>();
 const tradeableSignalCandleTimes = new Map<string, string>();
+const tradeableSignalDiagnosticOutcomes = new Map<string, { decision: ScoutDiagnosticDecision; reasons: string[]; updatedAt: number }>();
 const TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const pineConfirmations = new Map<string, PineConfirmation>();
 const pineConfirmationAlerts = new Map<string, number>();
@@ -43,6 +45,57 @@ const MIN_SCOUT_ALERT_RR = 2.0;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_AI_STUDIO_MODEL = process.env.OPENAI_AI_STUDIO_MODEL || 'gpt-4.1-mini';
 const AI_STUDIO_DISCLAIMER = 'Educational trading content only. This is not financial advice, not a signal service, and no trade outcome is guaranteed.';
+
+type ScoutDiagnosticDecision = 'Alert sent' | 'Watch only' | 'Rejected' | 'Duplicate suppressed' | 'Stale candle suppressed' | 'Cooldown suppressed' | 'Market closed suppressed' | 'Telegram failed';
+
+interface ScoutDiagnosticRow {
+  pair: string;
+  timeframe: string;
+  directionConsidered: string;
+  trendHtfAlignment: string;
+  location: string;
+  structureShift: string;
+  reversalConfirmation: string;
+  timingState: string;
+  entryDistance: number | null;
+  rr: number | null;
+  session: string;
+  cooldownStatus: string;
+  candleTime: string;
+  staleCandleStatus: string;
+  finalDecision: ScoutDiagnosticDecision;
+  rejectionReasons: string[];
+  setupGrade: string;
+  evalEligible: boolean;
+  interestLevel: string;
+  entryStatus: string;
+  pineConfirmation: string;
+}
+
+interface ScoutDiagnosticsReport {
+  generatedAt: string;
+  source: string;
+  summary: {
+    totalPairsScanned: number;
+    totalCandidatesFound: number;
+    totalASetups: number;
+    totalBSetups: number;
+    totalEvalEligible: number;
+    totalAlertsSent: number;
+    topRejectionReasons: Array<{ reason: string; count: number }>;
+    repeatedPairCounts: Array<{ pair: string; count: number }>;
+    scannedButNeverCandidates: string[];
+    timeframesActive: string[];
+    metalsScanned: Array<{ pair: string; timeframes: string[] }>;
+    rrFilterBlocks: number;
+    pineConfirmationBlocks: number;
+    cooldownSuppressions: number;
+    staleCandleSuppressions: number;
+    sessionSuppressions: number;
+  };
+  rows: ScoutDiagnosticRow[];
+  notes: string[];
+}
 
 interface PineConfirmation {
   symbol: string;
@@ -638,6 +691,202 @@ function isWatchScoutSignal(report: ScoutReport) {
     report.tp1 !== null;
 }
 
+function scoutDiagnosticReasons(report: ScoutReport, kind: 'entry' | 'watch' = 'entry') {
+  const reasons: string[] = [];
+  const direction = scoutTradeDirection(report);
+  const tradeTrend = direction === 'LONG' ? 'Bullish' : direction === 'SHORT' ? 'Bearish' : 'Mixed';
+  const locationAligned = isLocationAlignedForTrade(report);
+  const flowAligned = isSetupFlowAlignedForTrade(report);
+  const clearTrend = hasClearDailyOrH4Trend(report);
+  const confirmationStarted = ['Early Confirmation', 'Strong Confirmation', 'Trend Resumption Confirmed'].includes(displayScoutSetupStatus(report));
+
+  if (isIndexSymbol(report.pair)) reasons.push('index symbols are not Telegram Scout alert candidates');
+  if (direction === 'NEUTRAL') reasons.push('trade direction is neutral');
+  if (kind === 'entry' && report.evalEligible !== true) reasons.push(report.evalReason || 'eval eligibility is false');
+  if (kind === 'watch' && report.evalEligible === true) reasons.push('eval eligible setup is handled by entry alert path');
+  if (kind === 'watch' && !['A', 'B'].includes(report.setupGrade || '')) reasons.push('watch alerts require A or B setup grade');
+  if (report.rrRatio === null || report.rrRatio < MIN_SCOUT_ALERT_RR) reasons.push(`R:R is below ${MIN_SCOUT_ALERT_RR.toFixed(1)}`);
+  if (!clearTrend) reasons.push('Daily/H4 trend is not clear enough');
+  if (!locationAligned) reasons.push('location is not aligned with trade direction');
+  if (!flowAligned) reasons.push('current timeframe flow is not aligned with trade direction');
+  if (kind === 'entry' && !confirmationStarted) reasons.push('confirmation has not started');
+  if (kind === 'entry' && !report.reversalConfirmed) reasons.push('reversal confirmation is not active');
+  if (kind === 'entry' && report.entryTimingState !== 'Entry Triggered') reasons.push(`timing is ${report.entryTimingState}, not Entry Triggered`);
+  if (kind === 'watch' && !['Reaction Started', 'Area Reached'].includes(report.entryTimingState || '')) reasons.push(`watch timing is ${report.entryTimingState}, not Reaction Started or Area Reached`);
+  if (kind === 'entry' && report.entryStatus !== 'Tradeable') reasons.push(`entry status is ${report.entryStatus}, not Tradeable`);
+  if (kind === 'watch' && !['Tradeable', 'Near Entry', 'Waiting'].includes(report.entryStatus || '')) reasons.push(`watch entry status is ${report.entryStatus}`);
+  if (report.entry === null || report.sl === null || report.tp1 === null) reasons.push('entry, SL, or TP1 is missing');
+  if (report.decisionLevelConfirmed !== true) reasons.push(report.decisionLevelReason || 'decision level is not confirmed');
+  if (report.distanceFromEntryAtr !== null && report.distanceFromEntryAtr > 0.25 && kind === 'entry') reasons.push(`entry distance is ${report.distanceFromEntryAtr} ATR, above Tradeable threshold`);
+  if (report.setupGrade === 'C') reasons.push(report.setupGradeReason || 'C setup / lower priority');
+  if (tradeTrend !== 'Mixed' && report.dailyTrendDirection !== tradeTrend && report.dailyTrendDirection !== 'Neutral') reasons.push('Daily trend conflicts with trade direction');
+
+  return [...new Set(reasons.filter(Boolean))];
+}
+
+function scoutAlertKind(report: ScoutReport): 'entry' | 'watch' | null {
+  if (isTradeableScoutSignal(report)) return 'entry';
+  if (isWatchScoutSignal(report)) return 'watch';
+  return null;
+}
+
+function diagnosticDataKey(report: ScoutReport, kind: 'entry' | 'watch') {
+  return tradeableSignalDataKey(report, kind);
+}
+
+function diagnosticAlertKey(report: ScoutReport, kind: 'entry' | 'watch') {
+  return tradeableSignalAlertKey(report, kind);
+}
+
+function setScoutDiagnosticOutcome(report: ScoutReport, kind: 'entry' | 'watch', decision: ScoutDiagnosticDecision, reasons: string[] = []) {
+  tradeableSignalDiagnosticOutcomes.set(diagnosticAlertKey(report, kind), {
+    decision,
+    reasons,
+    updatedAt: Date.now(),
+  });
+  if (tradeableSignalDiagnosticOutcomes.size > 500) {
+    const stale = [...tradeableSignalDiagnosticOutcomes.entries()]
+      .sort((a, b) => a[1].updatedAt - b[1].updatedAt)
+      .slice(0, tradeableSignalDiagnosticOutcomes.size - 500);
+    stale.forEach(([key]) => tradeableSignalDiagnosticOutcomes.delete(key));
+  }
+}
+
+function scoutDiagnosticRow(report: ScoutReport, source = 'current cache'): ScoutDiagnosticRow {
+  const kind = scoutAlertKind(report);
+  const now = Date.now();
+  const direction = scoutTradeDirection(report);
+  const activeKind = kind || 'entry';
+  const dataKey = diagnosticDataKey(report, activeKind);
+  const alertKey = diagnosticAlertKey(report, activeKind);
+  const recordedOutcome = kind ? tradeableSignalDiagnosticOutcomes.get(alertKey) : null;
+  const previousCandleTime = tradeableSignalCandleTimes.get(dataKey);
+  const alertedAt = tradeableSignalAlerts.get(alertKey);
+  const cooldownActive = Boolean(alertedAt && now - alertedAt < TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS);
+  const staleCandle = Boolean(previousCandleTime && previousCandleTime === report.candleTime);
+  const marketOpen = isForexMarketOpen();
+  let finalDecision: ScoutDiagnosticDecision = 'Rejected';
+  let rejectionReasons = scoutDiagnosticReasons(report, activeKind);
+
+  if (kind) {
+    finalDecision = kind === 'entry' ? 'Alert sent' : 'Watch only';
+    rejectionReasons = [];
+    if (recordedOutcome) {
+      finalDecision = recordedOutcome.decision;
+      rejectionReasons = recordedOutcome.reasons;
+    } else if (!marketOpen) {
+      finalDecision = 'Market closed suppressed';
+      rejectionReasons.push('Forex market is closed by New York session check');
+    } else if (!report.candleTime) {
+      finalDecision = 'Rejected';
+      rejectionReasons.push('missing scout candle timestamp');
+    } else if (staleCandle) {
+      finalDecision = 'Stale candle suppressed';
+      rejectionReasons.push(`same candle already processed: ${report.candleTime}`);
+    } else if (cooldownActive) {
+      finalDecision = 'Cooldown suppressed';
+      rejectionReasons.push('same alert key is inside Scout Telegram cooldown');
+    }
+  }
+
+  return {
+    pair: report.pair,
+    timeframe: report.timeframe,
+    directionConsidered: direction,
+    trendHtfAlignment: `Daily=${report.dailyTrendDirection}; H4=${report.h4TrendDirection}; Trend=${report.trendDirection}; SetupTF=${report.setupTimeframeDirection}`,
+    location: report.zone,
+    structureShift: report.reversalConfirmed ? `Detected: ${report.reversalReason}` : `Waiting: ${report.reversalReason}`,
+    reversalConfirmation: report.confirmationStatus ? `${report.confirmationStatus}: ${report.confirmationReason}` : 'No confirmation data',
+    timingState: `${entryTimingDisplay(report)} (${report.entryTimingState})`,
+    entryDistance: report.distanceFromEntryAtr,
+    rr: report.rrRatio,
+    session: report.session,
+    cooldownStatus: cooldownActive ? 'Active cooldown' : 'No active cooldown',
+    candleTime: report.candleTime,
+    staleCandleStatus: staleCandle ? 'Stale candle / already processed' : 'Fresh or unprocessed candle',
+    finalDecision,
+    rejectionReasons,
+    setupGrade: report.setupGrade,
+    evalEligible: report.evalEligible,
+    interestLevel: report.interestLevel,
+    entryStatus: report.entryStatus,
+    pineConfirmation: report.pineConfirmation
+      ? `Confirmed: ${report.pineConfirmation.message}`
+      : report.pineZone
+      ? 'Pine zone stored, no rejection confirmation'
+      : 'No Pine confirmation attached',
+  };
+}
+
+function buildScoutDiagnostics(reports: ScoutReport[], source = 'current cache'): ScoutDiagnosticsReport {
+  const enriched = enrichScoutReports(reports);
+  const rows = enriched.map(report => scoutDiagnosticRow(report, source));
+  const reasonCounts = new Map<string, number>();
+  for (const row of rows) {
+    for (const reason of row.rejectionReasons) reasonCounts.set(reason, (reasonCounts.get(reason) || 0) + 1);
+  }
+  const pairCounts = new Map<string, number>();
+  for (const row of rows) pairCounts.set(row.pair, (pairCounts.get(row.pair) || 0) + 1);
+  const candidatePairs = new Set(rows.filter(r => r.finalDecision === 'Alert sent' || r.finalDecision === 'Watch only').map(r => r.pair));
+  const metals = ['XAU_USD', 'XAG_USD'];
+  const timeframesActive = [...new Set(rows.map(r => r.timeframe))].sort();
+
+  return {
+    generatedAt: new Date().toISOString(),
+    source,
+    summary: {
+      totalPairsScanned: rows.length,
+      totalCandidatesFound: rows.filter(r => r.finalDecision === 'Alert sent' || r.finalDecision === 'Watch only').length,
+      totalASetups: rows.filter(r => r.setupGrade === 'A').length,
+      totalBSetups: rows.filter(r => r.setupGrade === 'B').length,
+      totalEvalEligible: rows.filter(r => r.evalEligible).length,
+      totalAlertsSent: rows.filter(r => r.finalDecision === 'Alert sent').length,
+      topRejectionReasons: [...reasonCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 12)
+        .map(([reason, count]) => ({ reason, count })),
+      repeatedPairCounts: [...pairCounts.entries()]
+        .filter(([, count]) => count > 1)
+        .sort((a, b) => b[1] - a[1])
+        .map(([pair, count]) => ({ pair, count })),
+      scannedButNeverCandidates: [...pairCounts.keys()].filter(pair => !candidatePairs.has(pair)).sort(),
+      timeframesActive,
+      metalsScanned: metals.map(pair => ({
+        pair,
+        timeframes: rows.filter(r => r.pair === pair).map(r => r.timeframe).sort(),
+      })),
+      rrFilterBlocks: rows.filter(r => r.rejectionReasons.some(reason => reason.includes('R:R is below'))).length,
+      pineConfirmationBlocks: rows.filter(r => r.rejectionReasons.some(reason => reason.toLowerCase().includes('confirmation'))).length,
+      cooldownSuppressions: rows.filter(r => r.finalDecision === 'Cooldown suppressed').length,
+      staleCandleSuppressions: rows.filter(r => r.finalDecision === 'Stale candle suppressed').length,
+      sessionSuppressions: rows.filter(r => r.finalDecision === 'Market closed suppressed').length,
+    },
+    rows,
+    notes: [
+      'Diagnostics are read-only and do not change strategy logic, grading, levels, alerts, or journal behavior.',
+      'Alert sent means the row qualifies for the existing Scout Telegram alert path before Telegram API success/failure is known.',
+      'Historical questions like "last week" are limited to rows/logs available since this server process started; no persistent alert-decision history existed before this diagnostics pass.',
+    ],
+  };
+}
+
+function logScoutDiagnostics(report: ScoutDiagnosticsReport) {
+  console.log(`[Scout Diagnostics] ${report.generatedAt} ${report.source}`);
+  console.log(`[Scout Diagnostics] scanned=${report.summary.totalPairsScanned} candidates=${report.summary.totalCandidatesFound} A=${report.summary.totalASetups} B=${report.summary.totalBSetups} eval=${report.summary.totalEvalEligible} alerts=${report.summary.totalAlertsSent}`);
+  console.log(`[Scout Diagnostics] timeframes=${report.summary.timeframesActive.join(', ') || 'none'} metals=${report.summary.metalsScanned.map(m => `${m.pair}:${m.timeframes.join('/') || 'not scanned'}`).join(', ')}`);
+  console.log(`[Scout Diagnostics] top rejections=${report.summary.topRejectionReasons.map(r => `${r.reason} (${r.count})`).join(' | ') || 'none'}`);
+  console.log(`[Scout Diagnostics] repeated pairs=${report.summary.repeatedPairCounts.map(r => `${r.pair} x${r.count}`).join(', ') || 'none'}`);
+  for (const row of report.rows) {
+    console.log(
+      `[Scout Diagnostics] ${row.pair} ${row.timeframe} dir=${row.directionConsidered} trend="${row.trendHtfAlignment}" ` +
+      `loc=${row.location} structure="${row.structureShift}" reversal="${row.reversalConfirmation}" timing="${row.timingState}" ` +
+      `dist=${row.entryDistance ?? 'N/A'}ATR rr=${row.rr ?? 'N/A'} session="${row.session}" cooldown="${row.cooldownStatus}" ` +
+      `candle=${row.candleTime || 'N/A'} stale="${row.staleCandleStatus}" decision="${row.finalDecision}" ` +
+      `reasons="${row.rejectionReasons.join('; ') || 'none'}"`
+    );
+  }
+}
+
 function scoutKey(pair: string, timeframe: string) {
   return `${pair}|${String(timeframe || '').toUpperCase()}`;
 }
@@ -1035,10 +1284,17 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     ...reports.filter(isTradeableScoutSignal).map(report => ({ report, kind: 'entry' as const })),
     ...reports.filter(isWatchScoutSignal).map(report => ({ report, kind: 'watch' as const })),
   ];
-  if (!candidates.length) return;
+  latestScoutDiagnostics = buildScoutDiagnostics(reports, `${source} pre-alert`);
+  if (!candidates.length) {
+    logScoutDiagnostics(latestScoutDiagnostics);
+    return;
+  }
 
   if (!isForexMarketOpen()) {
     console.log(`[Telegram] ${source}: market closed; skipped ${candidates.length} scout timing alert${candidates.length === 1 ? '' : 's'}`);
+    candidates.forEach(({ report, kind }) => setScoutDiagnosticOutcome(report, kind, 'Market closed suppressed', ['Forex market is closed by New York session check']));
+    latestScoutDiagnostics = buildScoutDiagnostics(reports, `${source} market closed`);
+    logScoutDiagnostics(latestScoutDiagnostics);
     return;
   }
 
@@ -1050,6 +1306,8 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
   for (const { report, kind } of candidates) {
     if (!report.candleTime) {
       console.warn(`[Telegram] ${source}: skipped ${report.pair} ${report.timeframe}; missing scout candle timestamp`);
+      setScoutDiagnosticOutcome(report, kind, 'Rejected', ['missing scout candle timestamp']);
+      latestScoutDiagnostics = buildScoutDiagnostics(reports, `${source} missing candle timestamp`);
       continue;
     }
 
@@ -1057,6 +1315,8 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const previousCandleTime = tradeableSignalCandleTimes.get(dataKey);
     if (previousCandleTime === report.candleTime) {
       console.log(`[Telegram] ${kind} scout signal stale candle skipped for ${report.pair} ${report.timeframe} @ ${report.candleTime}`);
+      setScoutDiagnosticOutcome(report, kind, 'Stale candle suppressed', [`same candle already processed: ${report.candleTime}`]);
+      latestScoutDiagnostics = buildScoutDiagnostics(reports, `${source} stale candle`);
       continue;
     }
 
@@ -1064,6 +1324,8 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
     const alertedAt = tradeableSignalAlerts.get(key);
     if (alertedAt && now - alertedAt < TRADEABLE_SIGNAL_ALERT_COOLDOWN_MS) {
       console.log(`[Telegram] ${kind} scout signal suppressed by cooldown for ${report.pair} ${report.timeframe}`);
+      setScoutDiagnosticOutcome(report, kind, 'Cooldown suppressed', ['same alert key is inside Scout Telegram cooldown']);
+      latestScoutDiagnostics = buildScoutDiagnostics(reports, `${source} cooldown`);
       continue;
     }
     tradeableSignalCandleTimes.set(dataKey, report.candleTime);
@@ -1098,12 +1360,21 @@ async function notifyTradeableScoutSignals(reports: ScoutReport[], source: strin
       const data = await sendTelegram(text, 'Markdown');
       if (data.ok) {
         tradeableSignalAlerts.set(key, now);
+        setScoutDiagnosticOutcome(report, kind, kind === 'entry' ? 'Alert sent' : 'Watch only');
         console.log(`[Telegram] ${kind} scout signal sent for ${report.pair} ${report.timeframe}`);
+        latestScoutDiagnostics = buildScoutDiagnostics(reports, `${source} post-alert sent`);
+      } else {
+        setScoutDiagnosticOutcome(report, kind, 'Telegram failed', ['Telegram API did not return ok']);
+        latestScoutDiagnostics = buildScoutDiagnostics(reports, `${source} telegram failed`);
       }
     } catch (e: any) {
       console.error(`[Telegram] ${kind} scout signal failed for ${report.pair}:`, e.message);
+      setScoutDiagnosticOutcome(report, kind, 'Telegram failed', [e.message]);
+      latestScoutDiagnostics = buildScoutDiagnostics(reports, `${source} telegram failed`);
     }
   }
+  latestScoutDiagnostics = buildScoutDiagnostics(reports, `${source} complete`);
+  logScoutDiagnostics(latestScoutDiagnostics);
 }
 
 function getSurfacedTrends(results: TrendScanResult) {
@@ -1368,6 +1639,34 @@ app.post('/api/scout', async (req, res) => {
     lastScanTime = new Date().toISOString();
     const reports = enrichScoutReports(latestScoutResults);
     res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/scout/diagnostics', async (req, res) => {
+  const shouldRun = String(req.query.run || '').toLowerCase() === 'true';
+  const tfParam = String(req.query.tf || '').trim();
+  const requestedTimeframes = tfParam
+    ? tfParam.split(',').map(tf => tf.trim().toUpperCase()).filter(Boolean)
+    : [];
+  try {
+    if (shouldRun) {
+      await loadPriorityPairsFromStorage('SCOUT_DIAGNOSTICS_LOAD');
+      const timeframes = requestedTimeframes.length ? requestedTimeframes : ['H4', 'H1', 'M30'];
+      const reports = (await Promise.all(timeframes.map(tf => runScoutScan(tf)))).flat();
+      const diagnostics = buildScoutDiagnostics(reports, `manual diagnostics ${timeframes.join(',')}`);
+      latestScoutDiagnostics = diagnostics;
+      latestScoutResults = reports;
+      lastScanTime = new Date().toISOString();
+      logScoutDiagnostics(diagnostics);
+      return res.json(diagnostics);
+    }
+
+    if (!latestScoutDiagnostics) {
+      latestScoutDiagnostics = buildScoutDiagnostics(latestScoutResults, 'current cache');
+    }
+    return res.json(latestScoutDiagnostics);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
