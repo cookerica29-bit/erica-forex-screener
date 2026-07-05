@@ -562,8 +562,8 @@
     .developing-count.almost-ready { color:var(--blue); border-color:rgba(96,165,250,0.32); background:rgba(96,165,250,0.07); }
     .developing-count.wait { color:var(--gold); border-color:rgba(245,166,35,0.32); background:rgba(245,166,35,0.07); }
     .developing-count.skip { color:var(--slate-dim); }
-    .developing-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; }
-    .developing-card { border:1px solid rgba(148,163,184,0.11); border-radius:10px; padding:11px; background:rgba(2,6,23,0.28); }
+    .developing-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:12px; }
+    .developing-card { border:1px solid rgba(148,163,184,0.12); border-radius:12px; padding:12px; background:linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.38)); box-shadow:0 10px 24px rgba(0,0,0,0.12); }
     .developing-card-head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:8px; }
     .developing-pair { font-size:17px; font-weight:950; color:var(--text); letter-spacing:.02em; }
     .developing-meta { font-size:10px; color:var(--slate-dim); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
@@ -575,16 +575,41 @@
     .developing-status.almost-ready { color:var(--blue); border-color:rgba(96,165,250,0.38); background:rgba(96,165,250,0.09); }
     .developing-status.wait { color:var(--gold); border-color:rgba(245,166,35,0.36); background:rgba(245,166,35,0.08); }
     .developing-status.skip { color:var(--slate-dim); border-color:rgba(148,163,184,0.18); background:rgba(148,163,184,0.04); }
-    .developing-progress { margin:8px 0 9px; }
-    .developing-progress-top { display:flex; justify-content:space-between; font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.07em; margin-bottom:4px; }
-    .developing-progress-track { height:7px; border-radius:99px; background:rgba(148,163,184,0.12); overflow:hidden; }
-    .developing-progress-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#334155,#f5a623,#60a5fa,#00ff88); }
-    .developing-reason { font-size:11px; color:var(--slate); line-height:1.38; margin:7px 0; }
+    .developing-progress-row { display:grid; grid-template-columns:86px minmax(0,1fr); gap:11px; align-items:center; margin:9px 0 10px; }
+    .developing-circle { --progress-pct:0%; --accent:#64748b; width:78px; height:78px; border-radius:50%; display:grid; place-items:center; background:conic-gradient(var(--accent) var(--progress-pct), rgba(148,163,184,0.12) 0); box-shadow:0 0 20px rgba(0,0,0,0.16); position:relative; }
+    .developing-circle::after { content:""; position:absolute; inset:7px; border-radius:50%; background:#080d15; border:1px solid rgba(148,163,184,0.12); }
+    .developing-circle.enter-now { --accent:var(--green); }
+    .developing-circle.almost-ready { --accent:var(--blue); }
+    .developing-circle.wait { --accent:var(--gold); }
+    .developing-circle.skip { --accent:#64748b; }
+    .developing-percent { position:relative; z-index:1; font-size:20px; font-weight:950; color:var(--text); letter-spacing:-0.02em; }
+    .developing-percent-label { position:relative; z-index:1; font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; margin-top:-2px; }
+    .developing-circle-inner { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; line-height:1; }
+    .developing-reason { border:1px solid rgba(148,163,184,0.12); border-radius:10px; padding:9px 10px; background:rgba(148,163,184,0.045); min-width:0; }
+    .developing-reason-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin-bottom:5px; }
+    .developing-reason-text { font-size:12px; color:var(--slate); line-height:1.35; }
     .developing-levels { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; margin-top:8px; }
     .developing-level { border:1px solid rgba(148,163,184,0.1); border-radius:7px; padding:6px; background:rgba(148,163,184,0.035); min-width:0; }
     .developing-level-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
     .developing-level-value { font-size:11px; color:var(--slate); font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .developing-path { margin-top:8px; font-size:10px; color:var(--slate-dim); line-height:1.4; border-top:1px solid rgba(148,163,184,0.08); padding-top:7px; }
+    .developing-path { margin-top:9px; font-size:10px; color:var(--slate-dim); line-height:1.42; border:1px solid rgba(96,165,250,0.12); border-radius:9px; padding:8px 9px; background:rgba(96,165,250,0.035); }
+    .developing-path-label { font-size:8px; color:var(--blue); text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin-bottom:4px; }
+    .developing-guide { margin-top:12px; padding:10px; border:1px solid rgba(148,163,184,0.1); border-radius:10px; background:rgba(2,6,23,0.22); }
+    .developing-guide-title { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin-bottom:7px; }
+    .developing-guide-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+    .developing-guide-item { font-size:10px; color:var(--slate-dim); line-height:1.3; }
+    .developing-guide-item strong { display:block; color:var(--slate); font-size:10px; margin-bottom:2px; }
+    @media (max-width: 760px) {
+      .developing-head { flex-direction:column; }
+      .developing-counts { justify-content:flex-start; }
+      .developing-grid { grid-template-columns:1fr; }
+      .developing-guide-grid { grid-template-columns:1fr 1fr; }
+    }
+    @media (max-width: 430px) {
+      .developing-progress-row { grid-template-columns:1fr; }
+      .developing-circle { margin:0 auto; }
+      .developing-guide-grid { grid-template-columns:1fr; }
+    }
     .momentum-box { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-top:8px; padding:8px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.1); background:rgba(148,163,184,0.04); }
     .momentum-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
     .momentum-value { font-size:12px; font-weight:800; color:var(--slate); }
@@ -2829,6 +2854,23 @@
     return entryTimingReasonForReport(r);
   }
 
+  function conversationalDevelopingReason(text) {
+    const raw = String(text || '').trim();
+    if (!raw) return 'Waiting for the setup to improve.';
+    const closeBelow = raw.match(/price has not closed below nearest support ([0-9.]+) yet/i);
+    if (closeBelow) return `Waiting for price to close below ${closeBelow[1]} before the trade is ready.`;
+    const closeAbove = raw.match(/price has not closed above nearest resistance ([0-9.]+) yet/i);
+    if (closeAbove) return `Waiting for price to close above ${closeAbove[1]} before the trade is ready.`;
+    if (/confirmation has not started/i.test(raw)) return 'Waiting for confirmation to start.';
+    if (/too far/i.test(raw)) return 'Price is still too far from the planned entry area.';
+    if (/location conflicts/i.test(raw)) return 'Location conflicts with trade direction.';
+    if (/R:R is below|reward.?risk|below the Scout minimum/i.test(raw)) return 'R:R too low (< 2.0R).';
+    if (/decision level confirmation/i.test(raw)) return 'Waiting for price to confirm the decision level.';
+    if (/current timeframe flow/i.test(raw)) return 'Waiting for current timeframe flow to align.';
+    if (/rejection|structure shift/i.test(raw)) return 'Waiting for rejection and structure confirmation.';
+    return raw.replace(/\s+/g, ' ');
+  }
+
   function renderDevelopingSetups(rows) {
     const box = document.getElementById('developingSetups');
     if (!box) return;
@@ -2863,6 +2905,15 @@
           </div>
         </div>
         <div class="developing-grid">${cards}</div>
+        <div class="developing-guide">
+          <div class="developing-guide-title">Progress Guide</div>
+          <div class="developing-guide-grid">
+            <div class="developing-guide-item"><strong>Enter Now</strong>Ready to take the trade.</div>
+            <div class="developing-guide-item"><strong>Almost Ready</strong>Strong setup waiting for final confirmation.</div>
+            <div class="developing-guide-item"><strong>Waiting</strong>Setup is developing.</div>
+            <div class="developing-guide-item"><strong>Skip</strong>Low quality or major conflict.</div>
+          </div>
+        </div>
       </section>`;
   }
 
@@ -2877,7 +2928,8 @@
       displayTrend: displayTrendForReport(r),
       phase: displayPhaseForReport(r),
     });
-    const reason = developingReasonForReport(r, state);
+    const reason = conversationalDevelopingReason(developingReasonForReport(r, state));
+    const pathLabel = state.label === 'SKIP' ? 'Rejection Reason' : 'Expected Path';
     return `
       <article class="developing-card">
         <div class="developing-card-head">
@@ -2890,18 +2942,28 @@
           </div>
           <span class="developing-status ${state.className}">${state.label}</span>
         </div>
-        <div class="developing-progress">
-          <div class="developing-progress-top"><span>Progress</span><span>${state.progress}%</span></div>
-          <div class="developing-progress-track"><div class="developing-progress-fill" style="width:${state.progress}%;"></div></div>
+        <div class="developing-progress-row">
+          <div class="developing-circle ${state.className}" style="--progress-pct:${state.progress}%;">
+            <div class="developing-circle-inner">
+              <div class="developing-percent">${state.progress}%</div>
+              <div class="developing-percent-label">Ready</div>
+            </div>
+          </div>
+          <div class="developing-reason">
+            <div class="developing-reason-label">Waiting For</div>
+            <div class="developing-reason-text">${escapeHtml(reason)}</div>
+          </div>
         </div>
-        <div class="developing-reason">${escapeHtml(reason)}</div>
         <div class="developing-levels">
           <div class="developing-level"><div class="developing-level-label">Entry</div><div class="developing-level-value">${f(r.entry)}</div></div>
           <div class="developing-level"><div class="developing-level-label">SL</div><div class="developing-level-value">${f(r.sl)}</div></div>
           <div class="developing-level"><div class="developing-level-label">TP</div><div class="developing-level-value">${f(r.tp1)}</div></div>
           <div class="developing-level"><div class="developing-level-label">R:R</div><div class="developing-level-value">${r.rrRatio != null ? Number(r.rrRatio).toFixed(2) + 'R' : '—'}</div></div>
         </div>
-        <div class="developing-path"><strong>Expected Path:</strong> ${escapeHtml(expectedPath)}</div>
+        <div class="developing-path">
+          <div class="developing-path-label">${pathLabel}</div>
+          ${escapeHtml(state.label === 'SKIP' ? reason : expectedPath)}
+        </div>
       </article>`;
   }
 
