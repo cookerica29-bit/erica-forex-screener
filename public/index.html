@@ -2844,10 +2844,21 @@
     const direction = tradeDirectionForReport(r);
     const locationAligned = (direction === 'LONG' && r.zone === 'DISCOUNT') ||
       (direction === 'SHORT' && r.zone === 'PREMIUM');
+    const flowAligned = setupFlowAlignedForReport(r);
+    const nearEntry = r.entryStatus === 'Tradeable' || r.entryStatus === 'Near Entry';
+    const rejectionText = direction === 'SHORT'
+      ? 'Wait for bearish rejection near supply'
+      : direction === 'LONG'
+        ? 'Wait for bullish rejection near demand'
+        : 'Wait for rejection';
+    const decisionReason = decisionLevelUsableForMilestone(r)
+      ? (r.decisionLevelReason || 'Waiting for decision level confirmation.')
+      : '';
     if (state.label === 'ALMOST READY') {
-      if (!r.decisionLevelConfirmed) return r.decisionLevelReason || 'Waiting for decision level confirmation.';
-      if (!r.reversalConfirmed) return r.reversalReason || 'Waiting for rejection and structure shift.';
-      if (!setupFlowAlignedForReport(r)) return 'Current timeframe flow still needs to align with trade direction.';
+      if (!flowAligned) return 'Flow aligns';
+      if (!r.reversalConfirmed) return rejectionText;
+      if (!nearEntry) return 'Price closer to entry';
+      if (!r.decisionLevelConfirmed && decisionReason) return decisionReason;
       return entryTimingReasonForReport(r);
     }
     if (state.label === 'SKIP') {
@@ -2858,12 +2869,33 @@
       if (r.entry == null || r.sl == null || r.tp1 == null) return 'Trade levels are incomplete.';
       return r.evalReason || 'Major conflict remains.';
     }
-    if ((r.entryStatus || '') === 'Too Far') return 'Price is still too far from the planned entry area.';
     if (!locationAligned) return 'Waiting for price to develop into the correct location.';
-    if (!setupFlowAlignedForReport(r)) return 'Current timeframe flow is still developing.';
-    if (!r.reversalConfirmed) return r.reversalReason || 'Waiting for structure shift.';
-    if (!r.decisionLevelConfirmed) return r.decisionLevelReason || 'Waiting for decision level confirmation.';
+    if (!flowAligned) return 'Flow aligns';
+    if (!r.reversalConfirmed) return rejectionText;
+    if (!nearEntry) return 'Price closer to entry';
+    if (!r.decisionLevelConfirmed && decisionReason) return decisionReason;
     return entryTimingReasonForReport(r);
+  }
+
+  function decisionLevelUsableForMilestone(r) {
+    const level = Number(r.decisionLevel);
+    if (!Number.isFinite(level)) return false;
+    const tp1 = Number(r.tp1);
+    if (Number.isFinite(tp1)) {
+      const tolerance = Math.max(Math.abs(level) * 0.00001, 0.00001);
+      if (Math.abs(level - tp1) <= tolerance) return false;
+    }
+    const price = Number(r.price);
+    if (!Number.isFinite(price)) return false;
+    const atr = Number(r.atr);
+    const distance = Math.abs(level - price);
+    if (Number.isFinite(atr) && atr > 0 && distance > atr * 0.75) return false;
+    const entry = Number(r.entry);
+    if (Number.isFinite(entry)) {
+      const entryDistance = Math.abs(entry - price);
+      if (entryDistance > 0 && distance > Math.max(entryDistance * 1.25, (Number.isFinite(atr) ? atr * 0.25 : 0))) return false;
+    }
+    return true;
   }
 
   function conversationalDevelopingReason(text) {
@@ -2879,6 +2911,8 @@
     if (/R:R is below|reward.?risk|below the Scout minimum/i.test(raw)) return 'R:R too low (< 2.0R).';
     if (/decision level confirmation/i.test(raw)) return 'Waiting for decision level';
     if (/current timeframe flow/i.test(raw)) return 'Flow aligns';
+    if (/bearish rejection/i.test(raw)) return 'Bearish rejection';
+    if (/bullish rejection/i.test(raw)) return 'Bullish rejection';
     if (/rejection|structure shift/i.test(raw)) return 'Wait for rejection';
     return raw.replace(/\s+/g, ' ');
   }
