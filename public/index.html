@@ -583,7 +583,7 @@
     .developing-circle.wait { --accent:var(--gold); }
     .developing-circle.skip { --accent:#64748b; }
     .developing-percent { position:relative; z-index:1; font-size:20px; font-weight:950; color:var(--text); letter-spacing:-0.02em; }
-    .developing-percent-label { position:relative; z-index:1; font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; margin-top:-2px; }
+    .developing-percent-label { position:relative; z-index:1; font-size:7px; color:rgba(148,163,184,0.68); text-transform:uppercase; letter-spacing:.08em; margin-top:-2px; font-weight:700; }
     .developing-circle-inner { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; line-height:1; }
     .developing-reason { border:1px solid rgba(148,163,184,0.12); border-radius:10px; padding:9px 10px; background:rgba(148,163,184,0.045); min-width:0; }
     .developing-reason-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin-bottom:5px; }
@@ -2856,19 +2856,32 @@
 
   function conversationalDevelopingReason(text) {
     const raw = String(text || '').trim();
-    if (!raw) return 'Waiting for the setup to improve.';
+    if (!raw) return 'Waiting for setup to improve';
     const closeBelow = raw.match(/price has not closed below nearest support ([0-9.]+) yet/i);
-    if (closeBelow) return `Waiting for price to close below ${closeBelow[1]} before the trade is ready.`;
+    if (closeBelow) return `Close below ${closeBelow[1]}`;
     const closeAbove = raw.match(/price has not closed above nearest resistance ([0-9.]+) yet/i);
-    if (closeAbove) return `Waiting for price to close above ${closeAbove[1]} before the trade is ready.`;
-    if (/confirmation has not started/i.test(raw)) return 'Waiting for confirmation to start.';
-    if (/too far/i.test(raw)) return 'Price is still too far from the planned entry area.';
-    if (/location conflicts/i.test(raw)) return 'Location conflicts with trade direction.';
+    if (closeAbove) return `Close above ${closeAbove[1]}`;
+    if (/confirmation has not started/i.test(raw)) return 'Waiting for confirmation';
+    if (/too far/i.test(raw)) return 'Price too far from entry';
+    if (/location conflicts/i.test(raw)) return 'Location conflict';
     if (/R:R is below|reward.?risk|below the Scout minimum/i.test(raw)) return 'R:R too low (< 2.0R).';
-    if (/decision level confirmation/i.test(raw)) return 'Waiting for price to confirm the decision level.';
-    if (/current timeframe flow/i.test(raw)) return 'Waiting for current timeframe flow to align.';
-    if (/rejection|structure shift/i.test(raw)) return 'Waiting for rejection and structure confirmation.';
+    if (/decision level confirmation/i.test(raw)) return 'Waiting for decision level';
+    if (/current timeframe flow/i.test(raw)) return 'Waiting for flow to align';
+    if (/rejection|structure shift/i.test(raw)) return 'Waiting for rejection';
     return raw.replace(/\s+/g, ' ');
+  }
+
+  function shortDevelopingExpectation(r, state) {
+    if (state.label === 'SKIP') return 'This setup has a major conflict. Do not trade this one right now.';
+    if ((r.entryStatus || '') === 'Too Far') return 'Price is still too far from entry. Wait for it to move closer before considering a trade.';
+    const direction = tradeDirectionForReport(r);
+    if (direction === 'SHORT') {
+      return 'Price may move slightly higher first. Wait for rejection near the supply area. If price breaks above that area, skip the trade.';
+    }
+    if (direction === 'LONG') {
+      return 'Price may move slightly lower first. Wait for buyers to defend the support area. If price breaks below that area, skip the trade.';
+    }
+    return 'Price is still developing. Wait for the setup to become clear before considering a trade.';
   }
 
   function renderDevelopingSetups(rows) {
@@ -2923,13 +2936,9 @@
     const isJpy = r.pair && (r.pair.includes('JPY') || r.pair.includes('XAU') || r.pair.includes('XAG'));
     const dp = isJpy ? 3 : 5;
     const f = v => v == null ? '—' : Number(v).toFixed(dp);
-    const expectedPath = expectedPathForScoutReport(r, {
-      tradeDirection: direction,
-      displayTrend: displayTrendForReport(r),
-      phase: displayPhaseForReport(r),
-    });
     const reason = conversationalDevelopingReason(developingReasonForReport(r, state));
-    const pathLabel = state.label === 'SKIP' ? 'Rejection Reason' : 'Expected Path';
+    const expectation = shortDevelopingExpectation(r, state);
+    const pathLabel = state.label === 'SKIP' ? 'Rejection Reason' : 'What To Expect';
     return `
       <article class="developing-card">
         <div class="developing-card-head">
@@ -2962,7 +2971,7 @@
         </div>
         <div class="developing-path">
           <div class="developing-path-label">${pathLabel}</div>
-          ${escapeHtml(state.label === 'SKIP' ? reason : expectedPath)}
+          ${escapeHtml(expectation)}
         </div>
       </article>`;
   }
