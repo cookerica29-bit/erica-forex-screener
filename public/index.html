@@ -552,6 +552,39 @@
     .scout-indicators { display:flex; gap:14px; margin-top:8px; }
     .scout-ind-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; display:block; margin-bottom:1px; }
     .scout-ind-value { font-size:12px; font-weight:600; color:var(--slate); }
+    .developing-panel { margin:14px 0 18px; padding:14px; border:1px solid rgba(148,163,184,0.12); border-radius:12px; background:rgba(15,23,42,0.62); }
+    .developing-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:12px; }
+    .developing-title { font-size:15px; font-weight:900; color:var(--text); letter-spacing:.02em; }
+    .developing-subtitle { font-size:11px; color:var(--slate-dim); margin-top:3px; line-height:1.35; }
+    .developing-counts { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+    .developing-count { border:1px solid rgba(148,163,184,0.18); border-radius:99px; padding:5px 9px; font-size:10px; font-weight:900; color:var(--slate); background:rgba(148,163,184,0.05); }
+    .developing-count.enter-now { color:var(--green); border-color:rgba(0,255,136,0.32); background:rgba(0,255,136,0.07); }
+    .developing-count.almost-ready { color:var(--blue); border-color:rgba(96,165,250,0.32); background:rgba(96,165,250,0.07); }
+    .developing-count.wait { color:var(--gold); border-color:rgba(245,166,35,0.32); background:rgba(245,166,35,0.07); }
+    .developing-count.skip { color:var(--slate-dim); }
+    .developing-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; }
+    .developing-card { border:1px solid rgba(148,163,184,0.11); border-radius:10px; padding:11px; background:rgba(2,6,23,0.28); }
+    .developing-card-head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:8px; }
+    .developing-pair { font-size:17px; font-weight:950; color:var(--text); letter-spacing:.02em; }
+    .developing-meta { font-size:10px; color:var(--slate-dim); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+    .developing-direction.long { color:var(--green); }
+    .developing-direction.short { color:var(--red); }
+    .developing-direction.neutral { color:var(--slate); }
+    .developing-status { font-size:10px; font-weight:950; letter-spacing:.07em; border:1px solid rgba(148,163,184,0.2); border-radius:99px; padding:5px 9px; white-space:nowrap; }
+    .developing-status.enter-now { color:var(--green); border-color:rgba(0,255,136,0.42); background:rgba(0,255,136,0.1); }
+    .developing-status.almost-ready { color:var(--blue); border-color:rgba(96,165,250,0.38); background:rgba(96,165,250,0.09); }
+    .developing-status.wait { color:var(--gold); border-color:rgba(245,166,35,0.36); background:rgba(245,166,35,0.08); }
+    .developing-status.skip { color:var(--slate-dim); border-color:rgba(148,163,184,0.18); background:rgba(148,163,184,0.04); }
+    .developing-progress { margin:8px 0 9px; }
+    .developing-progress-top { display:flex; justify-content:space-between; font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.07em; margin-bottom:4px; }
+    .developing-progress-track { height:7px; border-radius:99px; background:rgba(148,163,184,0.12); overflow:hidden; }
+    .developing-progress-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#334155,#f5a623,#60a5fa,#00ff88); }
+    .developing-reason { font-size:11px; color:var(--slate); line-height:1.38; margin:7px 0; }
+    .developing-levels { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; margin-top:8px; }
+    .developing-level { border:1px solid rgba(148,163,184,0.1); border-radius:7px; padding:6px; background:rgba(148,163,184,0.035); min-width:0; }
+    .developing-level-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+    .developing-level-value { font-size:11px; color:var(--slate); font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .developing-path { margin-top:8px; font-size:10px; color:var(--slate-dim); line-height:1.4; border-top:1px solid rgba(148,163,184,0.08); padding-top:7px; }
     .momentum-box { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-top:8px; padding:8px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.1); background:rgba(148,163,184,0.04); }
     .momentum-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
     .momentum-value { font-size:12px; font-weight:800; color:var(--slate); }
@@ -820,6 +853,8 @@
   </select>
   <span id="resultCount" class="result-count"></span>
 </div>
+
+<div id="developingSetups"></div>
 
 <div id="mainContent">
   <div class="empty-state" id="initState">
@@ -2736,6 +2771,140 @@
     return rows.slice().sort((a, b) => displaySymbolForSort(a).localeCompare(displaySymbolForSort(b)));
   }
 
+  function developingStatusForReport(r) {
+    const direction = tradeDirectionForReport(r);
+    const grade = r.setupGrade || 'C';
+    const timing = r.entryTimingState || 'Not Ready';
+    const entryStatus = r.entryStatus || 'Waiting';
+    const locationAligned = (direction === 'LONG' && r.zone === 'DISCOUNT') ||
+      (direction === 'SHORT' && r.zone === 'PREMIUM');
+    const nearEntry = entryStatus === 'Tradeable' || entryStatus === 'Near Entry';
+    const hasLevels = r.entry != null && r.sl != null && r.tp1 != null;
+    const hasRr = meetsMinScoutRr(r);
+    const flowAligned = setupFlowAlignedForReport(r);
+    const hasMajorConflict = grade === 'C' ||
+      direction === 'NEUTRAL' ||
+      !hasLevels ||
+      !hasRr ||
+      ((direction === 'LONG' && r.zone === 'PREMIUM') || (direction === 'SHORT' && r.zone === 'DISCOUNT'));
+
+    if (timing === 'Entry Triggered' && r.evalEligible === true) {
+      return { label: 'ENTER NOW', className: 'enter-now', progress: 100 };
+    }
+
+    if ((grade === 'A' || grade === 'B') && nearEntry && locationAligned && hasLevels && hasRr) {
+      const waitingOnReaction = timing === 'Area Reached' || timing === 'Reaction Started' ||
+        !r.reversalConfirmed || !r.decisionLevelConfirmed || !flowAligned;
+      if (waitingOnReaction) return { label: 'ALMOST READY', className: 'almost-ready', progress: 85 };
+    }
+
+    if (hasMajorConflict) return { label: 'SKIP', className: 'skip', progress: 0 };
+    return { label: 'WAIT', className: 'wait', progress: 55 };
+  }
+
+  function developingReasonForReport(r, state) {
+    if (state.label === 'ENTER NOW') return 'Entry trigger and eval eligibility are active.';
+    const direction = tradeDirectionForReport(r);
+    const locationAligned = (direction === 'LONG' && r.zone === 'DISCOUNT') ||
+      (direction === 'SHORT' && r.zone === 'PREMIUM');
+    if (state.label === 'ALMOST READY') {
+      if (!r.decisionLevelConfirmed) return r.decisionLevelReason || 'Waiting for decision level confirmation.';
+      if (!r.reversalConfirmed) return r.reversalReason || 'Waiting for rejection and structure shift.';
+      if (!setupFlowAlignedForReport(r)) return 'Current timeframe flow still needs to align with trade direction.';
+      return entryTimingReasonForReport(r);
+    }
+    if (state.label === 'SKIP') {
+      if ((r.setupGrade || 'C') === 'C') return r.setupGradeReason || 'Lower-quality setup or major conflict.';
+      if (!meetsMinScoutRr(r)) return 'R:R is below the Scout minimum.';
+      if (!locationAligned) return 'Location conflicts with trade direction.';
+      if (direction === 'NEUTRAL') return 'No clear trade direction yet.';
+      if (r.entry == null || r.sl == null || r.tp1 == null) return 'Trade levels are incomplete.';
+      return r.evalReason || 'Major conflict remains.';
+    }
+    if ((r.entryStatus || '') === 'Too Far') return 'Price is still too far from the planned entry area.';
+    if (!locationAligned) return 'Waiting for price to develop into the correct location.';
+    if (!setupFlowAlignedForReport(r)) return 'Current timeframe flow is still developing.';
+    if (!r.reversalConfirmed) return r.reversalReason || 'Waiting for structure shift.';
+    if (!r.decisionLevelConfirmed) return r.decisionLevelReason || 'Waiting for decision level confirmation.';
+    return entryTimingReasonForReport(r);
+  }
+
+  function renderDevelopingSetups(rows) {
+    const box = document.getElementById('developingSetups');
+    if (!box) return;
+    if (!rows.length) {
+      box.innerHTML = '';
+      return;
+    }
+    const ranked = rows
+      .map(row => ({ row, state: developingStatusForReport(row) }))
+      .sort((a, b) => {
+        const rank = { 'ENTER NOW': 0, 'ALMOST READY': 1, 'WAIT': 2, 'SKIP': 3 };
+        return (rank[a.state.label] ?? 9) - (rank[b.state.label] ?? 9) ||
+          (Number(b.row.rrRatio) || 0) - (Number(a.row.rrRatio) || 0);
+      });
+    const counts = ranked.reduce((acc, item) => {
+      acc[item.state.label] = (acc[item.state.label] || 0) + 1;
+      return acc;
+    }, {});
+    const cards = ranked.slice(0, 12).map(({ row, state }) => renderDevelopingSetupCard(row, state)).join('');
+    box.innerHTML = `
+      <section class="developing-panel">
+        <div class="developing-head">
+          <div>
+            <div class="developing-title">Developing Setups</div>
+            <div class="developing-subtitle">Visibility only. Alerts still require the existing Entry Triggered rules.</div>
+          </div>
+          <div class="developing-counts">
+            <span class="developing-count enter-now">Enter Now ${counts['ENTER NOW'] || 0}</span>
+            <span class="developing-count almost-ready">Almost Ready ${counts['ALMOST READY'] || 0}</span>
+            <span class="developing-count wait">Waiting ${counts.WAIT || 0}</span>
+            <span class="developing-count skip">Skip ${counts.SKIP || 0}</span>
+          </div>
+        </div>
+        <div class="developing-grid">${cards}</div>
+      </section>`;
+  }
+
+  function renderDevelopingSetupCard(r, state) {
+    const direction = tradeDirectionForReport(r);
+    const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'neutral';
+    const isJpy = r.pair && (r.pair.includes('JPY') || r.pair.includes('XAU') || r.pair.includes('XAG'));
+    const dp = isJpy ? 3 : 5;
+    const f = v => v == null ? '—' : Number(v).toFixed(dp);
+    const expectedPath = expectedPathForScoutReport(r, {
+      tradeDirection: direction,
+      displayTrend: displayTrendForReport(r),
+      phase: displayPhaseForReport(r),
+    });
+    const reason = developingReasonForReport(r, state);
+    return `
+      <article class="developing-card">
+        <div class="developing-card-head">
+          <div>
+            <div class="developing-pair">${escapeHtml(r.displaySymbol || (r.pair || '').replace('_', '/'))}</div>
+            <div class="developing-meta">
+              <span>${escapeHtml(r.timeframe || '—')}</span>
+              <span class="developing-direction ${directionClass}">${escapeHtml(directionText(direction))}</span>
+            </div>
+          </div>
+          <span class="developing-status ${state.className}">${state.label}</span>
+        </div>
+        <div class="developing-progress">
+          <div class="developing-progress-top"><span>Progress</span><span>${state.progress}%</span></div>
+          <div class="developing-progress-track"><div class="developing-progress-fill" style="width:${state.progress}%;"></div></div>
+        </div>
+        <div class="developing-reason">${escapeHtml(reason)}</div>
+        <div class="developing-levels">
+          <div class="developing-level"><div class="developing-level-label">Entry</div><div class="developing-level-value">${f(r.entry)}</div></div>
+          <div class="developing-level"><div class="developing-level-label">SL</div><div class="developing-level-value">${f(r.sl)}</div></div>
+          <div class="developing-level"><div class="developing-level-label">TP</div><div class="developing-level-value">${f(r.tp1)}</div></div>
+          <div class="developing-level"><div class="developing-level-label">R:R</div><div class="developing-level-value">${r.rrRatio != null ? Number(r.rrRatio).toFixed(2) + 'R' : '—'}</div></div>
+        </div>
+        <div class="developing-path"><strong>Expected Path:</strong> ${escapeHtml(expectedPath)}</div>
+      </article>`;
+  }
+
   function entryStatusSummary(rows) {
     const counts = rows.reduce((acc, row) => {
       const status = ['Tradeable', 'Near Entry', 'Waiting', 'Too Far'].includes(row.entryStatus) ? row.entryStatus : 'Unknown';
@@ -2776,12 +2945,14 @@
     document.getElementById('s-low-priority').textContent = all.filter(s => actionPriorityForReport(s).value === 'Lower Priority').length;
     const main = document.getElementById('mainContent');
     if (!all.length) {
+      renderDevelopingSetups([]);
       const scanLabel = priorityPairsActive ? `${currentScanLabel()}: ${PAIRS.map(makePairLabel).join(', ')}` : currentScanLabel();
       main.innerHTML = `<div class="empty-state"><div style="font-size:48px;opacity:0.4">📡</div><div>Hit Scan to fetch live OANDA data</div><div style="font-size:11px;opacity:0.6;">${scanLabel}</div></div>`;
       document.getElementById('resultCount').textContent = '';
       return;
     }
     document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of ${all.length} setups · ${entryStatusSummary(filtered)}`;
+    renderDevelopingSetups(filtered);
     if (!filtered.length) { main.innerHTML = '<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No pairs match your filters</div></div>'; return; }
     main.innerHTML = '<div class="setup-grid">' + filtered.map(r => renderScoutCard(r)).join('') + '</div>';
   }
