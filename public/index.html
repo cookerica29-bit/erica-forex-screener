@@ -2959,16 +2959,32 @@
     return '';
   }
 
-  function nextMilestoneFromReason(reason, direction) {
-    if (/^Close below /i.test(reason)) return reason;
-    if (/^Close above /i.test(reason)) return reason;
-    if (/too far|closer/i.test(reason)) return 'Reach entry zone';
-    if (/flow/i.test(reason)) return 'Flow aligns';
-    if (/rejection|confirmation/i.test(reason)) return direction === 'LONG' ? 'Bullish rejection' : 'Bearish rejection';
-    if (/decision/i.test(reason)) return 'Decision level confirms';
-    if (/R:R/i.test(reason)) return 'Better R:R';
-    if (/location/i.test(reason)) return 'Correct location';
-    return reason;
+  function developingActionText(reason, direction, state) {
+    if (state.label === 'SKIP') return 'Do not trade this setup';
+    const isLong = direction === 'LONG';
+    const confirmation = isLong ? 'bullish confirmation' : 'bearish confirmation';
+    const closeBelow = String(reason || '').match(/^Close below (.+)$/i);
+    if (closeBelow) return `Wait for close below ${closeBelow[1]}`;
+    const closeAbove = String(reason || '').match(/^Close above (.+)$/i);
+    if (closeAbove) return `Wait for close above ${closeAbove[1]}`;
+    if (/flow|rejection|confirmation/i.test(reason || '')) return `Wait for ${confirmation}`;
+    if (/too far|closer|entry zone/i.test(reason || '')) return 'Wait for price to reach entry';
+    if (/location/i.test(reason || '')) return 'Wait for the correct trade area';
+    return String(reason || 'Wait for setup to improve');
+  }
+
+  function developingMilestoneText(actionText, direction, state) {
+    if (state.label === 'SKIP') return 'Do not trade';
+    const text = String(actionText || '');
+    const closeBelow = text.match(/^Wait for close below (.+)$/i);
+    if (closeBelow) return `Close below ${closeBelow[1]}`;
+    const closeAbove = text.match(/^Wait for close above (.+)$/i);
+    if (closeAbove) return `Close above ${closeAbove[1]}`;
+    if (/price to reach entry/i.test(text)) return 'Reach entry area';
+    if (/bullish confirmation/i.test(text)) return 'Bullish confirmation';
+    if (/bearish confirmation/i.test(text)) return 'Bearish confirmation';
+    if (/correct trade area/i.test(text)) return 'Correct trade area';
+    return text.replace(/^Wait for\s+/i, '');
   }
 
   function relativeUpdatedText(r) {
@@ -3041,7 +3057,8 @@
     const expectation = shortDevelopingExpectation(r, state, reason);
     const pathLabel = state.label === 'SKIP' ? 'Rejection Reason' : 'What To Expect';
     const circleSubtext = developingCircleSubtext(state);
-    const nextMilestone = nextMilestoneFromReason(reason, direction);
+    const actionText = developingActionText(reason, direction, state);
+    const nextMilestone = developingMilestoneText(actionText, direction, state);
     const updatedText = relativeUpdatedText(r);
     return `
       <article class="developing-card ${state.className}">
@@ -3063,8 +3080,8 @@
             </div>
           </div>
           <div class="developing-reason">
-            <div class="developing-reason-label">Waiting For</div>
-            <div class="developing-reason-text"><span class="developing-check-icon">○</span><span>${escapeHtml(reason)}</span></div>
+            <div class="developing-reason-label">Next Step</div>
+            <div class="developing-reason-text"><span class="developing-check-icon">○</span><span>${escapeHtml(actionText)}</span></div>
           </div>
         </div>
         <div class="developing-levels">
@@ -3073,7 +3090,7 @@
           <div class="developing-level"><div class="developing-level-label">TP</div><div class="developing-level-value">${f(r.tp1)}</div></div>
           <div class="developing-level"><div class="developing-level-label">R:R</div><div class="developing-level-value">${r.rrRatio != null ? Number(r.rrRatio).toFixed(2) + 'R' : '—'}</div></div>
         </div>
-        <div class="developing-next"><span class="developing-next-label">Next milestone</span><span class="developing-next-value">✓ ${escapeHtml(nextMilestone)}</span></div>
+        <div class="developing-next"><span class="developing-next-label">Next milestone</span><span class="developing-next-value">→ ${escapeHtml(nextMilestone)}</span></div>
         <div class="developing-path">
           <div class="developing-path-label">${pathLabel}</div>
           <ul class="developing-bullets">${expectation.map(line => `<li>• ${escapeHtml(line)}</li>`).join('')}</ul>
