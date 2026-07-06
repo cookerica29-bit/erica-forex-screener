@@ -576,8 +576,8 @@ export function analyzeCandles(
     if (direction === 'LONG')  return c.h >= tp1 - 0.5 * atr && c.c < tp1;
     else                       return c.l <= tp1 + 0.5 * atr && c.c > tp1;
   }).length;
-  if (tp1RejectCount >= 3) {
-    return { setup: null, reason: `TP1 at ${tp1.toFixed(5)} is a heavily tested level (${tp1RejectCount} failed closes in last 50 candles) — likely to block again`, detail };
+  if (tp1RejectCount >= 2) {
+    return { setup: null, reason: `TP1 at ${tp1.toFixed(5)} is a tested/rejected level (${tp1RejectCount} failed closes in last 50 candles) — likely to block again`, detail };
   }
 
   // 5e. Minimum R:R

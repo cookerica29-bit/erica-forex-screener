@@ -27,6 +27,7 @@ The suite checks the current Forex Scout phase and Telegram routing behavior wit
 - Waiting for close above/below decision level
 - Skip setup
 - Duplicate Enter Now same candle
+- TP1 freshness rejects two failed approaches
 
 ## Existing `server/test-refactor.ts` Audit
 
@@ -40,6 +41,6 @@ The older scanner harness reported 7 failures before this suite was added. These
 | G3-b: Weak EMA_BOUNCE offset | Rejected with `No rejection candle` | Setup / `OK` | Potential real behavior gap or stale fixture. Current momentum rules accept this synthetic candle. |
 | G5-a: TF swing high close to entry | Rejected with `Entry too close to resistance` | Setup / `OK` | Potential real behavior gap or stale fixture. Current structure clearance accepts this synthetic series. |
 | G5-b: HTF swing high close to entry | Rejected with `Entry too close to HTF resistance` | Setup / `OK` | Potential real behavior gap or stale fixture. Current HTF structure clearance accepts this synthetic series. |
-| G5-c: TP1 tested twice | Rejected with `tested/rejected level` | Setup / `OK` | Potential real behavior gap or stale fixture. Current TP freshness accepts this synthetic series. |
+| G5-c: TP1 tested twice | Rejected with `tested/rejected level` | Setup / `OK` | Real behavior gap. Fixed by rejecting TP1 after the second failed approach, matching the existing comment that only one failed approach is allowed. |
 
-The two stale reason-text failures were updated in `server/test-refactor.ts`. The five remaining verdict mismatches should be treated as scanner behavior questions before changing either strategy logic or test expectations.
+The two stale reason-text failures were updated in `server/test-refactor.ts`. The TP1 freshness verdict mismatch was fixed. The four remaining verdict mismatches should be treated as scanner behavior questions before changing either strategy logic or test expectations.
