@@ -28,6 +28,7 @@ The suite checks the current Forex Scout phase and Telegram routing behavior wit
 - Skip setup
 - Duplicate Enter Now same candle
 - TP1 freshness rejects two failed approaches
+- HTF conflict rejects long setup against bearish HTF
 
 ## Existing `server/test-refactor.ts` Audit
 
@@ -35,7 +36,7 @@ The older scanner harness reported 7 failures before this suite was added. These
 
 | Test | Expected | Actual | Assessment |
 | --- | --- | --- | --- |
-| G1-c: HTF downtrend conflicts with LONG | Rejected with `HTF conflict` | Setup / `OK` | Potential real behavior gap or stale fixture. The current scanner does not reject this synthetic HTF series. |
+| G1-c: HTF downtrend conflicts with LONG | Rejected with `HTF conflict` | Setup / `OK` | Real behavior gap. Fixed by rejecting clear non-neutral HTF trend conflicts. |
 | G2-a: Price 2.5x ATR above EMA20 | Rejected with `No pullback to 20 EMA` | Rejected with `No rejection candle...` | Stale reason expectation. Updated to match current rejection wording. |
 | G2-b: SHORT price 2.5x ATR below EMA20 | Rejected with `No pullback to 20 EMA` | Rejected with `No rejection candle...` | Stale reason expectation. Updated to match current rejection wording. |
 | G3-b: Weak EMA_BOUNCE offset | Rejected with `No rejection candle` | Setup / `OK` | Potential real behavior gap or stale fixture. Current momentum rules accept this synthetic candle. |
@@ -43,4 +44,4 @@ The older scanner harness reported 7 failures before this suite was added. These
 | G5-b: HTF swing high close to entry | Rejected with `Entry too close to HTF resistance` | Setup / `OK` | Potential real behavior gap or stale fixture. Current HTF structure clearance accepts this synthetic series. |
 | G5-c: TP1 tested twice | Rejected with `tested/rejected level` | Setup / `OK` | Real behavior gap. Fixed by rejecting TP1 after the second failed approach, matching the existing comment that only one failed approach is allowed. |
 
-The two stale reason-text failures were updated in `server/test-refactor.ts`. The TP1 freshness verdict mismatch was fixed. The four remaining verdict mismatches should be treated as scanner behavior questions before changing either strategy logic or test expectations.
+The two stale reason-text failures were updated in `server/test-refactor.ts`. The TP1 freshness and HTF conflict verdict mismatches were fixed. The three remaining verdict mismatches should be treated as scanner behavior questions before changing either strategy logic or test expectations.

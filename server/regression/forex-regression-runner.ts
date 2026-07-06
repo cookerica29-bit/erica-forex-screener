@@ -132,7 +132,21 @@ assertCase(
   `expected tested/rejected level reason, got "${tp1FreshnessResult.reason}"`,
 );
 
-const total = forexRegressionCases.length + 2;
+const htfConflictCaseName = 'HTF conflict rejects long setup against bearish HTF';
+const htfConflict = buildHtfConflictFixture();
+const htfConflictResult = analyzeCandles(htfConflict.candles, htfConflict.htf, 'EUR_USD', 'H1', 1.5);
+assertCase(
+  htfConflictCaseName,
+  htfConflictResult.setup === null,
+  `expected HTF conflict setup to reject, got SETUP with direction ${htfConflictResult.setup?.direction}`,
+);
+assertCase(
+  htfConflictCaseName,
+  htfConflictResult.reason.includes('HTF conflict'),
+  `expected HTF conflict reason, got "${htfConflictResult.reason}"`,
+);
+
+const total = forexRegressionCases.length + 3;
 const passed = total - new Set(failures.map(f => f.caseName)).size;
 
 console.log('\n── Forex Scout Regression Suite ───────────────────────────────────');
@@ -162,6 +176,14 @@ if (!tp1Failures.length) {
 } else {
   console.log(`❌ ${tp1FreshnessCaseName}`);
   tp1Failures.forEach(f => console.log(`   - ${f.message}`));
+}
+
+const htfFailures = failures.filter(f => f.caseName === htfConflictCaseName);
+if (!htfFailures.length) {
+  console.log(`✅ ${htfConflictCaseName}`);
+} else {
+  console.log(`❌ ${htfConflictCaseName}`);
+  htfFailures.forEach(f => console.log(`   - ${f.message}`));
 }
 
 console.log(`\nTotal: ${total} | Passed: ${passed} | Failed: ${new Set(failures.map(f => f.caseName)).size}`);
@@ -237,5 +259,49 @@ function buildTp1FreshnessFixture() {
   return {
     candles: overrideLast(candles, pullback),
     htf: altUp(150, ema20 * 0.999, 0.0003),
+  };
+}
+
+function makeZigzagDown(count: number, start: number): Candle[] {
+  const drop = 0.003;
+  const recover = 0.001;
+  const downLen = 7;
+  const upLen = 3;
+  const period = downLen + upLen;
+  const candles: Candle[] = [];
+  let p = start;
+  for (let i = 0; i < count; i++) {
+    const phase = i % period;
+    const isDown = phase < downLen;
+    const step = isDown ? -(drop / downLen) : (recover / upLen);
+    const o = p;
+    const c = p + step;
+    const wick = Math.abs(step) * 0.25;
+    p = c;
+    candles.push({
+      t: new Date(Date.UTC(2024, 0, 1) + i * 14400000).toISOString(),
+      o,
+      h: Math.max(o, c) + wick,
+      l: Math.min(o, c) - wick,
+      c,
+      v: 1000,
+    });
+  }
+  return candles;
+}
+
+function buildHtfConflictFixture() {
+  const longBase = altUp(250, 1.1000, 0.0004);
+  const atr = calcATRLocal(longBase);
+  const ema20 = calcEMALocal(longBase, 20)[249];
+  const bounceOpen = ema20 + 0.05 * atr;
+  const bounceLow = ema20 - 0.30 * atr;
+  const bounceClose = ema20 + 0.55 * atr;
+  const bounceHigh = bounceClose + 0.10 * atr;
+  const pullback = [{ o: bounceOpen, h: bounceHigh, l: bounceLow, c: bounceClose, v: 1500 }];
+  const p = longBase[249].c;
+  return {
+    candles: overrideLast(longBase, pullback),
+    htf: makeZigzagDown(150, p + 0.05),
   };
 }

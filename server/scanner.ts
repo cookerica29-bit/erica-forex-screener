@@ -394,8 +394,10 @@ export function analyzeCandles(
   const htfSwingLows  = htfSwings.filter(s => s.type === 'low');
   const htfTrend      = getTrend(htfSwings);
   detail.htfTrend = htfTrend;
-  // HTF conflict downgrades quality to DEVELOPING but no longer hard-rejects
   const htfConflict = htfTrend !== null && htfTrend !== direction;
+  if (htfConflict) {
+    return { setup: null, reason: `HTF conflict: ${htfTrend} higher timeframe trend conflicts with ${direction} setup`, detail };
+  }
 
   // ── GATE 2: PULLBACK QUALITY ───────────────────────────────────────────────
   // 2b. Pullback to EMA20: one of the last 8 candles must have touched within 1.5×ATR
