@@ -215,7 +215,7 @@ const noPullback = overrideLast(longBase, [
   {o:ema20+2.7*atr, h:ema20+3.2*atr, l:ema20+2.4*atr, c:ema20+3.0*atr},
 ]);
 test('G2-a: Price 2.5×ATR above EMA20 — no pullback → REJECTED',
-  noPullback, htfNeutral, 'EUR_USD', 'REJECTED', 'No pullback to 20 EMA');
+  noPullback, htfNeutral, 'EUR_USD', 'REJECTED', 'No rejection candle');
 
 // G2-b: SHORT — no pullback. Override last 3 candles so Gate 2 checks only far-below candles.
 // (2-candle override lets the 3rd unmodified candle trigger Gate 2 via its proximity to EMA20.)
@@ -225,7 +225,7 @@ const noPullbackS = overrideLast(shortBase, [
   {o:ema20s-2.6*atrS, h:ema20s-2.3*atrS, l:ema20s-3.1*atrS, c:ema20s-2.9*atrS},
 ]);
 test('G2-b: SHORT — price 2.5×ATR below EMA20 — no pullback → REJECTED',
-  noPullbackS, htfNeutral, 'EUR_USD', 'REJECTED', 'No pullback to 20 EMA');
+  noPullbackS, htfNeutral, 'EUR_USD', 'REJECTED', 'No rejection candle');
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n── Gate 3: Momentum ────────────────────────────────────────────────');
