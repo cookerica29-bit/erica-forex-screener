@@ -528,14 +528,14 @@ export function analyzeCandles(
   // ── GATE 5: VIABILITY (COMPOSITE) ─────────────────────────────────────────
   // All five sub-checks must pass. Returns specific sub-reason on failure.
 
-  // 5a. Structure clearance — entry-TF swings (0.75×ATR required, down from 1.5)
+  // 5a. Structure clearance — entry-TF swings must leave clean room before TP1.
   if (direction === 'SHORT') {
     const nearestSupport = swingLows
       .filter(s => s.price < price)
       .sort((a, b) => b.price - a.price)[0];
     if (nearestSupport) {
       const dist = price - nearestSupport.price;
-      if (dist < 1.0 * atr) {
+      if (dist < 1.5 * atr) {
         return { setup: null, reason: `Entry too close to support (${granularity}): swing low ${nearestSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
       }
     }
@@ -546,12 +546,35 @@ export function analyzeCandles(
       .sort((a, b) => a.price - b.price)[0];
     if (nearestResistance) {
       const dist = nearestResistance.price - price;
-      if (dist < 1.0 * atr) {
+      if (dist < 1.5 * atr) {
         return { setup: null, reason: `Entry too close to resistance (${granularity}): swing high ${nearestResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
       }
     }
   }
-  // 5b. HTF structure clearance removed — HTF swings are informational via htfConflict flag
+
+  // 5b. HTF structure clearance — higher-timeframe blockers matter more than local noise.
+  if (direction === 'SHORT') {
+    const nearestHtfSupport = htfSwingLows
+      .filter(s => s.price < price)
+      .sort((a, b) => b.price - a.price)[0];
+    if (nearestHtfSupport) {
+      const dist = price - nearestHtfSupport.price;
+      if (dist < 2.0 * atr) {
+        return { setup: null, reason: `Entry too close to HTF support: swing low ${nearestHtfSupport.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR below entry`, detail };
+      }
+    }
+  }
+  if (direction === 'LONG') {
+    const nearestHtfResistance = htfSwingHighs
+      .filter(s => s.price > price)
+      .sort((a, b) => a.price - b.price)[0];
+    if (nearestHtfResistance) {
+      const dist = nearestHtfResistance.price - price;
+      if (dist < 2.0 * atr) {
+        return { setup: null, reason: `Entry too close to HTF resistance: swing high ${nearestHtfResistance.price.toFixed(5)} only ${(dist / atr).toFixed(1)}×ATR above entry`, detail };
+      }
+    }
+  }
 
   // 5c. Impulse leg strength: last directional swing ≥1.5×ATR (filters chop)
   if (direction === 'LONG') {

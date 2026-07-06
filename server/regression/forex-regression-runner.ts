@@ -160,7 +160,44 @@ assertCase(
   `expected no rejection candle reason, got "${weakZoneRejectionResult.reason}"`,
 );
 
-const total = forexRegressionCases.length + 4;
+const structureClearanceCases = [
+  {
+    name: 'Local TF resistance blocks LONG path',
+    fixture: buildLocalLongStructureBlockFixture(),
+    reason: 'Entry too close to resistance',
+  },
+  {
+    name: 'Local TF support blocks SHORT path',
+    fixture: buildLocalShortStructureBlockFixture(),
+    reason: 'Entry too close to support',
+  },
+  {
+    name: 'HTF resistance blocks LONG path',
+    fixture: buildHtfLongStructureBlockFixture(),
+    reason: 'Entry too close to HTF resistance',
+  },
+  {
+    name: 'HTF support blocks SHORT path',
+    fixture: buildHtfShortStructureBlockFixture(),
+    reason: 'Entry too close to HTF support',
+  },
+];
+
+for (const testCase of structureClearanceCases) {
+  const result = analyzeCandles(testCase.fixture.candles, testCase.fixture.htf, 'EUR_USD', 'H1', 1.5);
+  assertCase(
+    testCase.name,
+    result.setup === null,
+    `expected structure blocker to reject, got SETUP with TP1 ${result.setup?.tp1}`,
+  );
+  assertCase(
+    testCase.name,
+    result.reason.includes(testCase.reason),
+    `expected reason to include "${testCase.reason}", got "${result.reason}"`,
+  );
+}
+
+const total = forexRegressionCases.length + 4 + structureClearanceCases.length;
 const passed = total - new Set(failures.map(f => f.caseName)).size;
 
 console.log('\n── Forex Scout Regression Suite ───────────────────────────────────');
@@ -208,6 +245,16 @@ if (!weakZoneFailures.length) {
   weakZoneFailures.forEach(f => console.log(`   - ${f.message}`));
 }
 
+for (const testCase of structureClearanceCases) {
+  const caseFailures = failures.filter(f => f.caseName === testCase.name);
+  if (!caseFailures.length) {
+    console.log(`✅ ${testCase.name}`);
+  } else {
+    console.log(`❌ ${testCase.name}`);
+    caseFailures.forEach(f => console.log(`   - ${f.message}`));
+  }
+}
+
 console.log(`\nTotal: ${total} | Passed: ${passed} | Failed: ${new Set(failures.map(f => f.caseName)).size}`);
 
 if (failures.length) {
@@ -241,6 +288,19 @@ function altUp(count: number, start: number, wick = 0.0004): Candle[] {
   let p = start;
   return Array.from({ length: count }, (_, i) => {
     const step = i % 2 === 0 ? up : -dn;
+    const c = p + step;
+    const o = p;
+    p = c;
+    return { t: new Date(Date.UTC(2024, 0, 1) + i * 3600000).toISOString(), o, h: Math.max(o, c) + wick, l: Math.min(o, c) - wick, c, v: 1000 };
+  });
+}
+
+function altDown(count: number, start: number, wick = 0.0004): Candle[] {
+  const dn = 0.00014;
+  const up = 0.00010;
+  let p = start;
+  return Array.from({ length: count }, (_, i) => {
+    const step = i % 2 === 0 ? -dn : up;
     const c = p + step;
     const o = p;
     p = c;
@@ -343,5 +403,123 @@ function buildWeakZoneRejectionFixture() {
       },
     ]),
     htf: altUp(150, ema20 * 0.999, 0.0003),
+  };
+}
+
+function buildLongPullbackFixture() {
+  const base = altUp(250, 1.1000, 0.0004);
+  const atr = calcATRLocal(base);
+  const ema20 = calcEMALocal(base, 20)[249];
+  const bounceOpen = ema20 + 0.05 * atr;
+  const bounceLow = ema20 - 0.30 * atr;
+  const bounceClose = ema20 + 0.55 * atr;
+  const bounceHigh = bounceClose + 0.10 * atr;
+  return {
+    base,
+    atr,
+    ema20,
+    entry: bounceClose,
+    pullback: [{ o: bounceOpen, h: bounceHigh, l: bounceLow, c: bounceClose, v: 1500 }],
+    htf: altUp(150, ema20 * 0.999, 0.0003),
+  };
+}
+
+function buildShortPullbackFixture() {
+  const base = altDown(250, 1.1500, 0.0004);
+  const atr = calcATRLocal(base);
+  const ema20 = calcEMALocal(base, 20)[249];
+  const bounceOpen = ema20;
+  const bounceHigh = ema20 + 0.30 * atr;
+  const bounceClose = ema20 - 0.45 * atr;
+  const bounceLow = bounceClose - 0.10 * atr;
+  return {
+    base,
+    atr,
+    ema20,
+    entry: bounceClose,
+    pullback: [{ o: bounceOpen, h: bounceHigh, l: bounceLow, c: bounceClose, v: 1500 }],
+    htf: altDown(150, ema20 * 1.001, 0.0003),
+  };
+}
+
+function injectSwingHigh(series: Candle[], highPrice: number, atr: number, relIdx: number): Candle[] {
+  const out = [...series];
+  const n = out.length;
+  for (let off = -5; off <= 5; off++) {
+    const idx = n + relIdx + off;
+    if (idx < 0 || idx >= n - 3) continue;
+    if (off === 0) out[idx] = { ...out[idx], h: highPrice, l: highPrice - atr * 0.4, o: highPrice - atr * 0.3, c: highPrice - atr * 0.2 };
+    else out[idx] = { ...out[idx], h: Math.min(out[idx].h, highPrice - Math.abs(off) * atr * 0.15) };
+  }
+  return out;
+}
+
+function injectSwingLow(series: Candle[], lowPrice: number, atr: number, relIdx: number): Candle[] {
+  const out = [...series];
+  const n = out.length;
+  for (let off = -5; off <= 5; off++) {
+    const idx = n + relIdx + off;
+    if (idx < 0 || idx >= n - 3) continue;
+    if (off === 0) out[idx] = { ...out[idx], l: lowPrice, h: lowPrice + atr * 0.4, o: lowPrice + atr * 0.3, c: lowPrice + atr * 0.2 };
+    else out[idx] = { ...out[idx], l: Math.max(out[idx].l, lowPrice + Math.abs(off) * atr * 0.15) };
+  }
+  return out;
+}
+
+function buildLocalLongStructureBlockFixture() {
+  const fx = buildLongPullbackFixture();
+  const blockingResistance = fx.entry + 1.2 * fx.atr;
+  return {
+    candles: overrideLast(injectSwingHigh(fx.base, blockingResistance, fx.atr, -18), fx.pullback),
+    htf: fx.htf,
+  };
+}
+
+function buildLocalShortStructureBlockFixture() {
+  const fx = buildShortPullbackFixture();
+  const blockingSupport = fx.entry - 1.2 * fx.atr;
+  return {
+    candles: overrideLast(injectSwingLow(fx.base, blockingSupport, fx.atr, -18), fx.pullback),
+    htf: fx.htf,
+  };
+}
+
+function buildHTFWithHighAt(highPrice: number): Candle[] {
+  const h = [...altUp(150, 1.100, 0.0005)];
+  const n = h.length;
+  for (let off = -5; off <= 5; off++) {
+    const idx = n - 30 + off;
+    if (idx < 0 || idx >= n) continue;
+    if (off === 0) h[idx] = { ...h[idx], h: highPrice, l: highPrice - 0.0007, o: highPrice - 0.0005, c: highPrice - 0.0004 };
+    else h[idx] = { ...h[idx], h: Math.min(h[idx].h, highPrice - Math.abs(off) * 0.00025) };
+  }
+  return h;
+}
+
+function buildHTFWithLowAt(lowPrice: number): Candle[] {
+  const h = [...altDown(150, 1.150, 0.0005)];
+  const n = h.length;
+  for (let off = -5; off <= 5; off++) {
+    const idx = n - 30 + off;
+    if (idx < 0 || idx >= n) continue;
+    if (off === 0) h[idx] = { ...h[idx], l: lowPrice, h: lowPrice + 0.0007, o: lowPrice + 0.0005, c: lowPrice + 0.0004 };
+    else h[idx] = { ...h[idx], l: Math.max(h[idx].l, lowPrice + Math.abs(off) * 0.00025) };
+  }
+  return h;
+}
+
+function buildHtfLongStructureBlockFixture() {
+  const fx = buildLongPullbackFixture();
+  return {
+    candles: overrideLast(fx.base, fx.pullback),
+    htf: buildHTFWithHighAt(fx.entry + 1.6 * fx.atr),
+  };
+}
+
+function buildHtfShortStructureBlockFixture() {
+  const fx = buildShortPullbackFixture();
+  return {
+    candles: overrideLast(fx.base, fx.pullback),
+    htf: buildHTFWithLowAt(fx.entry - 1.6 * fx.atr),
   };
 }
