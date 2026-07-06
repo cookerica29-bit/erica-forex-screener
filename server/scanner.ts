@@ -59,7 +59,7 @@ type ConfirmationStatus =
 export interface SetupChecklist {
   trend: boolean;           // Gate 1: EMA stack (price > EMA50 > EMA200) + EMA20 slope + HTF alignment
   pullbackQuality: boolean; // Gate 2: pullback to EMA20 within 0.5×ATR + not sandwiched
-  momentum: boolean;        // Gate 3: ENGULFING / PIN_BAR / STRONG_CLOSE / EMA_BOUNCE
+  momentum: boolean;        // Gate 3: ENGULFING / PIN_BAR / STRONG_CLOSE / zone rejection
   rsi: boolean;             // Gate 4: RSI in zone (40–68 LONG, 35–60 SHORT)
   viability: boolean;       // Gate 5: structure clearance + impulse leg + TP1 freshness + min R:R
   session: string;          // Info field: active session at signal time (not a filter)
@@ -423,9 +423,11 @@ export function analyzeCandles(
     detail,
   };
 
-  // ── GATE 3: MOMENTUM CONFIRMATION ─────────────────────────────────────────
-  // ENGULFING / PIN_BAR / STRONG_CLOSE at the pullback candle, or EMA_BOUNCE.
-  // EMA_BOUNCE requires: body ≥0.4×ATR + close ≥0.2×ATR beyond EMA (no drift candles).
+  // ── GATE 3: ZONE / ORDER-BLOCK REJECTION ─────────────────────────────────
+  // ENGULFING / PIN_BAR / STRONG_CLOSE at the pullback candle, or a clean
+  // rejection close away from the entry reference area. EMA20 is only a
+  // dynamic location helper here; it is not accepted as an entry reason by
+  // itself.
   const pullbackEma = ema20arr[pullbackIdx];
   const prevCandle  = candles[pullbackIdx - 1];
   const momentum    = detectMomentum(pullbackCandle, prevCandle, direction, atr, pullbackEma);
@@ -437,22 +439,24 @@ export function analyzeCandles(
     if (
       direction === 'LONG' &&
       pullbackCandle.l <= pullbackEma + 0.75 * atr &&
-      pullbackCandle.c > pullbackEma &&
-      bounceBody >= 0.25 * atr
+      pullbackCandle.c >= pullbackEma + 0.2 * atr &&
+      bounceBody >= 0.4 * atr
     ) {
+      // Internal key kept for journal compatibility; displayed as zone rejection.
       patternType = 'EMA_BOUNCE';
     } else if (
       direction === 'SHORT' &&
       pullbackCandle.h >= pullbackEma - 0.75 * atr &&
-      pullbackCandle.c < pullbackEma &&
-      bounceBody >= 0.25 * atr
+      pullbackCandle.c <= pullbackEma - 0.2 * atr &&
+      bounceBody >= 0.4 * atr
     ) {
+      // Internal key kept for journal compatibility; displayed as zone rejection.
       patternType = 'EMA_BOUNCE';
     }
   }
   if (!patternType) return {
     setup: null,
-    reason: 'No rejection candle at 20 EMA (need engulfing, pin bar, strong close, or clean EMA bounce close)',
+    reason: 'No rejection candle from the entry zone (need engulfing, pin bar, strong close, or clean close away from the zone)',
     detail,
   };
 
@@ -658,7 +662,7 @@ export function analyzeCandles(
   if (patternType === 'ENGULFING')    confluence.push('Engulfing at 20 EMA');
   if (patternType === 'PIN_BAR')      confluence.push('Pin bar at 20 EMA');
   if (patternType === 'STRONG_CLOSE') confluence.push('Strong close off 20 EMA');
-  if (patternType === 'EMA_BOUNCE')   confluence.push('EMA bounce close');
+  if (patternType === 'EMA_BOUNCE')   confluence.push('Zone rejection close');
   if (htfTrend === direction)         confluence.push('HTF aligned');
   if (htfConflict)                    confluence.push(`HTF counter-trend (${htfTrend})`);
   if (emaSlopeStrong)                 confluence.push('Strong EMA slope');
@@ -708,7 +712,7 @@ export function analyzeCandles(
     ENGULFING:    `${dl} Engulfing at 20 EMA`,
     PIN_BAR:      `${dl} Pin Bar off 20 EMA`,
     STRONG_CLOSE: `${dl} Strong Close off 20 EMA`,
-    EMA_BOUNCE:   `${dl} EMA 20 Pullback`,
+    EMA_BOUNCE:   `${dl} Zone Rejection`,
   };
 
   const checklist: SetupChecklist = {

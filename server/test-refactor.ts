@@ -96,7 +96,7 @@ const rsiL   = calcRSILocal(longBase);
 const pL     = longBase[249].c;
 
 // Derive meaningful entry from the pullback candle (last candle will become the pullback)
-// EMA_BOUNCE LONG: l touches EMA20 (within 0.5×ATR), c > EMA20+0.2×ATR, body ≥ 0.4×ATR
+// Zone rejection LONG: l taps the entry reference area, c > EMA20+0.2×ATR, body ≥ 0.4×ATR
 const bounceOpen  = ema20 + 0.05 * atr;
 const bounceLow   = ema20 - 0.30 * atr;   // touches EMA20 ✓
 const bounceClose = ema20 + 0.55 * atr;   // body=0.50×ATR≥0.4×ATR, close>EMA20+0.2×ATR ✓
@@ -117,7 +117,7 @@ const ema200s = ema200arrS[249];
 const rsiS    = calcRSILocal(shortBase);
 const pS      = shortBase[249].c;
 
-// EMA_BOUNCE SHORT: h touches EMA20 (within 0.5×ATR), c < EMA20-0.2×ATR, body ≥ 0.4×ATR
+// Zone rejection SHORT: h taps the entry reference area, c < EMA20-0.2×ATR, body ≥ 0.4×ATR
 // sBounceClose set to -0.45×ATR (not -0.55) so the pullback delta vs prev.c keeps RSI ≥35
 const sBounceOpen  = ema20s;
 const sBounceHigh  = ema20s + 0.30 * atrS;
@@ -230,14 +230,14 @@ test('G2-b: SHORT — price 2.5×ATR below EMA20 — no pullback → REJECTED',
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n── Gate 3: Momentum ────────────────────────────────────────────────');
 
-// G3-a: Doji — body < 0.3×ATR so detectMomentum returns null AND body < 0.4×ATR fails EMA_BOUNCE
+// G3-a: Doji — body < 0.3×ATR so detectMomentum returns null AND body < 0.4×ATR fails zone rejection
 const doji = overrideLast(longBase, [
   {o:ema20+0.01*atr, h:ema20+0.4*atr, l:ema20-0.3*atr, c:ema20+0.02*atr, v:800}
 ]);
 test('G3-a: Doji at EMA20 (body=0.01×ATR) — no pattern → REJECTED',
   doji, htfNeutral, 'EUR_USD', 'REJECTED', 'No rejection candle');
 
-// G3-b: Body ≥ 0.4×ATR but close only 0.15×ATR above EMA20 (needs 0.2×ATR)
+// G3-b: Body ≥ 0.4×ATR but close only 0.15×ATR above the entry reference area (needs 0.2×ATR)
 // Candle constructed to avoid ENGULFING/STRONG_CLOSE: open is above prev close
 // so min(o,c)>pLow → no engulf below; c < prev.h → no strong close
 // The previous candle in altUp at idx 248 is an up candle: o < c, pHigh = c.
@@ -245,31 +245,31 @@ test('G3-a: Doji at EMA20 (body=0.01×ATR) — no pattern → REJECTED',
 const weakOffset = overrideLast(longBase, [
   {o:ema20-0.25*atr, h:ema20+0.25*atr, l:ema20-0.30*atr, c:ema20+0.15*atr, v:900}
 ]);
-test('G3-b: Body≥0.4×ATR but close only 0.15×ATR above EMA20 — EMA_BOUNCE offset fails → REJECTED',
+test('G3-b: Weak zone/order-block rejection close only 0.15×ATR away → REJECTED',
   weakOffset, htfNeutral, 'EUR_USD', 'REJECTED', 'No rejection candle');
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n── Gate 4: RSI ─────────────────────────────────────────────────────');
 
 // G4-a: RSI overbought for LONG.
-// Strategy: put EMA_BOUNCE pullback at idx 247 (so Gate 2+3 fire there), then add 2 large
+// Strategy: put zone rejection pullback at idx 247 (so Gate 2+3 fire there), then add 2 large
 // up candles at idx 248-249 to drive RSI >> 70 by the time Gate 4 is evaluated at lastIdx.
 const overbought = overrideLast(longBase, [
   {o:bounceOpen, h:bounceHigh, l:bounceLow, c:bounceClose, v:1500},                      // idx 247: pullback
   {o:bounceClose, h:bounceClose+2*atr, l:bounceClose-0.1*atr, c:bounceClose+1.5*atr, v:1000}, // idx 248: big up
   {o:bounceClose+1.5*atr, h:bounceClose+3*atr, l:bounceClose+1.4*atr, c:bounceClose+2.5*atr, v:1000}, // idx 249: big up
 ]);
-test('G4-a: EMA_BOUNCE at idx 247 + 2 big gains → RSI overbought at idx 249 → REJECTED',
+test('G4-a: Zone rejection at idx 247 + 2 big gains → RSI overbought at idx 249 → REJECTED',
   overbought, htfNeutral, 'EUR_USD', 'REJECTED', 'RSI');
 
 // G4-b: RSI oversold for SHORT.
-// Same pattern: SHORT EMA_BOUNCE at idx 247, then 2 large down candles at 248-249.
+// Same pattern: SHORT zone rejection at idx 247, then 2 large down candles at 248-249.
 const oversold = overrideLast(shortBase, [
   {o:sBounceOpen, h:sBounceHigh, l:sBounceLow, c:sBounceClose, v:1500},                  // idx 247: pullback
   {o:sBounceClose, h:sBounceClose+0.1*atrS, l:sBounceClose-2*atrS, c:sBounceClose-1.5*atrS, v:1000}, // idx 248: big down
   {o:sBounceClose-1.5*atrS, h:sBounceClose-1.4*atrS, l:sBounceClose-3*atrS, c:sBounceClose-2.5*atrS, v:1000}, // idx 249: big down
 ]);
-test('G4-b: SHORT EMA_BOUNCE at idx 247 + 2 big losses → RSI oversold at idx 249 → REJECTED',
+test('G4-b: SHORT zone rejection at idx 247 + 2 big losses → RSI oversold at idx 249 → REJECTED',
   oversold, htfNeutral, 'EUR_USD', 'REJECTED', 'RSI');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -355,15 +355,15 @@ else { failed++; rows.push(`  ❌ G5-d: Expected RR rejection with minRR=20, got
 console.log('\n── Passing setups ──────────────────────────────────────────────────');
 
 // PASS-1: LONG with neutral HTF
-test('PASS-1: LONG EMA_BOUNCE — all 5 gates pass → SETUP',
+test('PASS-1: LONG zone rejection — all 5 gates pass → SETUP',
   overrideLast(longBase, pullbackL), htfNeutral, 'EUR_USD', 'SETUP');
 
 // PASS-2: LONG with confirming HTF (same direction → +15 score)
 test('PASS-2: LONG with HTF confirmation → SETUP',
   overrideLast(longBase, pullbackL), htfConfirm, 'EUR_USD', 'SETUP');
 
-// PASS-3: SHORT with EMA_BOUNCE
-test('PASS-3: SHORT EMA_BOUNCE — all 5 gates pass → SETUP',
+// PASS-3: SHORT with zone rejection
+test('PASS-3: SHORT zone rejection — all 5 gates pass → SETUP',
   overrideLast(shortBase, pullbackS), htfNeutral, 'EUR_USD', 'SETUP');
 
 // PASS-4: JPY pair (tests getSessionLabel 'Tokyo'/'Off-hours' logic)

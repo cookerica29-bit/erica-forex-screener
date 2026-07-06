@@ -146,7 +146,21 @@ assertCase(
   `expected HTF conflict reason, got "${htfConflictResult.reason}"`,
 );
 
-const total = forexRegressionCases.length + 3;
+const weakZoneRejectionCaseName = 'Weak zone rejection close is rejected';
+const weakZoneRejection = buildWeakZoneRejectionFixture();
+const weakZoneRejectionResult = analyzeCandles(weakZoneRejection.candles, weakZoneRejection.htf, 'EUR_USD', 'H1', 1.5);
+assertCase(
+  weakZoneRejectionCaseName,
+  weakZoneRejectionResult.setup === null,
+  `expected weak zone rejection to reject, got SETUP with pattern ${weakZoneRejectionResult.setup?.pattern}`,
+);
+assertCase(
+  weakZoneRejectionCaseName,
+  weakZoneRejectionResult.reason.includes('No rejection candle'),
+  `expected no rejection candle reason, got "${weakZoneRejectionResult.reason}"`,
+);
+
+const total = forexRegressionCases.length + 4;
 const passed = total - new Set(failures.map(f => f.caseName)).size;
 
 console.log('\n── Forex Scout Regression Suite ───────────────────────────────────');
@@ -184,6 +198,14 @@ if (!htfFailures.length) {
 } else {
   console.log(`❌ ${htfConflictCaseName}`);
   htfFailures.forEach(f => console.log(`   - ${f.message}`));
+}
+
+const weakZoneFailures = failures.filter(f => f.caseName === weakZoneRejectionCaseName);
+if (!weakZoneFailures.length) {
+  console.log(`✅ ${weakZoneRejectionCaseName}`);
+} else {
+  console.log(`❌ ${weakZoneRejectionCaseName}`);
+  weakZoneFailures.forEach(f => console.log(`   - ${f.message}`));
 }
 
 console.log(`\nTotal: ${total} | Passed: ${passed} | Failed: ${new Set(failures.map(f => f.caseName)).size}`);
@@ -303,5 +325,23 @@ function buildHtfConflictFixture() {
   return {
     candles: overrideLast(longBase, pullback),
     htf: makeZigzagDown(150, p + 0.05),
+  };
+}
+
+function buildWeakZoneRejectionFixture() {
+  const longBase = altUp(250, 1.1000, 0.0004);
+  const atr = calcATRLocal(longBase);
+  const ema20 = calcEMALocal(longBase, 20)[249];
+  return {
+    candles: overrideLast(longBase, [
+      {
+        o: ema20 - 0.25 * atr,
+        h: ema20 + 0.25 * atr,
+        l: ema20 - 0.30 * atr,
+        c: ema20 + 0.15 * atr,
+        v: 900,
+      },
+    ]),
+    htf: altUp(150, ema20 * 0.999, 0.0003),
   };
 }
