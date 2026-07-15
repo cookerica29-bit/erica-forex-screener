@@ -111,6 +111,12 @@ const html = fs.readFileSync('public/index.html', 'utf8');
 const rendererStart = html.indexOf('function renderForexV2LifecycleCard');
 const rendererEnd = html.indexOf('function renderScoutCard', rendererStart);
 const renderer = html.slice(rendererStart, rendererEnd);
+const forexCardRendererStart = html.indexOf('function renderForexCard');
+const forexCardRendererEnd = html.indexOf('function renderV2List', forexCardRendererStart);
+const forexCardRenderer = html.slice(forexCardRendererStart, forexCardRendererEnd);
+const compareBranchStart = forexCardRenderer.indexOf('if (forexCardV2CompareEnabled())');
+const compareBranchEnd = forexCardRenderer.indexOf('return renderForexV2LifecycleCard', compareBranchStart);
+const compareBranch = forexCardRenderer.slice(compareBranchStart, compareBranchEnd);
 const inspectorStart = html.indexOf('function v2RequirementKeysByStatus');
 const inspectorEnd = html.indexOf('function renderForexV2LifecycleCard', inspectorStart);
 const inspector = html.slice(inspectorStart, inspectorEnd);
@@ -120,6 +126,9 @@ assertCase('Frontend reads Decision Engine card payload', renderer.includes('r.v
 assertCase('Frontend v2 renderer avoids trading calculations', !/(BOS|CHoCH|premium|discount|liquidity|entryTimingState|decisionLevelConfirmed|recentBOS|recentChoCH)/i.test(renderer), 'v2 renderer should not duplicate trading logic terms');
 assertCase('Feature flag preserves v1 default', html.includes("localStorage.getItem(FOREX_CARD_V2_FLAG) === 'true'") && html.includes('if (!forexCardV2Enabled()) return renderScoutCard(r);'), 'feature flag should default to v1 renderer');
 assertCase('Comparison mode renders both cards', html.includes('V1 Card') && html.includes('V2 Lifecycle Card') && html.includes('renderScoutCard(r)'), 'comparison mode should render both cards');
+assertCase('Comparison mode keeps paired cards in one wrapper', compareBranch.includes('<div class="forex-v2-compare">') && compareBranch.includes('forex-v2-compare-side-v1') && compareBranch.includes('forex-v2-compare-side-v2'), 'comparison branch should wrap V1 and V2 sides together');
+assertCase('Comparison wrapper renders exactly one V1 and one V2 card', (compareBranch.match(/renderScoutCard\(r\)/g) || []).length === 1 && (compareBranch.match(/renderForexV2LifecycleCard\(r\)/g) || []).length === 1, 'comparison wrapper should contain one V1 renderer and one V2 renderer');
+assertCase('Comparison mode suppresses separate developing card grid', html.includes('renderDevelopingSetups(forexCardV2CompareEnabled() ? [] : filtered);'), 'comparison mode should not render a separate V1-like developing grid before paired cards');
 assertCase('Developer inspector is collapsed in v2 renderer', inspector.includes('<details class="forex-v2-inspector">') && inspector.includes('<summary>Developer State Inspector</summary>') && renderer.includes('renderV2DeveloperInspector(card)'), 'developer inspector should render as collapsed details');
 assertCase('Developer inspector reads only v2 card payload', inspectorStart > -1 && inspectorEnd > inspectorStart && inspector.includes('card?.engine_snapshot?.requirements') && inspector.includes('card?.execution_plan') && !/\br\./.test(inspector), 'inspector should read from v2LifecycleCard-derived card only');
 assertCase('Developer inspector hidden when v2 disabled', scoutRenderer.includes('function renderScoutCard') && !scoutRenderer.includes('Developer State Inspector'), 'v1 renderer should not include developer inspector');
@@ -134,7 +143,7 @@ if (!failures.length) {
 } else {
   for (const failure of failures) console.log(`FAIL ${failure.caseName}: ${failure.message}`);
 }
-const totalCases = 15;
+const totalCases = 18;
 console.log(`\nTotal: ${totalCases} | Passed: ${totalCases - groupedFailures.size} | Failed: ${groupedFailures.size}`);
 
 if (failures.length) process.exit(1);

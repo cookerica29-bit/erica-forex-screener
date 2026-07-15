@@ -3179,7 +3179,7 @@
       return;
     }
     document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of ${all.length} setups · ${entryStatusSummary(filtered)}`;
-    renderDevelopingSetups(filtered);
+    renderDevelopingSetups(forexCardV2CompareEnabled() ? [] : filtered);
     if (!filtered.length) { main.innerHTML = '<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No pairs match your filters</div></div>'; return; }
     main.innerHTML = '<div class="setup-grid">' + filtered.map(r => renderForexCard(r)).join('') + '</div>';
   }
@@ -4931,11 +4931,11 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     if (forexCardV2CompareEnabled()) {
       return `
         <div class="forex-v2-compare">
-          <div>
+          <div class="forex-v2-compare-side forex-v2-compare-side-v1">
             <div class="forex-v2-compare-label">V1 Card</div>
             ${renderScoutCard(r)}
           </div>
-          <div>
+          <div class="forex-v2-compare-side forex-v2-compare-side-v2">
             <div class="forex-v2-compare-label">V2 Lifecycle Card</div>
             ${renderForexV2LifecycleCard(r)}
           </div>
