@@ -553,6 +553,12 @@
     .forex-v2-plan-cell { border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:8px; background:rgba(0,0,0,0.16); }
     .forex-v2-plan-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:3px; }
     .forex-v2-plan-value { font-size:13px; font-weight:800; color:var(--text); }
+    .forex-v2-inspector { border:1px dashed rgba(167,139,250,0.28); border-radius:8px; background:rgba(167,139,250,0.045); padding:9px 10px; }
+    .forex-v2-inspector summary { cursor:pointer; color:#c4b5fd; font-size:9px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
+    .forex-v2-inspector-grid { display:grid; gap:7px; margin-top:9px; }
+    .forex-v2-inspector-row { display:grid; grid-template-columns:minmax(110px,.35fr) minmax(0,1fr); gap:8px; align-items:start; font-size:10px; line-height:1.4; }
+    .forex-v2-inspector-key { color:var(--slate-dim); font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+    .forex-v2-inspector-value { color:var(--slate); overflow-wrap:anywhere; }
     .forex-v2-timeline { display:flex; flex-direction:column; gap:0; }
     .forex-v2-step { display:grid; grid-template-columns:18px 1fr; gap:8px; align-items:start; color:var(--slate-dim); font-size:11px; }
     .forex-v2-step-dot { width:10px; height:10px; border-radius:50%; margin-top:2px; background:rgba(148,163,184,0.22); border:1px solid rgba(148,163,184,0.35); }
@@ -4971,6 +4977,37 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       </div>`).join('');
   }
 
+  function v2RequirementKeysByStatus(card, status) {
+    return Object.entries(card?.engine_snapshot?.requirements || {})
+      .filter(([, requirement]) => requirement?.status === status)
+      .map(([key]) => key);
+  }
+
+  function renderV2DeveloperInspector(card) {
+    const plan = card?.execution_plan || {};
+    const planFields = ['current_price', 'planned_entry', 'stop', 'tp1', 'tp2', 'tp3'];
+    const directPlanValues = planFields.every(key => Object.prototype.hasOwnProperty.call(plan, key));
+    const rows = [
+      ['Raw lifecycle state', card?.state || 'N/A'],
+      ['Transition reason', card?.transition_reason || 'N/A'],
+      ['Completed requirement keys', v2RequirementKeysByStatus(card, 'COMPLETE').join(', ') || 'None'],
+      ['Missing requirement keys', v2RequirementKeysByStatus(card, 'INCOMPLETE').join(', ') || 'None'],
+      ['Next step', card?.next_step || 'N/A'],
+      ['Execution plan source', directPlanValues ? 'v2LifecycleCard.execution_plan' : 'Missing v2LifecycleCard.execution_plan fields'],
+    ];
+    return `
+      <details class="forex-v2-inspector">
+        <summary>Developer State Inspector</summary>
+        <div class="forex-v2-inspector-grid">
+          ${rows.map(([label, value]) => `
+            <div class="forex-v2-inspector-row">
+              <div class="forex-v2-inspector-key">${escapeHtml(label)}</div>
+              <div class="forex-v2-inspector-value">${escapeHtml(value)}</div>
+            </div>`).join('')}
+        </div>
+      </details>`;
+  }
+
   function renderForexV2LifecycleCard(r) {
     const card = r.v2LifecycleCard;
     const displaySym = r.displaySymbol || (r.pair || '').replace('_', '/');
@@ -5032,6 +5069,8 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             <div class="forex-v2-title">Next Step</div>
             <div class="setup-status-value">${escapeHtml(card.next_step || '')}</div>
           </div>
+
+          ${renderV2DeveloperInspector(card)}
         </div>
       </div>`;
   }

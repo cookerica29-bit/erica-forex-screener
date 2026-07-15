@@ -111,11 +111,18 @@ const html = fs.readFileSync('public/index.html', 'utf8');
 const rendererStart = html.indexOf('function renderForexV2LifecycleCard');
 const rendererEnd = html.indexOf('function renderScoutCard', rendererStart);
 const renderer = html.slice(rendererStart, rendererEnd);
+const inspectorStart = html.indexOf('function v2RequirementKeysByStatus');
+const inspectorEnd = html.indexOf('function renderForexV2LifecycleCard', inspectorStart);
+const inspector = html.slice(inspectorStart, inspectorEnd);
+const scoutRenderer = html.slice(rendererEnd);
 assertCase('Frontend v2 renderer exists', rendererStart > -1 && rendererEnd > rendererStart, 'v2 renderer function not found');
 assertCase('Frontend reads Decision Engine card payload', renderer.includes('r.v2LifecycleCard'), 'renderer should consume v2LifecycleCard');
 assertCase('Frontend v2 renderer avoids trading calculations', !/(BOS|CHoCH|premium|discount|liquidity|entryTimingState|decisionLevelConfirmed|recentBOS|recentChoCH)/i.test(renderer), 'v2 renderer should not duplicate trading logic terms');
 assertCase('Feature flag preserves v1 default', html.includes("localStorage.getItem(FOREX_CARD_V2_FLAG) === 'true'") && html.includes('if (!forexCardV2Enabled()) return renderScoutCard(r);'), 'feature flag should default to v1 renderer');
 assertCase('Comparison mode renders both cards', html.includes('V1 Card') && html.includes('V2 Lifecycle Card') && html.includes('renderScoutCard(r)'), 'comparison mode should render both cards');
+assertCase('Developer inspector is collapsed in v2 renderer', inspector.includes('<details class="forex-v2-inspector">') && inspector.includes('<summary>Developer State Inspector</summary>') && renderer.includes('renderV2DeveloperInspector(card)'), 'developer inspector should render as collapsed details');
+assertCase('Developer inspector reads only v2 card payload', inspectorStart > -1 && inspectorEnd > inspectorStart && inspector.includes('card?.engine_snapshot?.requirements') && inspector.includes('card?.execution_plan') && !/\br\./.test(inspector), 'inspector should read from v2LifecycleCard-derived card only');
+assertCase('Developer inspector hidden when v2 disabled', scoutRenderer.includes('function renderScoutCard') && !scoutRenderer.includes('Developer State Inspector'), 'v1 renderer should not include developer inspector');
 
 console.log('\n-- Kairos Forex v2 Card Contract Regression Suite ------------------');
 const groupedFailures = new Set(failures.map(f => f.caseName));
@@ -123,9 +130,11 @@ if (!failures.length) {
   console.log(`PASS v2 card state=${card.state}`);
   console.log(`PASS execution plan entry=${card.execution_plan.planned_entry}, stop=${card.execution_plan.stop}, tp1=${card.execution_plan.tp1}`);
   console.log('PASS frontend renderer consumes v2LifecycleCard without trading logic terms');
+  console.log('PASS developer inspector is v2-only and card-payload sourced');
 } else {
   for (const failure of failures) console.log(`FAIL ${failure.caseName}: ${failure.message}`);
 }
-console.log(`\nTotal: 12 | Passed: ${12 - groupedFailures.size} | Failed: ${groupedFailures.size}`);
+const totalCases = 15;
+console.log(`\nTotal: ${totalCases} | Passed: ${totalCases - groupedFailures.size} | Failed: ${groupedFailures.size}`);
 
 if (failures.length) process.exit(1);
