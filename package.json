@@ -9,7 +9,8 @@
     "test:regression": "tsx server/regression/forex-regression-runner.ts",
     "test:lifecycle": "tsx server/v2/regression/lifecycle-regression-runner.ts",
     "test:shadow": "tsx server/v2/regression/shadow-comparison-runner.ts",
-    "test:market-structure": "tsx server/v2/regression/market-structure-runner.ts"
+    "test:market-structure": "tsx server/v2/regression/market-structure-runner.ts",
+    "test:decision-validation": "tsx server/v2/regression/decision-validation-runner.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
