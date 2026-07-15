@@ -378,7 +378,6 @@
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
       .setup-grid { grid-template-columns: 1fr; padding: 10px; }
-      .forex-v2-compare { grid-template-columns:1fr; }
       .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
       .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
@@ -562,8 +561,12 @@
     .forex-v2-step.active { color:#c4b5fd; font-weight:900; }
     .forex-v2-step.active .forex-v2-step-dot { background:#a78bfa; border-color:#c4b5fd; box-shadow:0 0 0 3px rgba(167,139,250,0.14); }
     .forex-v2-connector { width:1px; height:12px; margin:2px 0 2px 5px; background:rgba(148,163,184,0.22); }
-    .forex-v2-compare { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:0; }
+    .forex-v2-compare { grid-column:1 / -1; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; padding:0; width:100%; min-width:0; }
+    .forex-v2-compare > div { min-width:0; }
     .forex-v2-compare-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.1em; margin:0 0 6px 2px; font-weight:900; }
+    @media (max-width: 900px) {
+      .forex-v2-compare { grid-template-columns:minmax(0, 1fr); }
+    }
     .plan-diagnostics-box { margin:8px 0 10px; padding:9px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.1); background:rgba(148,163,184,0.035); }
     .plan-diagnostics-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:6px; }
     .plan-quality { font-size:9px; padding:3px 8px; border-radius:99px; border:1px solid rgba(148,163,184,0.24); font-weight:900; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
