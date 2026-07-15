@@ -118,7 +118,10 @@ const compareBranchStart = forexCardRenderer.indexOf('if (forexCardV2CompareEnab
 const compareBranchEnd = forexCardRenderer.indexOf('return renderForexV2LifecycleCard', compareBranchStart);
 const compareBranch = forexCardRenderer.slice(compareBranchStart, compareBranchEnd);
 const inspectorStart = html.indexOf('function v2RequirementKeysByStatus');
-const inspectorEnd = html.indexOf('function renderForexV2LifecycleCard', inspectorStart);
+const feedbackStart = html.indexOf('function renderV2FeedbackCapture');
+const feedbackEnd = html.indexOf('function renderForexV2LifecycleCard', feedbackStart);
+const feedback = html.slice(feedbackStart, feedbackEnd);
+const inspectorEnd = feedbackStart > -1 ? feedbackStart : html.indexOf('function renderForexV2LifecycleCard', inspectorStart);
 const inspector = html.slice(inspectorStart, inspectorEnd);
 const scoutRenderer = html.slice(rendererEnd);
 assertCase('Frontend v2 renderer exists', rendererStart > -1 && rendererEnd > rendererStart, 'v2 renderer function not found');
@@ -132,6 +135,9 @@ assertCase('Comparison mode suppresses separate developing card grid', html.incl
 assertCase('Developer inspector is collapsed in v2 renderer', inspector.includes('<details class="forex-v2-inspector">') && inspector.includes('<summary>Developer State Inspector</summary>') && renderer.includes('renderV2DeveloperInspector(card)'), 'developer inspector should render as collapsed details');
 assertCase('Developer inspector reads only v2 card payload', inspectorStart > -1 && inspectorEnd > inspectorStart && inspector.includes('card?.engine_snapshot?.requirements') && inspector.includes('card?.execution_plan') && !/\br\./.test(inspector), 'inspector should read from v2LifecycleCard-derived card only');
 assertCase('Developer inspector hidden when v2 disabled', scoutRenderer.includes('function renderScoutCard') && !scoutRenderer.includes('Developer State Inspector'), 'v1 renderer should not include developer inspector');
+assertCase('V2 feedback capture is v2-only', renderer.includes('renderV2FeedbackCapture(r, card)') && feedback.includes('Something felt unclear') && !scoutRenderer.includes('Something felt unclear'), 'feedback capture should render only inside v2 cards');
+assertCase('V2 feedback capture stores local review fields', feedback.includes('FOREX_CARD_V2_FEEDBACK_KEY') && feedback.includes('localStorage.setItem') && feedback.includes('symbol') && feedback.includes('timeframe') && feedback.includes('lifecycle_state') && feedback.includes('next_step') && feedback.includes('transition_reason') && feedback.includes('timestamp') && feedback.includes('note'), 'feedback should persist the requested local review fields');
+assertCase('V2 feedback capture has no server side effects', !/fetch|XMLHttpRequest|sendBeacon|journal|telegram|alert/i.test(feedback), 'feedback capture should not call production workflows');
 
 console.log('\n-- Kairos Forex v2 Card Contract Regression Suite ------------------');
 const groupedFailures = new Set(failures.map(f => f.caseName));
@@ -140,10 +146,11 @@ if (!failures.length) {
   console.log(`PASS execution plan entry=${card.execution_plan.planned_entry}, stop=${card.execution_plan.stop}, tp1=${card.execution_plan.tp1}`);
   console.log('PASS frontend renderer consumes v2LifecycleCard without trading logic terms');
   console.log('PASS developer inspector is v2-only and card-payload sourced');
+  console.log('PASS v2 feedback capture is local-only and v2-only');
 } else {
   for (const failure of failures) console.log(`FAIL ${failure.caseName}: ${failure.message}`);
 }
-const totalCases = 18;
+const totalCases = 21;
 console.log(`\nTotal: ${totalCases} | Passed: ${totalCases - groupedFailures.size} | Failed: ${groupedFailures.size}`);
 
 if (failures.length) process.exit(1);

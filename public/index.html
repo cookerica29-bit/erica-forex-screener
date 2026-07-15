@@ -559,6 +559,10 @@
     .forex-v2-inspector-row { display:grid; grid-template-columns:minmax(110px,.35fr) minmax(0,1fr); gap:8px; align-items:start; font-size:10px; line-height:1.4; }
     .forex-v2-inspector-key { color:var(--slate-dim); font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
     .forex-v2-inspector-value { color:var(--slate); overflow-wrap:anywhere; }
+    .forex-v2-feedback { border:1px solid rgba(245,166,35,0.24); border-radius:8px; background:rgba(245,166,35,0.045); padding:9px 10px; display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .forex-v2-feedback-label { font-size:10px; color:var(--slate-dim); line-height:1.35; }
+    .forex-v2-feedback-btn { border:1px solid rgba(245,166,35,0.42); background:rgba(245,166,35,0.1); color:var(--gold); border-radius:8px; padding:6px 10px; font-size:10px; font-weight:900; font-family:inherit; cursor:pointer; white-space:nowrap; }
+    .forex-v2-feedback-btn:hover { background:rgba(245,166,35,0.16); }
     .forex-v2-timeline { display:flex; flex-direction:column; gap:0; }
     .forex-v2-step { display:grid; grid-template-columns:18px 1fr; gap:8px; align-items:start; color:var(--slate-dim); font-size:11px; }
     .forex-v2-step-dot { width:10px; height:10px; border-radius:50%; margin-top:2px; background:rgba(148,163,184,0.22); border:1px solid rgba(148,163,184,0.35); }
@@ -4913,6 +4917,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
 
   const FOREX_CARD_V2_FLAG = 'FOREX_CARD_V2_ENABLED';
   const FOREX_CARD_V2_COMPARE_FLAG = 'FOREX_CARD_V2_COMPARE';
+  const FOREX_CARD_V2_FEEDBACK_KEY = 'FOREX_CARD_V2_FEEDBACK';
 
   function forexCardV2Enabled() {
     return localStorage.getItem(FOREX_CARD_V2_FLAG) === 'true';
@@ -5008,6 +5013,49 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       </details>`;
   }
 
+  function renderV2FeedbackCapture(r, card) {
+    const payload = {
+      symbol: r.displaySymbol || (r.pair || '').replace('_', '/'),
+      timeframe: r.timeframe || '',
+      lifecycle_state: card?.state || '',
+      next_step: card?.next_step || '',
+      transition_reason: card?.transition_reason || '',
+    };
+    return `
+      <div class="forex-v2-feedback">
+        <div class="forex-v2-feedback-label">Developer review note</div>
+        <button class="forex-v2-feedback-btn" type="button" onclick="captureV2LifecycleFeedback(decodeURIComponent('${encodeSetupArg(payload)}'))">Something felt unclear</button>
+      </div>`;
+  }
+
+  function captureV2LifecycleFeedback(encodedPayload) {
+    let payload = {};
+    try {
+      payload = JSON.parse(encodedPayload || '{}');
+    } catch (_) {
+      payload = {};
+    }
+    const note = prompt('What felt unclear? Optional note:', '') || '';
+    const entry = {
+      symbol: payload.symbol || '',
+      timeframe: payload.timeframe || '',
+      lifecycle_state: payload.lifecycle_state || '',
+      next_step: payload.next_step || '',
+      transition_reason: payload.transition_reason || '',
+      timestamp: new Date().toISOString(),
+      note,
+    };
+    let existing = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem(FOREX_CARD_V2_FEEDBACK_KEY) || '[]');
+      existing = Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      existing = [];
+    }
+    existing.push(entry);
+    localStorage.setItem(FOREX_CARD_V2_FEEDBACK_KEY, JSON.stringify(existing));
+  }
+
   function renderForexV2LifecycleCard(r) {
     const card = r.v2LifecycleCard;
     const displaySym = r.displaySymbol || (r.pair || '').replace('_', '/');
@@ -5071,6 +5119,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           </div>
 
           ${renderV2DeveloperInspector(card)}
+          ${renderV2FeedbackCapture(r, card)}
         </div>
       </div>`;
   }
