@@ -21,6 +21,7 @@ import {
   tradeableSignalAlertKey,
   tradeableSignalDataKey,
 } from './scoutPhase.js';
+import { formatLifecycleDiagnosticsSummary, recordLifecycleShadowScan } from './v2/diagnostics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -1331,6 +1332,22 @@ function getSurfacedTrends(results: TrendScanResult) {
   return surfaced;
 }
 
+function recordV2LifecycleShadow(reports: ScoutReport[], source: string) {
+  try {
+    const diagnostics = recordLifecycleShadowScan(reports, source);
+    console.log(formatLifecycleDiagnosticsSummary(diagnostics.summary));
+    for (const transition of diagnostics.transitions.slice(-10)) {
+      if (transition.from === transition.to) continue;
+      console.log(
+        `[V2 Lifecycle Transition] ${transition.symbol} ${transition.timeframe}: ` +
+        `${transition.from || 'NEW'} -> ${transition.to}. Reason: ${transition.reason}`
+      );
+    }
+  } catch (e: any) {
+    console.warn('[V2 Lifecycle Shadow] diagnostics failed:', e.message);
+  }
+}
+
 async function notifyNewTrendingPairs(results: TrendScanResult) {
   const surfaced = getSurfacedTrends(results);
   const currentPairs = new Set(surfaced.keys());
@@ -1525,6 +1542,7 @@ async function scheduledScan(forceTf?: string) {
       const scoutTimeframes = forceTf ? [forceTf] : ['H4', 'H1'];
       latestScoutResults = (await Promise.all(scoutTimeframes.map(tf => runScoutScan(tf)))).flat();
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
+      recordV2LifecycleShadow(latestScoutResults, 'scheduled scout scan');
       await notifyTradeableScoutSignals(latestScoutResults, 'scheduled scout scan');
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
@@ -1576,6 +1594,7 @@ app.post('/api/scout', async (req, res) => {
       console.log(`[Scout] Priority mode active for setup queue, ignored for scout card coverage (${priorityPairsData.pairs.length} priority pairs)`);
     }
     latestScoutResults = await runScoutScan(tf);
+    recordV2LifecycleShadow(latestScoutResults, 'manual scout scan');
     await notifyTradeableScoutSignals(latestScoutResults, 'manual scout scan');
     lastScanTime = new Date().toISOString();
     const reports = enrichScoutReports(latestScoutResults);
@@ -1596,6 +1615,7 @@ app.get('/api/scout/diagnostics', async (req, res) => {
       await loadPriorityPairsFromStorage('SCOUT_DIAGNOSTICS_LOAD');
       const timeframes = requestedTimeframes.length ? requestedTimeframes : ['H4', 'H1', 'M30'];
       const reports = (await Promise.all(timeframes.map(tf => runScoutScan(tf)))).flat();
+      recordV2LifecycleShadow(reports, `manual diagnostics ${timeframes.join(',')}`);
       const diagnostics = buildScoutDiagnostics(reports, `manual diagnostics ${timeframes.join(',')}`);
       latestScoutDiagnostics = diagnostics;
       latestScoutResults = reports;
