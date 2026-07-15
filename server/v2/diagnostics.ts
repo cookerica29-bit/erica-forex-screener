@@ -1,7 +1,7 @@
 import type { ScoutReport } from '../scanner.js';
 import { scoutPhaseState } from '../scoutPhase.js';
 import { evaluateLifecycle, lifecycleInputFromScoutReport } from './lifecycle.js';
-import { STATE_ORDER, type LifecycleSnapshot, type LifecycleState, type LifecycleTransition } from './stateMachine.js';
+import { STATE_ORDER, type EngineName, type LifecycleSnapshot, type LifecycleState, type LifecycleTransition } from './stateMachine.js';
 
 export interface ShadowComparison {
   symbol: string;
@@ -11,6 +11,7 @@ export interface ShadowComparison {
   v2_result: LifecycleSnapshot;
   matches: boolean;
   disagreement_reason: string | null;
+  disagreement_engine: EngineName | null;
   most_important_missing_requirement: string | null;
 }
 
@@ -22,6 +23,7 @@ export interface LifecycleDiagnosticsSummary {
   v1_enter_now: number;
   v2_enter_now: number;
   largest_disagreement_category: string | null;
+  largest_disagreement_engine: EngineName | null;
   most_common_missing_requirement: string | null;
   average_lifecycle_stage: LifecycleState | null;
   transitions: number;
@@ -44,6 +46,11 @@ function disagreementReason(comparison: Omit<ShadowComparison, 'disagreement_rea
   return comparison.most_important_missing_requirement
     ? `${comparison.most_important_missing_requirement} not confirmed`
     : `${comparison.v1_mapped_state} vs ${comparison.v2_result.current_state}`;
+}
+
+function disagreementEngine(v2: LifecycleSnapshot): EngineName | null {
+  const missing = Object.values(v2.requirements).find(r => r.status === 'INCOMPLETE');
+  return missing?.engine ?? null;
 }
 
 function countBy(values: string[]) {
@@ -90,6 +97,7 @@ export class LifecycleDiagnosticsStore {
         v1_mapped_state: v1Mapped,
         v2_result: v2,
         matches: v1Mapped === v2.current_state,
+        disagreement_engine: v1Mapped === v2.current_state ? null : disagreementEngine(v2),
         most_important_missing_requirement: v2.missing_requirements[0] ?? null,
       };
       return {
@@ -118,6 +126,10 @@ export class LifecycleDiagnosticsStore {
     const disagreementCategories = comparisons
       .filter(c => !c.matches)
       .map(c => c.disagreement_reason || 'Unknown disagreement');
+    const disagreementEngines = comparisons
+      .filter(c => !c.matches)
+      .map(c => c.disagreement_engine)
+      .filter((v): v is EngineName => Boolean(v));
     const avgOrder = comparisons.length
       ? Math.round(comparisons.reduce((sum, c) => sum + STATE_ORDER[c.v2_result.current_state], 0) / comparisons.length)
       : null;
@@ -134,6 +146,7 @@ export class LifecycleDiagnosticsStore {
       v1_enter_now: comparisons.filter(c => c.v1_result === 'Enter Now').length,
       v2_enter_now: comparisons.filter(c => ['STRUCTURE_CONFIRMED', 'SETUP_CONFIRMED_WAITING_FOR_ENTRY', 'ENTRY_REACHED'].includes(c.v2_result.current_state)).length,
       largest_disagreement_category: topCount(countBy(disagreementCategories)),
+      largest_disagreement_engine: topCount(countBy(disagreementEngines)) as EngineName | null,
       most_common_missing_requirement: topCount(countBy(missing)),
       average_lifecycle_stage: avgStage,
       transitions: this.transitions.length,
@@ -159,6 +172,7 @@ export function formatLifecycleDiagnosticsSummary(summary = lifecycleDiagnostics
     `Matching ${summary.matching_states}`,
     `Disagreements ${summary.different_states}`,
     `Top disagreement ${summary.largest_disagreement_category || 'None'}`,
+    `Top engine ${summary.largest_disagreement_engine || 'None'}`,
     `Most common missing ${summary.most_common_missing_requirement || 'None'}`,
     `Average lifecycle stage ${summary.average_lifecycle_stage || 'N/A'}`,
     `Transitions ${summary.transitions}`,

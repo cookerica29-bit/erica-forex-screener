@@ -17,6 +17,7 @@ export const LIFECYCLE_STATES = [
 export type LifecycleState = typeof LIFECYCLE_STATES[number];
 
 export type RequirementStatus = 'COMPLETE' | 'INCOMPLETE' | 'NOT_APPLICABLE';
+export type EngineName = 'Context' | 'Liquidity' | 'Structure' | 'Location' | 'Execution';
 
 export const REQUIREMENT_KEYS = [
   'daily_bias',
@@ -33,6 +34,7 @@ export type RequirementKey = typeof REQUIREMENT_KEYS[number];
 export interface LifecycleRequirement {
   key: RequirementKey;
   label: string;
+  engine: EngineName;
   status: RequirementStatus;
   reason: string;
 }
@@ -125,8 +127,9 @@ export function lifecycleNextStep(state: LifecycleState, plannedEntry?: number |
 export function requirement(
   key: RequirementKey,
   label: string,
+  engine: EngineName,
   status: RequirementStatus,
   reason: string
 ): LifecycleRequirement {
-  return { key, label, status, reason };
+  return { key, label, engine, status, reason };
 }
