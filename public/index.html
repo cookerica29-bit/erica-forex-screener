@@ -378,6 +378,7 @@
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
       .setup-grid { grid-template-columns: 1fr; padding: 10px; }
+      .forex-v2-compare { grid-template-columns:1fr; }
       .trend-grid, .scalp-grid, .scalp-stats { grid-template-columns:1fr; }
       .scalp-fields { grid-template-columns:1fr 1fr; }
       .video-studio-page { padding:12px; }
@@ -540,6 +541,29 @@
     .expected-path-box { margin:8px 0 10px; padding:9px 10px; border-radius:8px; border:1px solid rgba(96,165,250,0.16); background:rgba(96,165,250,0.04); }
     .expected-path-label { font-size:8px; color:var(--blue); text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin-bottom:4px; }
     .expected-path-text { font-size:11px; color:var(--slate); line-height:1.42; }
+    .forex-v2-card { background:linear-gradient(135deg,#0D1117 0%,#071018 100%); border:1px solid rgba(167,139,250,0.28); border-radius:14px; overflow:hidden; }
+    .forex-v2-body { padding:14px; display:flex; flex-direction:column; gap:12px; }
+    .forex-v2-status { font-size:12px; font-weight:900; color:#c4b5fd; text-transform:uppercase; letter-spacing:.08em; }
+    .forex-v2-section { border:1px solid rgba(255,255,255,0.07); border-radius:8px; padding:10px; background:rgba(255,255,255,0.025); }
+    .forex-v2-title { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.1em; font-weight:900; margin-bottom:8px; }
+    .forex-v2-list { display:flex; flex-direction:column; gap:5px; }
+    .forex-v2-item { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--slate); }
+    .forex-v2-item.complete { color:var(--green); }
+    .forex-v2-item.missing { color:var(--gold); }
+    .forex-v2-plan { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .forex-v2-plan-cell { border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:8px; background:rgba(0,0,0,0.16); }
+    .forex-v2-plan-label { font-size:8px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:3px; }
+    .forex-v2-plan-value { font-size:13px; font-weight:800; color:var(--text); }
+    .forex-v2-timeline { display:flex; flex-direction:column; gap:0; }
+    .forex-v2-step { display:grid; grid-template-columns:18px 1fr; gap:8px; align-items:start; color:var(--slate-dim); font-size:11px; }
+    .forex-v2-step-dot { width:10px; height:10px; border-radius:50%; margin-top:2px; background:rgba(148,163,184,0.22); border:1px solid rgba(148,163,184,0.35); }
+    .forex-v2-step.complete { color:var(--green); }
+    .forex-v2-step.complete .forex-v2-step-dot { background:rgba(0,255,136,0.35); border-color:rgba(0,255,136,0.8); }
+    .forex-v2-step.active { color:#c4b5fd; font-weight:900; }
+    .forex-v2-step.active .forex-v2-step-dot { background:#a78bfa; border-color:#c4b5fd; box-shadow:0 0 0 3px rgba(167,139,250,0.14); }
+    .forex-v2-connector { width:1px; height:12px; margin:2px 0 2px 5px; background:rgba(148,163,184,0.22); }
+    .forex-v2-compare { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:0; }
+    .forex-v2-compare-label { font-size:9px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.1em; margin:0 0 6px 2px; font-weight:900; }
     .plan-diagnostics-box { margin:8px 0 10px; padding:9px 10px; border-radius:8px; border:1px solid rgba(148,163,184,0.1); background:rgba(148,163,184,0.035); }
     .plan-diagnostics-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:6px; }
     .plan-quality { font-size:9px; padding:3px 8px; border-radius:99px; border:1px solid rgba(148,163,184,0.24); font-weight:900; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
@@ -3148,10 +3172,10 @@
     document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of ${all.length} setups · ${entryStatusSummary(filtered)}`;
     renderDevelopingSetups(filtered);
     if (!filtered.length) { main.innerHTML = '<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No pairs match your filters</div></div>'; return; }
-    main.innerHTML = '<div class="setup-grid">' + filtered.map(r => renderScoutCard(r)).join('') + '</div>';
+    main.innerHTML = '<div class="setup-grid">' + filtered.map(r => renderForexCard(r)).join('') + '</div>';
   }
 
-  function renderCard(s, idx) { return renderScoutCard(s); } // legacy alias
+  function renderCard(s, idx) { return renderForexCard(s); } // legacy alias
 
   function aiSignalRows() {
     if (Array.isArray(allSetups) && allSetups.length) {
@@ -4876,6 +4900,137 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
     }
 
     return `Price is developing around ${zoneName}. The next healthy step is continuation in the ${isLong ? 'long' : isShort ? 'short' : 'planned'} direction after the pullback. Confirmation comes from ${rejectionName}, structure shift, and acceptable R:R. It weakens if price rejects the plan area in the opposite direction. Wait for the setup to become clear before acting.`;
+  }
+
+  const FOREX_CARD_V2_FLAG = 'FOREX_CARD_V2_ENABLED';
+  const FOREX_CARD_V2_COMPARE_FLAG = 'FOREX_CARD_V2_COMPARE';
+
+  function forexCardV2Enabled() {
+    return localStorage.getItem(FOREX_CARD_V2_FLAG) === 'true';
+  }
+
+  function forexCardV2CompareEnabled() {
+    return forexCardV2Enabled() && localStorage.getItem(FOREX_CARD_V2_COMPARE_FLAG) === 'true';
+  }
+
+  function formatV2State(state) {
+    return String(state || 'BUILDING').replace(/_/g, ' ');
+  }
+
+  function renderForexCard(r) {
+    if (!forexCardV2Enabled()) return renderScoutCard(r);
+    if (forexCardV2CompareEnabled()) {
+      return `
+        <div class="forex-v2-compare">
+          <div>
+            <div class="forex-v2-compare-label">V1 Card</div>
+            ${renderScoutCard(r)}
+          </div>
+          <div>
+            <div class="forex-v2-compare-label">V2 Lifecycle Card</div>
+            ${renderForexV2LifecycleCard(r)}
+          </div>
+        </div>`;
+    }
+    return renderForexV2LifecycleCard(r);
+  }
+
+  function renderV2List(items, kind) {
+    const values = Array.isArray(items) ? items : [];
+    if (!values.length) return `<div class="forex-v2-item ${kind}"><span>—</span><span>None</span></div>`;
+    const icon = kind === 'complete' ? '✓' : '□';
+    return values.map(item => `<div class="forex-v2-item ${kind}"><span>${icon}</span><span>${escapeHtml(item)}</span></div>`).join('');
+  }
+
+  function renderV2Timeline(steps) {
+    const rows = Array.isArray(steps) ? steps : [];
+    return rows.map((step, idx) => `
+      <div class="forex-v2-step ${escapeHtml(step.status || 'pending')}">
+        <span class="forex-v2-step-dot"></span>
+        <span>${escapeHtml(step.label || step.key || 'Lifecycle Step')}</span>
+      </div>
+      ${idx < rows.length - 1 ? '<div class="forex-v2-connector"></div>' : ''}`).join('');
+  }
+
+  function renderExecutionPlan(plan = {}) {
+    const fields = [
+      ['Current Price', plan.current_price],
+      ['Planned Entry', plan.planned_entry],
+      ['Stop', plan.stop],
+      ['TP1', plan.tp1],
+      ['TP2', plan.tp2],
+      ['TP3', plan.tp3],
+    ];
+    return fields.map(([label, value]) => `
+      <div class="forex-v2-plan-cell">
+        <div class="forex-v2-plan-label">${escapeHtml(label)}</div>
+        <div class="forex-v2-plan-value">${escapeHtml(value || 'N/A')}</div>
+      </div>`).join('');
+  }
+
+  function renderForexV2LifecycleCard(r) {
+    const card = r.v2LifecycleCard;
+    const displaySym = r.displaySymbol || (r.pair || '').replace('_', '/');
+    if (!card) {
+      return `
+        <div class="forex-v2-card">
+          <div class="forex-v2-body">
+            <div class="card-top">
+              <div class="symbol">${escapeHtml(displaySym)}</div>
+              <div class="forex-v2-status">V2 DATA UNAVAILABLE</div>
+            </div>
+            <div class="entry-note">Decision Engine payload is missing. V1 remains unchanged.</div>
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="forex-v2-card" data-v2-state="${escapeHtml(card.state)}">
+        <div class="forex-v2-body">
+          <div class="card-top">
+            <div>
+              <div class="symbol">${escapeHtml(displaySym)}</div>
+              <div class="badges">
+                <span class="badge tf">${escapeHtml(r.timeframe || '')}</span>
+                ${r.session ? `<span class="badge session">${escapeHtml(r.session)}</span>` : ''}
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="forex-v2-status">V2 ${escapeHtml(formatV2State(card.state))}</div>
+              <div style="font-size:9px;color:var(--slate-dim);margin-top:3px;text-transform:uppercase;letter-spacing:.06em;">Lifecycle</div>
+            </div>
+          </div>
+
+          <div class="forex-v2-section">
+            <div class="forex-v2-title">Lifecycle</div>
+            <div class="forex-v2-timeline">${renderV2Timeline(card.lifecycle)}</div>
+          </div>
+
+          <div class="forex-v2-section">
+            <div class="forex-v2-title">Completed Requirements</div>
+            <div class="forex-v2-list">${renderV2List(card.completed, 'complete')}</div>
+          </div>
+
+          <div class="forex-v2-section">
+            <div class="forex-v2-title">Missing Requirements</div>
+            <div class="forex-v2-list">${renderV2List(card.missing, 'missing')}</div>
+          </div>
+
+          <div class="forex-v2-section">
+            <div class="forex-v2-title">Transition Reason</div>
+            <div class="expected-path-text">${escapeHtml(card.transition_reason || '')}</div>
+          </div>
+
+          <div class="forex-v2-section">
+            <div class="forex-v2-title">Execution Plan</div>
+            <div class="forex-v2-plan">${renderExecutionPlan(card.execution_plan)}</div>
+          </div>
+
+          <div class="forex-v2-section">
+            <div class="forex-v2-title">Next Step</div>
+            <div class="setup-status-value">${escapeHtml(card.next_step || '')}</div>
+          </div>
+        </div>
+      </div>`;
   }
 
   function renderScoutCard(r) {

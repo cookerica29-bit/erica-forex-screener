@@ -21,6 +21,7 @@ import {
   tradeableSignalAlertKey,
   tradeableSignalDataKey,
 } from './scoutPhase.js';
+import { attachForexV2LifecycleCards } from './v2/cardContract.js';
 import { formatLifecycleDiagnosticsSummary, recordLifecycleShadowScan } from './v2/diagnostics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1582,7 +1583,7 @@ app.post('/api/scan', async (req, res) => {
 
 // ── Scout API ──────────────────────────────────────────────────────────────────
 app.get('/api/scout', (_req, res) => {
-  const reports = enrichScoutReports(latestScoutResults);
+  const reports = attachForexV2LifecycleCards(enrichScoutReports(latestScoutResults));
   res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
 });
 
@@ -1597,7 +1598,7 @@ app.post('/api/scout', async (req, res) => {
     recordV2LifecycleShadow(latestScoutResults, 'manual scout scan');
     await notifyTradeableScoutSignals(latestScoutResults, 'manual scout scan');
     lastScanTime = new Date().toISOString();
-    const reports = enrichScoutReports(latestScoutResults);
+    const reports = attachForexV2LifecycleCards(enrichScoutReports(latestScoutResults));
     res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
