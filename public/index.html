@@ -869,6 +869,12 @@
 
 <div class="filter-row">
   <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
+  <select class="filter-select" id="timeframeFilter" onchange="renderSetups()" aria-label="Timeframe display filter">
+    <option value="ALL">Timeframe: All</option>
+    <option value="M30">Timeframe: M30</option>
+    <option value="H1">Timeframe: H1</option>
+    <option value="H4">Timeframe: H4</option>
+  </select>
   <select class="filter-select" id="actionFilter" onchange="renderSetups()" aria-label="Action filter">
     <option value="ALL">Status: All</option>
     <option value="Entry Proven">Status: Entry Ready</option>
@@ -2379,6 +2385,7 @@
   function getFiltered() {
     const s = document.getElementById('searchBox').value.toLowerCase();
     const action = document.getElementById('actionFilter')?.value || 'ALL';
+    const timeframe = document.getElementById('timeframeFilter')?.value || 'ALL';
     const entryStatus = document.getElementById('entryStatusFilter')?.value || 'ALL';
     const grade = document.getElementById('gradeFilter')?.value || 'ALL';
     const trend = document.getElementById('trendFilter')?.value || 'ALL';
@@ -2387,6 +2394,7 @@
     const location = document.getElementById('locationFilter')?.value || 'ALL';
     return allSetups.filter(x => {
       if (action !== 'ALL' && actionPriorityForReport(x).value !== action) return false;
+      if (timeframe !== 'ALL' && String(x.timeframe || '').toUpperCase() !== timeframe) return false;
       if (entryStatus === 'DECISION_CONFIRMED' && x.decisionLevelConfirmed !== true) return false;
       if (entryStatus === 'DECISION_WAITING' && x.decisionLevelConfirmed === true) return false;
       if (!['ALL', 'DECISION_CONFIRMED', 'DECISION_WAITING'].includes(entryStatus) && x.entryStatus !== entryStatus) return false;

@@ -13,6 +13,10 @@ function assertCase(caseName: string, condition: boolean, message: string) {
   if (!condition) failures.push({ caseName, message });
 }
 
+function filterByTimeframe<T extends { timeframe?: string | null }>(rows: T[], timeframe: string) {
+  return rows.filter(row => timeframe === 'ALL' || String(row.timeframe || '').toUpperCase() === timeframe);
+}
+
 function report(overrides: Partial<ScoutReport> = {}): ScoutReport {
   return {
     pair: 'EUR_USD',
@@ -148,11 +152,23 @@ const inspectorStart = html.indexOf('function v2RequirementKeysByStatus');
 const inspectorEnd = html.indexOf('function renderForexV2LifecycleCard', inspectorStart);
 const inspector = html.slice(inspectorStart, inspectorEnd);
 const scoutRenderer = html.slice(rendererEnd);
+const filteredFunctionStart = html.indexOf('function getFiltered');
+const filteredFunctionEnd = html.indexOf('function entryStatusRank', filteredFunctionStart);
+const filteredFunction = html.slice(filteredFunctionStart, filteredFunctionEnd);
+const timeframeFixture = [
+  { pair: 'EUR_USD', timeframe: 'H4' },
+  { pair: 'AUD_USD', timeframe: 'H1' },
+  { pair: 'GBP_JPY', timeframe: 'M30' },
+];
 assertCase('Frontend v2 renderer exists', rendererStart > -1 && rendererEnd > rendererStart, 'v2 renderer function not found');
 assertCase('Frontend reads Decision Engine card payload', renderer.includes('r.v2LifecycleCard'), 'renderer should consume v2LifecycleCard');
 assertCase('Frontend v2 renderer avoids trading calculations', !/(BOS|CHoCH|premium|discount|liquidity|entryTimingState|decisionLevelConfirmed|recentBOS|recentChoCH)/i.test(renderer), 'v2 renderer should not duplicate trading logic terms');
 assertCase('Frontend separates conflict and pending requirement lists', renderer.includes('Blocking Conflicts') && renderer.includes('Not Yet Met') && renderer.includes('card.blocking_conflicts') && renderer.includes('card.not_yet_met'), 'v2 renderer should split incomplete requirements into conflict and pending groups');
 assertCase('Frontend renders stage note when lifecycle is gated', renderer.includes('card.stage_note') && renderer.includes('entry-note'), 'v2 renderer should show gated lifecycle note when present');
+assertCase('Frontend renders timeframe display filter', html.includes('id="timeframeFilter"') && html.includes('Timeframe: H4') && html.includes('Timeframe: All'), 'timeframe display filter should be present');
+assertCase('Frontend getFiltered reads timeframe filter', filteredFunction.includes("document.getElementById('timeframeFilter')?.value || 'ALL'") && filteredFunction.includes("String(x.timeframe || '').toUpperCase() !== timeframe"), 'getFiltered should filter by ScoutReport timeframe');
+assertCase('Timeframe filter keeps only H4 rows', filterByTimeframe(timeframeFixture, 'H4').map(row => row.pair).join(',') === 'EUR_USD', 'H4 filter should only keep H4 rows');
+assertCase('Timeframe filter ALL excludes nothing', filterByTimeframe(timeframeFixture, 'ALL').length === timeframeFixture.length, 'ALL timeframe filter should not exclude rows');
 assertCase('V2 renderer is the default card surface', html.includes("localStorage.getItem(FOREX_CARD_V2_FLAG) !== 'false'") && html.includes('if (!forexCardV2Enabled()) return renderScoutCard(r);'), 'v2 renderer should be default, with v1 available only by explicit opt-out');
 assertCase('Comparison mode renders both cards', html.includes('V1 Card') && html.includes('V2 Lifecycle Card') && html.includes('renderScoutCard(r)'), 'comparison mode should render both cards');
 assertCase('Comparison mode keeps paired cards in one wrapper', compareBranch.includes('<div class="forex-v2-compare">') && compareBranch.includes('forex-v2-compare-side-v1') && compareBranch.includes('forex-v2-compare-side-v2'), 'comparison branch should wrap V1 and V2 sides together');
