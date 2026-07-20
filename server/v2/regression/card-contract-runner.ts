@@ -107,6 +107,33 @@ assertCase('Card exposes missing requirements', card.missing.includes('Entry Rea
 assertCase('Execution plan matches engine input', card.execution_plan.planned_entry === '1.16520' && card.execution_plan.stop === '1.16380' && card.execution_plan.tp1 === '1.16900', `unexpected execution plan ${JSON.stringify(card.execution_plan)}`);
 assertCase('Lifecycle progress highlights current state', card.lifecycle.some(step => step.status === 'active' && step.label === 'Entry Planned'), `unexpected lifecycle ${JSON.stringify(card.lifecycle)}`);
 
+const contextBlockedCard = buildForexV2LifecycleCard(report({
+  pair: 'AUD_USD',
+  displaySymbol: 'AUD/USD',
+  tradeDirection: 'LONG',
+  bias: 'BULLISH',
+  zone: 'PREMIUM',
+  dailyTrendDirection: 'Bearish',
+  h4TrendDirection: 'Bullish',
+  reversalConfirmed: true,
+  reversalReason: 'bullish CHoCH detected after the pullback.',
+  confirmationConfirmed: true,
+  decisionLevelConfirmed: false,
+  zoneTouchState: 'NONE',
+  zoneInteraction: 'NONE',
+  entryStatus: 'Tradeable',
+  entryTimingState: 'Not Ready',
+  entry: 0.69902,
+  sl: 0.698,
+  tp1: 0.70126,
+  rrRatio: 2.2,
+}));
+assertCase('Context-blocked card stays in building state', contextBlockedCard.state === 'BUILDING', `unexpected state ${contextBlockedCard.state}`);
+assertCase('Context-blocked card labels active stage clearly', contextBlockedCard.lifecycle.some(step => step.status === 'active' && step.label === 'Market Scan — Context Blocked'), `unexpected lifecycle ${JSON.stringify(contextBlockedCard.lifecycle)}`);
+assertCase('Context-blocked card separates conflicts from pending work', contextBlockedCard.blocking_conflicts.includes('Daily Bias') && contextBlockedCard.blocking_conflicts.includes('Location') && contextBlockedCard.not_yet_met.includes('Liquidity Sweep') && contextBlockedCard.not_yet_met.includes('Entry Reached'), `unexpected split conflicts=${contextBlockedCard.blocking_conflicts.join(',')} pending=${contextBlockedCard.not_yet_met.join(',')}`);
+assertCase('Context-blocked card keeps later completed evidence visible', contextBlockedCard.completed.includes('Structure Confirmation') && contextBlockedCard.completed.includes('Planned Entry'), `unexpected completed ${contextBlockedCard.completed.join(',')}`);
+assertCase('Context-blocked card explains gated lifecycle', Boolean(contextBlockedCard.stage_note && contextBlockedCard.stage_note.includes('cannot advance until Daily Bias and Location are resolved')), `unexpected note ${contextBlockedCard.stage_note}`);
+
 const html = fs.readFileSync('public/index.html', 'utf8');
 const rendererStart = html.indexOf('function renderForexV2LifecycleCard');
 const rendererEnd = html.indexOf('function renderScoutCard', rendererStart);
@@ -124,6 +151,8 @@ const scoutRenderer = html.slice(rendererEnd);
 assertCase('Frontend v2 renderer exists', rendererStart > -1 && rendererEnd > rendererStart, 'v2 renderer function not found');
 assertCase('Frontend reads Decision Engine card payload', renderer.includes('r.v2LifecycleCard'), 'renderer should consume v2LifecycleCard');
 assertCase('Frontend v2 renderer avoids trading calculations', !/(BOS|CHoCH|premium|discount|liquidity|entryTimingState|decisionLevelConfirmed|recentBOS|recentChoCH)/i.test(renderer), 'v2 renderer should not duplicate trading logic terms');
+assertCase('Frontend separates conflict and pending requirement lists', renderer.includes('Blocking Conflicts') && renderer.includes('Not Yet Met') && renderer.includes('card.blocking_conflicts') && renderer.includes('card.not_yet_met'), 'v2 renderer should split incomplete requirements into conflict and pending groups');
+assertCase('Frontend renders stage note when lifecycle is gated', renderer.includes('card.stage_note') && renderer.includes('entry-note'), 'v2 renderer should show gated lifecycle note when present');
 assertCase('V2 renderer is the default card surface', html.includes("localStorage.getItem(FOREX_CARD_V2_FLAG) !== 'false'") && html.includes('if (!forexCardV2Enabled()) return renderScoutCard(r);'), 'v2 renderer should be default, with v1 available only by explicit opt-out');
 assertCase('Comparison mode renders both cards', html.includes('V1 Card') && html.includes('V2 Lifecycle Card') && html.includes('renderScoutCard(r)'), 'comparison mode should render both cards');
 assertCase('Comparison mode keeps paired cards in one wrapper', compareBranch.includes('<div class="forex-v2-compare">') && compareBranch.includes('forex-v2-compare-side-v1') && compareBranch.includes('forex-v2-compare-side-v2'), 'comparison branch should wrap V1 and V2 sides together');

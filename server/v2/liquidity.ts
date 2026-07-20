@@ -17,6 +17,7 @@ export function evaluateLiquidity(evidence: LiquidityEvidence) {
   return {
     status: 'INCOMPLETE' as RequirementStatus,
     reason: evidence.reason || 'Liquidity sweep is missing.',
+    unmet_kind: 'PENDING' as const,
   };
 }
 

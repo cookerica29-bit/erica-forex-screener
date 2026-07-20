@@ -17,6 +17,7 @@ export const LIFECYCLE_STATES = [
 export type LifecycleState = typeof LIFECYCLE_STATES[number];
 
 export type RequirementStatus = 'COMPLETE' | 'INCOMPLETE' | 'NOT_APPLICABLE';
+export type RequirementUnmetKind = 'CONFLICT' | 'PENDING';
 export type EngineName = 'Context' | 'Liquidity' | 'Structure' | 'Location' | 'Execution';
 
 export const REQUIREMENT_KEYS = [
@@ -37,6 +38,7 @@ export interface LifecycleRequirement {
   engine: EngineName;
   status: RequirementStatus;
   reason: string;
+  unmet_kind?: RequirementUnmetKind;
 }
 
 export interface LifecycleSnapshot {
@@ -47,6 +49,8 @@ export interface LifecycleSnapshot {
   previous_state: LifecycleState | null;
   reason: string;
   missing_requirements: string[];
+  blocking_conflicts: string[];
+  not_yet_met: string[];
   completed_requirements: string[];
   next_step: string;
   requirements: Record<RequirementKey, LifecycleRequirement>;
@@ -129,7 +133,8 @@ export function requirement(
   label: string,
   engine: EngineName,
   status: RequirementStatus,
-  reason: string
+  reason: string,
+  unmetKind?: RequirementUnmetKind
 ): LifecycleRequirement {
-  return { key, label, engine, status, reason };
+  return { key, label, engine, status, reason, unmet_kind: status === 'INCOMPLETE' ? unmetKind : undefined };
 }

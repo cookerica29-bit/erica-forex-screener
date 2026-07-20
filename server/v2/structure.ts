@@ -49,6 +49,7 @@ export function evaluateStructure(evidence: StructureEvidence) {
   return {
     status: 'INCOMPLETE' as RequirementStatus,
     reason: evidence.reason || 'Structure confirmation is missing.',
+    unmet_kind: 'PENDING' as const,
   };
 }
 

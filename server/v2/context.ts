@@ -20,6 +20,7 @@ export function evaluateBiasRequirement(direction: Direction, bias: BiasLabel, l
     return {
       status: 'INCOMPLETE' as RequirementStatus,
       reason: `${label} cannot align because setup direction is neutral.`,
+      unmet_kind: 'PENDING' as const,
     };
   }
   if (biasMatchesDirection(direction, bias)) {
@@ -32,11 +33,13 @@ export function evaluateBiasRequirement(direction: Direction, bias: BiasLabel, l
     return {
       status: 'INCOMPLETE' as RequirementStatus,
       reason: `${label} is mixed or neutral.`,
+      unmet_kind: 'PENDING' as const,
     };
   }
   return {
     status: 'INCOMPLETE' as RequirementStatus,
     reason: `${label} conflicts with the setup direction.`,
+    unmet_kind: 'CONFLICT' as const,
   };
 }
 

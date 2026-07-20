@@ -548,6 +548,7 @@
     .forex-v2-list { display:flex; flex-direction:column; gap:5px; }
     .forex-v2-item { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--slate); }
     .forex-v2-item.complete { color:var(--green); }
+    .forex-v2-item.conflict { color:var(--red); }
     .forex-v2-item.missing { color:var(--gold); }
     .forex-v2-plan { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
     .forex-v2-plan-cell { border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:8px; background:rgba(0,0,0,0.16); }
@@ -4947,7 +4948,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
   function renderV2List(items, kind) {
     const values = Array.isArray(items) ? items : [];
     if (!values.length) return `<div class="forex-v2-item ${kind}"><span>—</span><span>None</span></div>`;
-    const icon = kind === 'complete' ? '✓' : '□';
+    const icon = kind === 'complete' ? '✓' : kind === 'conflict' ? '!' : '□';
     return values.map(item => `<div class="forex-v2-item ${kind}"><span>${icon}</span><span>${escapeHtml(item)}</span></div>`).join('');
   }
 
@@ -5051,9 +5052,16 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           </div>
 
           <div class="forex-v2-section">
-            <div class="forex-v2-title">Missing Requirements</div>
-            <div class="forex-v2-list">${renderV2List(card.missing, 'missing')}</div>
+            <div class="forex-v2-title">Blocking Conflicts</div>
+            <div class="forex-v2-list">${renderV2List(card.blocking_conflicts, 'conflict')}</div>
           </div>
+
+          <div class="forex-v2-section">
+            <div class="forex-v2-title">Not Yet Met</div>
+            <div class="forex-v2-list">${renderV2List(card.not_yet_met, 'missing')}</div>
+          </div>
+
+          ${card.stage_note ? `<div class="entry-note">${escapeHtml(card.stage_note)}</div>` : ''}
 
           <div class="forex-v2-section">
             <div class="forex-v2-title">Transition Reason</div>

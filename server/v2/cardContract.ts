@@ -17,6 +17,9 @@ export interface ForexV2LifecycleCard {
   transition_reason: string;
   completed: string[];
   missing: string[];
+  blocking_conflicts: string[];
+  not_yet_met: string[];
+  stage_note: string | null;
   execution_plan: ForexV2ExecutionPlan;
   lifecycle: Array<{
     key: string;
@@ -38,9 +41,11 @@ function lifecycleStepStatus(state: string, stepState: string, completedStates: 
   return 'pending' as const;
 }
 
-function lifecycleProgress(state: string) {
+function lifecycleProgress(snapshot: LifecycleSnapshot) {
+  const state = snapshot.current_state;
+  const contextBlocked = state === 'BUILDING' && snapshot.blocking_conflicts.length > 0;
   const orderedStates = [
-    ['market_scan', 'Market Scan', 'BUILDING'],
+    ['market_scan', contextBlocked ? 'Market Scan — Context Blocked' : 'Market Scan — Building', 'BUILDING'],
     ['context_found', 'Context Found', 'ALMOST_READY'],
     ['liquidity_taken', 'Liquidity Taken', 'LIQUIDITY_SWEPT'],
     ['structure_confirmed', 'Structure Confirmed', 'STRUCTURE_CONFIRMED'],
@@ -59,6 +64,24 @@ function lifecycleProgress(state: string) {
   }));
 }
 
+const CONTEXT_REQUIREMENTS = new Set(['Daily Bias', 'H4 Bias', 'Location']);
+
+function stageNote(snapshot: LifecycleSnapshot) {
+  const laterEvidencePresent =
+    snapshot.current_state === 'BUILDING' &&
+    snapshot.completed_requirements.some(label => !CONTEXT_REQUIREMENTS.has(label));
+  if (!laterEvidencePresent) return null;
+  const blockers = snapshot.blocking_conflicts.length
+    ? snapshot.blocking_conflicts.join(' and ')
+    : snapshot.not_yet_met[0] || 'earlier requirements';
+  const suffix = snapshot.blocking_conflicts.length > 1
+    ? 'are resolved'
+    : snapshot.blocking_conflicts.length === 1
+    ? 'is resolved'
+    : 'is met';
+  return `Some later-stage requirements are already met, but the setup cannot advance until ${blockers} ${suffix}.`;
+}
+
 export function buildForexV2LifecycleCard(report: ScoutReport): ForexV2LifecycleCard {
   const snapshot = evaluateLifecycle(lifecycleInputFromScoutReport(report));
   return {
@@ -67,6 +90,9 @@ export function buildForexV2LifecycleCard(report: ScoutReport): ForexV2Lifecycle
     transition_reason: snapshot.reason,
     completed: snapshot.completed_requirements,
     missing: snapshot.missing_requirements,
+    blocking_conflicts: snapshot.blocking_conflicts,
+    not_yet_met: snapshot.not_yet_met,
+    stage_note: stageNote(snapshot),
     execution_plan: {
       current_price: formatLevel(report.price, report.pair),
       planned_entry: formatLevel(report.entry, report.pair),
@@ -75,7 +101,7 @@ export function buildForexV2LifecycleCard(report: ScoutReport): ForexV2Lifecycle
       tp2: formatLevel(report.tp2, report.pair),
       tp3: 'N/A',
     },
-    lifecycle: lifecycleProgress(snapshot.current_state),
+    lifecycle: lifecycleProgress(snapshot),
     engine_snapshot: snapshot,
   };
 }
