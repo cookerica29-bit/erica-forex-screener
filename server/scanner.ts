@@ -2466,13 +2466,18 @@ export function scoutAnalyzeCandles(
   // Recent BOS and ChoCH detection
   let recentBOS: ScoutReport['recentBOS'] = null;
   let recentChoCH: ScoutReport['recentChoCH'] = null;
+  let recentBOSIndex = -1;
+  let recentChoCHIndex = -1;
 
   for (const sh of swingHighs.slice(-4)) {
     for (let i = sh.index + 1; i < recentCandles.length; i++) {
       if (recentCandles[i].c > sh.price) {
         const event = { type: 'bullish' as const, level: sh.price };
-        if (trend === 'SHORT') { if (!recentChoCH) recentChoCH = event; }
-        else { if (!recentBOS) recentBOS = event; }
+        if (trend === 'SHORT') {
+          if (i > recentChoCHIndex) { recentChoCH = event; recentChoCHIndex = i; }
+        } else if (i > recentBOSIndex) {
+          recentBOS = event; recentBOSIndex = i;
+        }
         break;
       }
     }
@@ -2481,19 +2486,24 @@ export function scoutAnalyzeCandles(
     for (let i = sl.index + 1; i < recentCandles.length; i++) {
       if (recentCandles[i].c < sl.price) {
         const event = { type: 'bearish' as const, level: sl.price };
-        if (trend === 'LONG') { if (!recentChoCH) recentChoCH = event; }
-        else { if (!recentBOS) recentBOS = event; }
+        if (trend === 'LONG') {
+          if (i > recentChoCHIndex) { recentChoCH = event; recentChoCHIndex = i; }
+        } else if (i > recentBOSIndex) {
+          recentBOS = event; recentBOSIndex = i;
+        }
         break;
       }
     }
   }
 
-  // ChoCH override: if the most recent structural event is a ChoCH, it defines the new bias.
-  // This matches how the indicator works — a confirmed ChoCH flips the trend read
-  // regardless of what getTrend says about older swing sequences.
+  // The most recent structural event defines bias, whether it is BOS or CHoCH.
   let finalBias = bias;
-  if (recentChoCH?.type === 'bearish') finalBias = 'BEARISH';
-  else if (recentChoCH?.type === 'bullish') finalBias = 'BULLISH';
+  const latestStructure =
+    recentChoCHIndex > recentBOSIndex ? recentChoCH :
+    recentBOSIndex > recentChoCHIndex ? recentBOS :
+    null;
+  if (latestStructure?.type === 'bearish') finalBias = 'BEARISH';
+  else if (latestStructure?.type === 'bullish') finalBias = 'BULLISH';
   const trendSetupPhase = buildTrendSetupPhase(
     candles,
     dailyCandles?.length ? dailyCandles : htf,
