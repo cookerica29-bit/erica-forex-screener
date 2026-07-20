@@ -3179,7 +3179,7 @@
       return;
     }
     document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> of ${all.length} setups · ${entryStatusSummary(filtered)}`;
-    renderDevelopingSetups(forexCardV2CompareEnabled() ? [] : filtered);
+    renderDevelopingSetups(forexCardV2Enabled() ? [] : filtered);
     if (!filtered.length) { main.innerHTML = '<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No pairs match your filters</div></div>'; return; }
     main.innerHTML = '<div class="setup-grid">' + filtered.map(r => renderForexCard(r)).join('') + '</div>';
   }
@@ -4915,7 +4915,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
   const FOREX_CARD_V2_COMPARE_FLAG = 'FOREX_CARD_V2_COMPARE';
 
   function forexCardV2Enabled() {
-    return localStorage.getItem(FOREX_CARD_V2_FLAG) === 'true';
+    return localStorage.getItem(FOREX_CARD_V2_FLAG) !== 'false';
   }
 
   function forexCardV2CompareEnabled() {
