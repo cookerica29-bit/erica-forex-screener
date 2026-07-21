@@ -5038,7 +5038,7 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       symbol: r.pair,
       displaySymbol: displaySym,
       direction: tradeDirectionForReport(r),
-      quality: r.setupGrade || card.state || 'DEVELOPING',
+      quality: 'DEVELOPING',
       pattern: `V2 ${formatV2State(card.state)} Scout`,
       sl: r.sl,
       notes: [
