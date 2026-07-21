@@ -5032,6 +5032,24 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
           </div>
         </div>`;
     }
+    const actionSetup = {
+      ...r,
+      id: `${r.pair || displaySym}-${r.timeframe || 'tf'}-v2`,
+      symbol: r.pair,
+      displaySymbol: displaySym,
+      direction: tradeDirectionForReport(r),
+      quality: r.setupGrade || card.state || 'DEVELOPING',
+      pattern: `V2 ${formatV2State(card.state)} Scout`,
+      sl: r.sl,
+      notes: [
+        `V2 Lifecycle State: ${formatV2State(card.state)}`,
+        card.transition_reason ? `Transition Reason: ${card.transition_reason}` : '',
+        card.next_step ? `Next Step: ${card.next_step}` : '',
+        Array.isArray(card.completed) && card.completed.length ? `Completed: ${card.completed.join(', ')}` : '',
+        Array.isArray(card.blocking_conflicts) && card.blocking_conflicts.length ? `Blocking Conflicts: ${card.blocking_conflicts.join(', ')}` : '',
+        Array.isArray(card.not_yet_met) && card.not_yet_met.length ? `Not Yet Met: ${card.not_yet_met.join(', ')}` : '',
+      ].filter(Boolean).join('\n'),
+    };
     return `
       <div class="forex-v2-card" data-v2-state="${escapeHtml(card.state)}">
         <div class="forex-v2-body">
@@ -5085,6 +5103,8 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
             <div class="forex-v2-title">Next Step</div>
             <div class="setup-status-value">${escapeHtml(card.next_step || '')}</div>
           </div>
+
+          ${renderTradeActionBlock(actionSetup, 'v2-scout')}
 
           ${renderV2DeveloperInspector(card)}
         </div>
@@ -7935,45 +7955,6 @@ The value is in reviewing the process for ${brand.audience}.\n\nTemplate: ${temp
       btn.textContent = 'Error';
       console.error('[SendToBot] catch error:', e);
     }
-  }
-
-  async function pushToJournal(setupId) {
-    const setup = allSetups.find(s => s.id === setupId);
-    if (!setup) return;
-    try {
-      const res = await fetch('/api/journal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: setup.symbol,
-          displaySymbol: setup.displaySymbol,
-          direction: setup.direction,
-          quality: setup.quality,
-          pattern: setup.pattern,
-          timeframe: setup.timeframe,
-          entry: setup.entry,
-          stopLoss: setup.sl || setup.stopLoss,
-          tp1: setup.tp1,
-          tp2: setup.tp2,
-          tp3: setup.tp3,
-          rr1: setup.rrRatio,
-          rr2: setup.rr2,
-          rr3: setup.rr3,
-          confluences: setup.confluences,
-          session: setup.session,
-          newsRisk: setup.newsRisk ?? false,
-          notes: setup.notes || '',
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        journalMap[setupId] = data.id;
-        const btn = document.getElementById('push-' + setupId);
-        if (btn) { btn.textContent = '✓ Journaled'; btn.classList.add('pushed'); }
-        const panel = document.getElementById('journal-' + setupId);
-        if (panel) panel.style.display = 'flex';
-      }
-    } catch(e) { console.error('Push failed:', e); }
   }
 
   async function savePriorityToJournal(pair) {
