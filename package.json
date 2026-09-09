@@ -14,7 +14,8 @@
     "test:card-contract": "tsx server/v2/regression/card-contract-runner.ts",
     "test:card-continuity": "tsx server/v2/regression/card-lifecycle-continuity-runner.ts",
     "test:m30-confirmation": "tsx server/v2/regression/m30-confirmation-runner.ts",
-    "test:m30-retest": "tsx server/v2/regression/m30-retest-runner.ts"
+    "test:m30-retest": "tsx server/v2/regression/m30-retest-runner.ts",
+    "test:m30-scan-context": "tsx server/v2/regression/m30-scan-context-runner.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -23,8 +23,9 @@ import {
 } from './scoutPhase.js';
 import { attachForexV2LifecycleCards } from './v2/cardContract.js';
 import { formatLifecycleDiagnosticsSummary, recordLifecycleShadowScan } from './v2/diagnostics.js';
-import { attachM30Confirmations, refreshM30Confirmations, type M30Confirmation } from './v2/m30Confirmation.js';
-import { attachM30Retests, refreshM30Retests, type M30Retest } from './v2/m30Retest.js';
+import { attachM30Confirmations, type M30Confirmation } from './v2/m30Confirmation.js';
+import { attachM30Retests, type M30Retest } from './v2/m30Retest.js';
+import { refreshM30ScanContexts } from './v2/m30ScanContext.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -39,15 +40,17 @@ let latestSetups: Setup[] = [];
 let latestScoutResults: ScoutReport[] = [];
 // V2 M30 shadow confirmation (2026-09 session, Sprint 2) -- keyed by the
 // same shadowKey identity Sprint 1 already uses (pair + timeframe +
-// direction). Refreshed only at real scan time (refreshM30Confirmations),
-// exactly like latestScoutResults itself; a GET request only ever reads
-// this cache, never triggers a fetch. Never required for Scout -- see
-// scheduledScan()'s own isolated try/catch around the refresh call.
+// direction). Refreshed only at real scan time (refreshM30ScanContexts,
+// Sprint 3.5 -- one shared M30 fetch per unique pair feeds both this map
+// and latestM30Retests below), exactly like latestScoutResults itself; a
+// GET request only ever reads this cache, never triggers a fetch. Never
+// required for Scout -- see scheduledScan()'s own isolated try/catch
+// around the refresh call.
 let latestM30Confirmations = new Map<string, M30Confirmation>();
 // V2 M30 shadow retest (2026-09 session, Sprint 3) -- same shadowKey
-// identity as latestM30Confirmations, refreshed only at real scan time
-// (refreshM30Retests), exactly like it. Never required for Scout -- see
-// scheduledScan()'s own isolated try/catch around the refresh call.
+// identity as latestM30Confirmations, refreshed alongside it by the same
+// refreshM30ScanContexts call (Sprint 3.5). Never required for Scout --
+// see scheduledScan()'s own isolated try/catch around the refresh call.
 let latestM30Retests = new Map<string, M30Retest>();
 let latestScoutDiagnostics: ScoutDiagnosticsReport | null = null;
 let latestScalpResults: ScalpReport[] = [];
@@ -1559,22 +1562,17 @@ async function scheduledScan(forceTf?: string) {
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
       recordV2LifecycleShadow(latestScoutResults, 'scheduled scout scan');
       await notifyTradeableScoutSignals(latestScoutResults, 'scheduled scout scan');
-      // V2 M30 shadow confirmation (Sprint 2) -- isolated on purpose: a
-      // failure here (or inside any single pair's OANDA fetch, already
-      // caught per-report) can never affect latestScoutResults, alerts,
-      // or anything above this line.
+      // V2 M30 shadow confirmation + retest (Sprint 2/3, unified fetch in
+      // Sprint 3.5) -- isolated on purpose: a failure here (or inside any
+      // single pair's OANDA fetch, already caught per-pair) can never
+      // affect latestScoutResults, alerts, or anything above this line.
+      // One M30 fetch per unique pair now serves both shadow fields.
       try {
-        latestM30Confirmations = await refreshM30Confirmations(latestScoutResults);
+        const { confirmations, retests } = await refreshM30ScanContexts(latestScoutResults);
+        latestM30Confirmations = confirmations;
+        latestM30Retests = retests;
       } catch (e: any) {
-        console.warn('[V2 M30] Shadow confirmation refresh failed:', e.message);
-      }
-      // V2 M30 shadow retest (Sprint 3) -- isolated the same way as the
-      // confirmation refresh above: a failure here can never affect
-      // latestScoutResults, alerts, or the confirmation shadow field.
-      try {
-        latestM30Retests = await refreshM30Retests(latestScoutResults);
-      } catch (e: any) {
-        console.warn('[V2 M30] Shadow retest refresh failed:', e.message);
+        console.warn('[V2 M30] Shadow scan context refresh failed:', e.message);
       }
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
@@ -1644,21 +1642,16 @@ app.post('/api/scout', async (req, res) => {
     const withCards = attachForexV2LifecycleCards(enrichScoutReports(latestScoutResults));
     recordV2LifecycleShadow(latestScoutResults, 'manual scout scan');
     await notifyTradeableScoutSignals(latestScoutResults, 'manual scout scan');
-    // Sprint 2: isolated the same way as the scheduledScan() refresh --
-    // a failure here can never affect the response's Scout data, only
-    // this observational field.
+    // Sprint 2/3, unified fetch in Sprint 3.5: isolated the same way as
+    // the scheduledScan() refresh -- a failure here can never affect the
+    // response's Scout data, only these observational fields. One M30
+    // fetch per unique pair now serves both shadow fields.
     try {
-      latestM30Confirmations = await refreshM30Confirmations(latestScoutResults);
+      const { confirmations, retests } = await refreshM30ScanContexts(latestScoutResults);
+      latestM30Confirmations = confirmations;
+      latestM30Retests = retests;
     } catch (e: any) {
-      console.warn('[V2 M30] Shadow confirmation refresh failed:', e.message);
-    }
-    // Sprint 3: isolated the same way as the confirmation refresh above --
-    // a failure here can never affect the response's Scout or
-    // confirmation data, only this observational field.
-    try {
-      latestM30Retests = await refreshM30Retests(latestScoutResults);
-    } catch (e: any) {
-      console.warn('[V2 M30] Shadow retest refresh failed:', e.message);
+      console.warn('[V2 M30] Shadow scan context refresh failed:', e.message);
     }
     const withConfirmations = attachM30Confirmations(withCards, latestM30Confirmations);
     const reports = attachM30Retests(withConfirmations, latestM30Retests);
