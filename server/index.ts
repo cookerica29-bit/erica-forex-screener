@@ -26,6 +26,7 @@ import { formatLifecycleDiagnosticsSummary, recordLifecycleShadowScan } from './
 import { attachM30Confirmations, type M30Confirmation } from './v2/m30Confirmation.js';
 import { attachM30Retests, type M30Retest } from './v2/m30Retest.js';
 import { refreshM30ScanContexts } from './v2/m30ScanContext.js';
+import { attachM5Executions, refreshM5Executions, type M5Execution } from './v2/m5Execution.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -52,6 +53,14 @@ let latestM30Confirmations = new Map<string, M30Confirmation>();
 // refreshM30ScanContexts call (Sprint 3.5). Never required for Scout --
 // see scheduledScan()'s own isolated try/catch around the refresh call.
 let latestM30Retests = new Map<string, M30Retest>();
+// V2 M5 shadow execution trigger (2026-09 session, Sprint 4) -- same
+// shadowKey identity as latestM30Confirmations/latestM30Retests. M5 is
+// only ever fetched for reports whose latestM30Retests entry is already
+// RETEST_REACHED (refreshM5Executions' own activation guard); a plain GET
+// only ever reads this cache, never triggers a fetch. Never required for
+// Scout -- see scheduledScan()'s own isolated try/catch around the
+// refresh call.
+let latestM5Executions = new Map<string, M5Execution>();
 let latestScoutDiagnostics: ScoutDiagnosticsReport | null = null;
 let latestScalpResults: ScalpReport[] = [];
 let latestTrendResults: TrendScanResult | null = null;
@@ -1574,6 +1583,16 @@ async function scheduledScan(forceTf?: string) {
       } catch (e: any) {
         console.warn('[V2 M30] Shadow scan context refresh failed:', e.message);
       }
+      // V2 M5 shadow execution trigger (Sprint 4) -- isolated the same
+      // way as the M30 refresh above: a failure here can never affect
+      // latestScoutResults, alerts, or the M30 shadow fields. M5 is only
+      // fetched for reports whose M30 retest is RETEST_REACHED, deduped
+      // per unique pair -- see refreshM5Executions' own activation guard.
+      try {
+        latestM5Executions = await refreshM5Executions(latestScoutResults, latestM30Retests);
+      } catch (e: any) {
+        console.warn('[V2 M5] Shadow execution refresh failed:', e.message);
+      }
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
     }
@@ -1620,7 +1639,11 @@ app.get('/api/scout', (_req, res) => {
   // Sprint 3: read-only -- attachM30Retests only reads the cache
   // latestM30Retests already holds from the last real scan. A GET
   // never fetches M30 itself.
-  const reports = attachM30Retests(withConfirmations, latestM30Retests);
+  const withRetests = attachM30Retests(withConfirmations, latestM30Retests);
+  // Sprint 4: read-only -- attachM5Executions only reads the cache
+  // latestM5Executions already holds from the last real scan. A GET
+  // never fetches M5 itself.
+  const reports = attachM5Executions(withRetests, latestM5Executions);
   res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
 });
 
@@ -1653,8 +1676,17 @@ app.post('/api/scout', async (req, res) => {
     } catch (e: any) {
       console.warn('[V2 M30] Shadow scan context refresh failed:', e.message);
     }
+    // Sprint 4: isolated the same way as the M30 refresh above -- a
+    // failure here can never affect the response's Scout or M30 shadow
+    // data, only this observational field.
+    try {
+      latestM5Executions = await refreshM5Executions(latestScoutResults, latestM30Retests);
+    } catch (e: any) {
+      console.warn('[V2 M5] Shadow execution refresh failed:', e.message);
+    }
     const withConfirmations = attachM30Confirmations(withCards, latestM30Confirmations);
-    const reports = attachM30Retests(withConfirmations, latestM30Retests);
+    const withRetests = attachM30Retests(withConfirmations, latestM30Retests);
+    const reports = attachM5Executions(withRetests, latestM5Executions);
     lastScanTime = new Date().toISOString();
     res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
   } catch (e: any) {
