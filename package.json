@@ -11,7 +11,9 @@
     "test:shadow": "tsx server/v2/regression/shadow-comparison-runner.ts",
     "test:market-structure": "tsx server/v2/regression/market-structure-runner.ts",
     "test:decision-validation": "tsx server/v2/regression/decision-validation-runner.ts",
-    "test:card-contract": "tsx server/v2/regression/card-contract-runner.ts"
+    "test:card-contract": "tsx server/v2/regression/card-contract-runner.ts",
+    "test:card-continuity": "tsx server/v2/regression/card-lifecycle-continuity-runner.ts",
+    "test:m30-confirmation": "tsx server/v2/regression/m30-confirmation-runner.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

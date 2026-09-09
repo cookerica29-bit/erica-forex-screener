@@ -23,6 +23,7 @@ import {
 } from './scoutPhase.js';
 import { attachForexV2LifecycleCards } from './v2/cardContract.js';
 import { formatLifecycleDiagnosticsSummary, recordLifecycleShadowScan } from './v2/diagnostics.js';
+import { attachM30Confirmations, refreshM30Confirmations, type M30Confirmation } from './v2/m30Confirmation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -35,6 +36,13 @@ app.use(express.text({ type: 'text/plain' }));
 
 let latestSetups: Setup[] = [];
 let latestScoutResults: ScoutReport[] = [];
+// V2 M30 shadow confirmation (2026-09 session, Sprint 2) -- keyed by the
+// same shadowKey identity Sprint 1 already uses (pair + timeframe +
+// direction). Refreshed only at real scan time (refreshM30Confirmations),
+// exactly like latestScoutResults itself; a GET request only ever reads
+// this cache, never triggers a fetch. Never required for Scout -- see
+// scheduledScan()'s own isolated try/catch around the refresh call.
+let latestM30Confirmations = new Map<string, M30Confirmation>();
 let latestScoutDiagnostics: ScoutDiagnosticsReport | null = null;
 let latestScalpResults: ScalpReport[] = [];
 let latestTrendResults: TrendScanResult | null = null;
@@ -1545,6 +1553,15 @@ async function scheduledScan(forceTf?: string) {
       console.log(`[Scout] ${latestScoutResults.length} pairs scanned, ${latestScoutResults.filter(r => r.interestLevel === 'HIGH').length} HIGH interest`);
       recordV2LifecycleShadow(latestScoutResults, 'scheduled scout scan');
       await notifyTradeableScoutSignals(latestScoutResults, 'scheduled scout scan');
+      // V2 M30 shadow confirmation (Sprint 2) -- isolated on purpose: a
+      // failure here (or inside any single pair's OANDA fetch, already
+      // caught per-report) can never affect latestScoutResults, alerts,
+      // or anything above this line.
+      try {
+        latestM30Confirmations = await refreshM30Confirmations(latestScoutResults);
+      } catch (e: any) {
+        console.warn('[V2 M30] Shadow confirmation refresh failed:', e.message);
+      }
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
     }
@@ -1583,7 +1600,11 @@ app.post('/api/scan', async (req, res) => {
 
 // ── Scout API ──────────────────────────────────────────────────────────────────
 app.get('/api/scout', (_req, res) => {
-  const reports = attachForexV2LifecycleCards(enrichScoutReports(latestScoutResults));
+  // Sprint 2: read-only -- attachM30Confirmations only reads the cache
+  // latestM30Confirmations already holds from the last real scan. A GET
+  // never fetches M30 itself.
+  const withCards = attachForexV2LifecycleCards(enrichScoutReports(latestScoutResults));
+  const reports = attachM30Confirmations(withCards, latestM30Confirmations);
   res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
 });
 
@@ -1595,10 +1616,26 @@ app.post('/api/scout', async (req, res) => {
       console.log(`[Scout] Priority mode active for setup queue, ignored for scout card coverage (${priorityPairsData.pairs.length} priority pairs)`);
     }
     latestScoutResults = await runScoutScan(tf);
+    // V2 lifecycle continuity (2026-09 session, Sprint 1): build the cards
+    // BEFORE recordV2LifecycleShadow advances the shared diagnostics
+    // store's previousStates for this same scan. If this ran after,
+    // buildForexV2LifecycleCard's own previous-state lookup would read
+    // the value THIS scan just wrote (current == previous), hiding the
+    // very transition the card exists to show. GET /api/scout needs no
+    // such ordering -- it never calls recordV2LifecycleShadow itself.
+    const withCards = attachForexV2LifecycleCards(enrichScoutReports(latestScoutResults));
     recordV2LifecycleShadow(latestScoutResults, 'manual scout scan');
     await notifyTradeableScoutSignals(latestScoutResults, 'manual scout scan');
+    // Sprint 2: isolated the same way as the scheduledScan() refresh --
+    // a failure here can never affect the response's Scout data, only
+    // this observational field.
+    try {
+      latestM30Confirmations = await refreshM30Confirmations(latestScoutResults);
+    } catch (e: any) {
+      console.warn('[V2 M30] Shadow confirmation refresh failed:', e.message);
+    }
+    const reports = attachM30Confirmations(withCards, latestM30Confirmations);
     lastScanTime = new Date().toISOString();
-    const reports = attachForexV2LifecycleCards(enrichScoutReports(latestScoutResults));
     res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

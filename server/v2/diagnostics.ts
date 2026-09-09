@@ -29,7 +29,14 @@ export interface LifecycleDiagnosticsSummary {
   transitions: number;
 }
 
-function shadowKey(report: ScoutReport) {
+// Exported (2026-09 session, Sprint 1 -- stateful V2 card) so the V2 card
+// path (cardContract.ts) can look up the SAME identity this store already
+// uses for shadow-comparison continuity, rather than inventing a second
+// key scheme. Smallest identity already proven safe here: pair + timeframe
+// + direction -- a direction flip (e.g. EUR_USD LONG -> EUR_USD SHORT) is a
+// different key on purpose, so a reversed setup never inherits the old
+// setup's lifecycle state.
+export function shadowKey(report: ScoutReport) {
   const direction = report.tradeDirection || report.bias || 'NEUTRAL';
   return [report.pair, report.timeframe, direction].join('|');
 }
@@ -155,6 +162,15 @@ export class LifecycleDiagnosticsStore {
 
   recentTransitions(limit = 25) {
     return this.transitions.slice(-limit);
+  }
+
+  // Read-only (2026-09 session, Sprint 1 -- stateful V2 card). Deliberately
+  // NOT a mutation -- the V2 card path only ever READS the last known
+  // state for a given identity; recordScan() above remains the sole
+  // writer. This keeps the card path from becoming a second, competing
+  // place that advances lifecycle bookkeeping.
+  getPreviousState(key: string): LifecycleState | null {
+    return this.previousStates.get(key) ?? null;
   }
 }
 

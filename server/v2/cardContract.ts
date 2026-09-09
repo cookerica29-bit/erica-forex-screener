@@ -1,5 +1,6 @@
 import type { ScoutReport } from '../scanner.js';
 import { evaluateLifecycle, lifecycleInputFromScoutReport } from './lifecycle.js';
+import { lifecycleDiagnostics, shadowKey, LifecycleDiagnosticsStore } from './diagnostics.js';
 import type { LifecycleSnapshot } from './stateMachine.js';
 
 export interface ForexV2ExecutionPlan {
@@ -59,8 +60,22 @@ function lifecycleProgress(state: string) {
   }));
 }
 
-export function buildForexV2LifecycleCard(report: ScoutReport): ForexV2LifecycleCard {
-  const snapshot = evaluateLifecycle(lifecycleInputFromScoutReport(report));
+// Sprint 1 (2026-09 session) -- stateful V2 shadow lifecycle. `store`
+// defaults to the SAME shared singleton recordLifecycleShadowScan()
+// already writes to (server/v2/diagnostics.ts) -- reused, not
+// duplicated. The optional parameter exists only so tests can inject an
+// isolated store instance (matching how shadow-comparison-runner.ts
+// already tests LifecycleDiagnosticsStore directly) without touching
+// global state shared with other test files or production.
+//
+// This function only READS store.getPreviousState(); it never writes.
+// recordLifecycleShadowScan() (called separately, at real scan time)
+// remains the only place that ever advances a setup's lifecycle state --
+// see server/index.ts's ordering comment on the POST /api/scout handler
+// for why that matters.
+export function buildForexV2LifecycleCard(report: ScoutReport, store: LifecycleDiagnosticsStore = lifecycleDiagnostics): ForexV2LifecycleCard {
+  const previousState = store.getPreviousState(shadowKey(report));
+  const snapshot = evaluateLifecycle(lifecycleInputFromScoutReport(report, previousState));
   return {
     state: snapshot.current_state,
     next_step: snapshot.next_step,
@@ -80,9 +95,9 @@ export function buildForexV2LifecycleCard(report: ScoutReport): ForexV2Lifecycle
   };
 }
 
-export function attachForexV2LifecycleCards<T extends ScoutReport>(reports: T[]) {
+export function attachForexV2LifecycleCards<T extends ScoutReport>(reports: T[], store: LifecycleDiagnosticsStore = lifecycleDiagnostics) {
   return reports.map(report => ({
     ...report,
-    v2LifecycleCard: buildForexV2LifecycleCard(report),
+    v2LifecycleCard: buildForexV2LifecycleCard(report, store),
   }));
 }
