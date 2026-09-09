@@ -30,6 +30,12 @@ export interface M30Confirmation {
   eventDirection: 'bullish' | 'bearish' | null;
   confirmedAt: string | null; // ISO timestamp of the confirming M30 candle's close, if any
   ageBars: number | null;     // M30 candles between the confirming event and the latest evaluated candle
+  // Sprint 3, Phase 1: preserved from computeStructures' own event
+  // (previously only interpolated into `reason`'s free text and then
+  // discarded) so a later shadow layer (m30Retest.ts) can reuse the
+  // EXACT level this confirmation broke, rather than re-deriving or
+  // approximating one.
+  brokenLevel: number | null;
   reason: string;
 }
 
@@ -42,7 +48,10 @@ export interface M30Confirmation {
 // whole recency rule -- no additional arbitrary cutoff is layered on top.
 // `ageBars` is still surfaced on every CONFIRMED result so a human can
 // calibrate a tighter cutoff later without this module hiding one now.
-const M30_STRUCTURE_WINDOW = 140;
+// Exported (Sprint 3) so m30Retest.ts can slice the SAME window when it
+// locates the confirming candle by timestamp, rather than guessing a
+// second window size that could silently drift from this one.
+export const M30_STRUCTURE_WINDOW = 140;
 const M30_STRUCTURE_MARGIN = 4;
 // Matches analyzeIndependentCandidate's own minimum-data guard for M30.
 const MIN_M30_CANDLES = 80;
@@ -58,12 +67,15 @@ function candleEpochSeconds(candle: M30Candle): number {
   return Math.floor(new Date(candle.t).getTime() / 1000);
 }
 
-function unavailable(direction: Direction, reason: string): M30Confirmation {
-  return { status: 'UNAVAILABLE', direction, eventType: null, eventDirection: null, confirmedAt: null, ageBars: null, reason };
+// Exported (Sprint 3) so fetchM30RetestForReport's own failure branch can
+// build an equivalent UNAVAILABLE confirmation without duplicating this
+// shape -- same reasoning as shadowKey's own Sprint 1 export.
+export function unavailable(direction: Direction, reason: string): M30Confirmation {
+  return { status: 'UNAVAILABLE', direction, eventType: null, eventDirection: null, confirmedAt: null, ageBars: null, brokenLevel: null, reason };
 }
 
 function notConfirmed(direction: Direction, reason: string): M30Confirmation {
-  return { status: 'NOT_CONFIRMED', direction, eventType: null, eventDirection: null, confirmedAt: null, ageBars: null, reason };
+  return { status: 'NOT_CONFIRMED', direction, eventType: null, eventDirection: null, confirmedAt: null, ageBars: null, brokenLevel: null, reason };
 }
 
 // Pure, synchronous, network-free -- the entire confirmation rule lives
@@ -116,6 +128,7 @@ export function evaluateM30Confirmation(direction: Direction, m30Candles: M30Can
     eventDirection: latest.event.type,
     confirmedAt,
     ageBars,
+    brokenLevel: latest.event.brokenLevel,
     reason: `M30 ${latest.event.type} ${latest.eventType} at ${latest.event.brokenLevel} confirms the ${direction} thesis.`,
   };
 }

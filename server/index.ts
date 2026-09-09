@@ -24,6 +24,7 @@ import {
 import { attachForexV2LifecycleCards } from './v2/cardContract.js';
 import { formatLifecycleDiagnosticsSummary, recordLifecycleShadowScan } from './v2/diagnostics.js';
 import { attachM30Confirmations, refreshM30Confirmations, type M30Confirmation } from './v2/m30Confirmation.js';
+import { attachM30Retests, refreshM30Retests, type M30Retest } from './v2/m30Retest.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -43,6 +44,11 @@ let latestScoutResults: ScoutReport[] = [];
 // this cache, never triggers a fetch. Never required for Scout -- see
 // scheduledScan()'s own isolated try/catch around the refresh call.
 let latestM30Confirmations = new Map<string, M30Confirmation>();
+// V2 M30 shadow retest (2026-09 session, Sprint 3) -- same shadowKey
+// identity as latestM30Confirmations, refreshed only at real scan time
+// (refreshM30Retests), exactly like it. Never required for Scout -- see
+// scheduledScan()'s own isolated try/catch around the refresh call.
+let latestM30Retests = new Map<string, M30Retest>();
 let latestScoutDiagnostics: ScoutDiagnosticsReport | null = null;
 let latestScalpResults: ScalpReport[] = [];
 let latestTrendResults: TrendScanResult | null = null;
@@ -1562,6 +1568,14 @@ async function scheduledScan(forceTf?: string) {
       } catch (e: any) {
         console.warn('[V2 M30] Shadow confirmation refresh failed:', e.message);
       }
+      // V2 M30 shadow retest (Sprint 3) -- isolated the same way as the
+      // confirmation refresh above: a failure here can never affect
+      // latestScoutResults, alerts, or the confirmation shadow field.
+      try {
+        latestM30Retests = await refreshM30Retests(latestScoutResults);
+      } catch (e: any) {
+        console.warn('[V2 M30] Shadow retest refresh failed:', e.message);
+      }
     } catch (e: any) {
       console.warn('[Scout] Scan failed:', e.message);
     }
@@ -1604,7 +1618,11 @@ app.get('/api/scout', (_req, res) => {
   // latestM30Confirmations already holds from the last real scan. A GET
   // never fetches M30 itself.
   const withCards = attachForexV2LifecycleCards(enrichScoutReports(latestScoutResults));
-  const reports = attachM30Confirmations(withCards, latestM30Confirmations);
+  const withConfirmations = attachM30Confirmations(withCards, latestM30Confirmations);
+  // Sprint 3: read-only -- attachM30Retests only reads the cache
+  // latestM30Retests already holds from the last real scan. A GET
+  // never fetches M30 itself.
+  const reports = attachM30Retests(withConfirmations, latestM30Retests);
   res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
 });
 
@@ -1634,7 +1652,16 @@ app.post('/api/scout', async (req, res) => {
     } catch (e: any) {
       console.warn('[V2 M30] Shadow confirmation refresh failed:', e.message);
     }
-    const reports = attachM30Confirmations(withCards, latestM30Confirmations);
+    // Sprint 3: isolated the same way as the confirmation refresh above --
+    // a failure here can never affect the response's Scout or
+    // confirmation data, only this observational field.
+    try {
+      latestM30Retests = await refreshM30Retests(latestScoutResults);
+    } catch (e: any) {
+      console.warn('[V2 M30] Shadow retest refresh failed:', e.message);
+    }
+    const withConfirmations = attachM30Confirmations(withCards, latestM30Confirmations);
+    const reports = attachM30Retests(withConfirmations, latestM30Retests);
     lastScanTime = new Date().toISOString();
     res.json({ reports, lastScanTime, count: reports.length, pineConfirmations: Array.from(pineConfirmations.values()), pineZones: Array.from(pineZones.values()) });
   } catch (e: any) {
