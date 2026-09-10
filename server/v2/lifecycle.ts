@@ -42,7 +42,7 @@ function locationRequirement(input: LifecycleInput) {
   if (input.location_valid) {
     return requirement('location', 'Location', 'Location', 'COMPLETE', input.location_reason || 'Location aligns with the setup direction.');
   }
-  return requirement('location', 'Location', 'Location', 'INCOMPLETE', input.location_reason || 'Location is not aligned with the setup direction.');
+  return requirement('location', 'Location', 'Location', 'INCOMPLETE', input.location_reason || 'Location is not aligned with the setup direction.', 'CONFLICT');
 }
 
 function buildRequirements(input: LifecycleInput): Record<RequirementKey, LifecycleRequirement> {
@@ -63,24 +63,26 @@ function buildRequirements(input: LifecycleInput): Record<RequirementKey, Lifecy
   };
 
   return {
-    daily_bias: requirement('daily_bias', 'Daily Bias', 'Context', daily.status, daily.reason),
-    h4_bias: requirement('h4_bias', 'H4 Bias', 'Context', h4.status, h4.reason),
-    liquidity: requirement('liquidity', 'Liquidity Sweep', 'Liquidity', liquidity.status, liquidity.reason),
-    structure: requirement('structure', 'Structure Confirmation', 'Structure', structure.status, structure.reason),
+    daily_bias: requirement('daily_bias', 'Daily Bias', 'Context', daily.status, daily.reason, daily.unmet_kind),
+    h4_bias: requirement('h4_bias', 'H4 Bias', 'Context', h4.status, h4.reason, h4.unmet_kind),
+    liquidity: requirement('liquidity', 'Liquidity Sweep', 'Liquidity', liquidity.status, liquidity.reason, liquidity.unmet_kind),
+    structure: requirement('structure', 'Structure Confirmation', 'Structure', structure.status, structure.reason, structure.unmet_kind),
     location: locationRequirement(input),
     planned_entry: requirement(
       'planned_entry',
       'Planned Entry',
       'Execution',
       evaluatePlannedEntry(execution).status,
-      evaluatePlannedEntry(execution).reason
+      evaluatePlannedEntry(execution).reason,
+      evaluatePlannedEntry(execution).unmet_kind
     ),
     entry_reached: requirement(
       'entry_reached',
       'Entry Reached',
       'Execution',
       evaluateEntryReached(execution).status,
-      evaluateEntryReached(execution).reason
+      evaluateEntryReached(execution).reason,
+      evaluateEntryReached(execution).unmet_kind
     ),
   };
 }
@@ -141,6 +143,12 @@ export function evaluateLifecycle(input: LifecycleInput): LifecycleSnapshot {
   const missing = Object.values(requirements)
     .filter(r => r.status === 'INCOMPLETE')
     .map(r => r.label);
+  const blockingConflicts = Object.values(requirements)
+    .filter(r => r.status === 'INCOMPLETE' && r.unmet_kind === 'CONFLICT')
+    .map(r => r.label);
+  const notYetMet = Object.values(requirements)
+    .filter(r => r.status === 'INCOMPLETE' && r.unmet_kind !== 'CONFLICT')
+    .map(r => r.label);
 
   return {
     symbol: input.symbol,
@@ -150,6 +158,8 @@ export function evaluateLifecycle(input: LifecycleInput): LifecycleSnapshot {
     previous_state: input.previous_state ?? null,
     reason: stateReason(currentState, input, requirements),
     missing_requirements: missing,
+    blocking_conflicts: blockingConflicts,
+    not_yet_met: notYetMet,
     completed_requirements: completed,
     next_step: lifecycleNextStep(currentState, input.planned_entry),
     requirements,

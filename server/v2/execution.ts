@@ -19,6 +19,7 @@ export function evaluatePlannedEntry(evidence: ExecutionEvidence) {
   return {
     status: 'INCOMPLETE' as RequirementStatus,
     reason: evidence.reason || 'Planned entry is missing or incomplete.',
+    unmet_kind: 'PENDING' as const,
   };
 }
 
@@ -38,5 +39,6 @@ export function evaluateEntryReached(evidence: ExecutionEvidence) {
   return {
     status: 'INCOMPLETE' as RequirementStatus,
     reason: 'Price has not reached the planned entry area.',
+    unmet_kind: 'PENDING' as const,
   };
 }
