@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import { PAIRS } from './scanner.js';
 
 const OANDA_API_KEY = process.env.OANDA_API_KEY || '';
 const OANDA_BASE = (process.env.OANDA_ACCOUNT_TYPE || 'practice') === 'live'
@@ -67,6 +66,8 @@ export interface CorrectionScanPayload {
   otherRegimes: Array<{ pair: string; state: 'ALIGNED_TREND' | 'NO_CLEAR_THESIS' | 'INVALIDATED' | 'NO_CLEAN_CORRECTION'; reason: string }>;
   errors: Array<{ pair: string; error: string }>;
   counts: Record<CorrectionStage | 'OTHER', number>;
+  /** Units/precision for every scanned instrument (display only). */
+  instruments: Record<string, InstrumentMeta>;
 }
 
 function sma(candles: Candle[], period: number): number | null {
@@ -145,10 +146,55 @@ function currencies(pair: string): string[] {
   return pair.split('_').filter(code => code.length === 3);
 }
 
-function pipSize(pair: string): number {
-  if (pair.includes('JPY')) return 0.01;
-  if (pair.startsWith('XAU_') || pair.startsWith('XAG_')) return 0.01;
-  return 0.0001;
+// ── Instrument universe + units ─────────────────────────────────────────────
+// The correction finder owns its universe, independent of the legacy setup
+// scanner's instrument list. FX is unchanged. Metals and indices use OANDA
+// price data (not tradeable on the configured OANDA accounts -- data only);
+// detection rules are ATR/structure-relative and are applied unchanged, never
+// tuned per asset class.
+export type AssetClass = 'FX' | 'METAL' | 'INDEX';
+export interface InstrumentMeta {
+  assetClass: AssetClass;
+  /** Unit of every *Pips distance field: pips for FX, US$ for metals, index points for indices. */
+  distanceUnit: 'pips' | 'usd' | 'points';
+  unitSize: number;
+  distanceDecimals: number;
+  displayPrecision: number;
+  exposureTag?: string;
+}
+
+export const FX_CORRECTION_PAIRS = [
+  'EUR_USD', 'GBP_USD', 'USD_JPY', 'USD_CAD', 'USD_CHF',
+  'AUD_USD', 'NZD_USD',
+  'EUR_JPY', 'GBP_JPY', 'AUD_JPY', 'NZD_JPY', 'CAD_JPY',
+  'EUR_GBP', 'EUR_AUD',
+] as const;
+
+const NON_FX_INSTRUMENTS: Record<string, InstrumentMeta> = {
+  XAU_USD: { assetClass: 'METAL', distanceUnit: 'usd', unitSize: 1, distanceDecimals: 2, displayPrecision: 3, exposureTag: 'METALS' },
+  XAG_USD: { assetClass: 'METAL', distanceUnit: 'usd', unitSize: 1, distanceDecimals: 3, displayPrecision: 5, exposureTag: 'METALS' },
+  US30_USD: { assetClass: 'INDEX', distanceUnit: 'points', unitSize: 1, distanceDecimals: 1, displayPrecision: 1, exposureTag: 'US_INDICES' },
+  NAS100_USD: { assetClass: 'INDEX', distanceUnit: 'points', unitSize: 1, distanceDecimals: 1, displayPrecision: 1, exposureTag: 'US_INDICES' },
+};
+
+export const CORRECTION_INSTRUMENTS: string[] = [...FX_CORRECTION_PAIRS, ...Object.keys(NON_FX_INSTRUMENTS)];
+
+export function instrumentMeta(pair: string): InstrumentMeta {
+  const known = NON_FX_INSTRUMENTS[pair];
+  if (known) return known;
+  const jpy = pair.includes('JPY');
+  return { assetClass: 'FX', distanceUnit: 'pips', unitSize: jpy ? 0.01 : 0.0001, distanceDecimals: 1, displayPrecision: jpy ? 3 : 5 };
+}
+
+/** Distance in the instrument's unit (FX: pips to 0.1, exactly as before). */
+function unitDistance(pair: string, distance: number): number {
+  const meta = instrumentMeta(pair);
+  return Number((distance / meta.unitSize).toFixed(meta.distanceDecimals));
+}
+
+function exposureFor(pair: string): string[] {
+  const tag = instrumentMeta(pair).exposureTag;
+  return tag ? [...currencies(pair), tag] : currencies(pair);
 }
 
 // ── Correction maturity (informational context only) ───────────────────────
@@ -239,7 +285,7 @@ export function computeCorrectionMaturity(pair: string, h1: Candle[], thesis: Di
   out.correctionStartPrice = startPrice;
   out.correctionEndPrice = endPrice;
   out.correctionDistancePrice = Number(distance.toFixed(6));
-  out.correctionDistancePips = Number((distance / pipSize(pair)).toFixed(1));
+  out.correctionDistancePips = unitDistance(pair, distance);
   out.correctionDistancePercent = Number((distance / Math.max(Math.abs(startPrice), Number.EPSILON) * 100).toFixed(3));
 
   const opposite = pivots.filter(pivot => pivot.type === (bearishCorrection ? 'low' : 'high') && pivot.index < origin.index);
@@ -296,7 +342,7 @@ export function modelHTFZones(input: {
         type, timeframe, low, high, formedAt: source.t, ageCandles,
         freshness: touches === 0 ? 'FRESH' : touches === 1 ? 'TESTED_ONCE' : 'TESTED_TWICE', touches,
         state: inZone ? 'IN_ZONE' : distanceAtr <= ZONE_RULES.approachingAtr ? 'APPROACHING' : 'AWAY',
-        distance, distanceAtr: Number(distanceAtr.toFixed(2)), distancePips: Number((distance / pipSize(input.pair)).toFixed(1)),
+        distance, distanceAtr: Number(distanceAtr.toFixed(2)), distancePips: unitDistance(input.pair, distance),
         distancePercent: Number((distance / Math.max(input.livePrice, Number.EPSILON) * 100).toFixed(3)),
       });
     }
@@ -395,7 +441,7 @@ export function analyzeCorrection(input: {
     invalidation: { timeframe: 'D', level: invalidationLevel, rule: `Thesis dies only if a completed Daily structural candle closes ${dailyDirection === 'LONG' ? 'below' : 'above'} this level.` },
     correctionQuality: { cleanCounterLeg, legAtr: Number(legDistance.toFixed(2)), bars: 24, extended },
     priority: Math.max(0, priority), priorityReasons,
-    exposure: currencies(pair), scannedAt: new Date().toISOString(),
+    exposure: exposureFor(pair), scannedAt: new Date().toISOString(),
     maturity: computeCorrectionMaturity(pair, h1, dailyDirection),
   } };
 }
@@ -416,8 +462,8 @@ export async function scanCorrections(): Promise<CorrectionScanPayload> {
   const errors: CorrectionScanPayload['errors'] = [];
   const market = new Map<string, import('./correctionLifecycle.js').LifecycleMarketData>();
   // Keep request pressure modest: four instruments at a time, with four TFs per instrument.
-  for (let offset = 0; offset < PAIRS.length; offset += 4) {
-    await Promise.all(PAIRS.slice(offset, offset + 4).map(async pair => {
+  for (let offset = 0; offset < CORRECTION_INSTRUMENTS.length; offset += 4) {
+    await Promise.all(CORRECTION_INSTRUMENTS.slice(offset, offset + 4).map(async pair => {
       try {
         const [daily, h4, h1, m30, m5] = await Promise.all([
           fetchTimeframe(pair, 'D', 260), fetchTimeframe(pair, 'H4', 220),
@@ -437,5 +483,6 @@ export async function scanCorrections(): Promise<CorrectionScanPayload> {
   await correctionValidationStore.syncLifecycle(candidates);
   const counts = { CORRECTION_IN_PROGRESS: 0, APPROACHING_LOCATION: 0, AT_LOCATION: 0, SHIFT_30M_DETECTED: 0, WAITING_FOR_RETEST: 0, TRIGGER_5M_OBSERVED: 0, TREND_RESUMED: 0, INVALIDATED: 0, OTHER: otherRegimes.length } as CorrectionScanPayload['counts'];
   for (const candidate of candidates) counts[candidate.stage]++;
-  return { engine: 'correction_finder_v1', generatedAt: new Date().toISOString(), candidates, otherRegimes, errors, counts };
+  const instruments = Object.fromEntries(CORRECTION_INSTRUMENTS.map(pair => [pair, instrumentMeta(pair)]));
+  return { engine: 'correction_finder_v1', generatedAt: new Date().toISOString(), candidates, otherRegimes, errors, counts, instruments };
 }

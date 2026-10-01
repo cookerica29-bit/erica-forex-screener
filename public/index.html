@@ -354,6 +354,7 @@
   <label style="font-size:12px;color:var(--slate);">Zone timeframe <select id="zoneTimeframe" onchange="renderSetups()"><option value="ALL">All</option><option value="D">Daily</option><option value="H4">4H</option><option value="NONE">No zone</option></select></label>
   <label style="font-size:12px;color:var(--slate);">Zone state <select id="zoneState" onchange="renderSetups()"><option value="ALL">All</option><option>IN_ZONE</option><option>APPROACHING</option><option>AWAY</option><option value="NONE">No zone</option></select></label>
   <label style="font-size:12px;color:var(--slate);">Depth <select id="correctionDepth" onchange="renderSetups()"><option value="ALL">Any depth</option><option value="SHALLOW">Shallow</option><option value="DEVELOPING">Developing</option><option value="DEEP">Deep</option></select></label>
+  <label style="font-size:12px;color:var(--slate);">Asset <select id="assetClass" onchange="renderSetups()"><option value="ALL">All assets</option><option value="FX">FX</option><option value="METAL">Metals</option><option value="INDEX">Indices</option></select></label>
 </div>
 
 <div class="challenge-guard" id="challengeGuard">
@@ -418,8 +419,9 @@
 <div id="content-validation" class="tab-content">
   <div class="journal-page">
     <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px;">
-      <div><div style="font-size:17px;font-weight:800;color:var(--text)">20-Setup Correction Validation</div><div style="font-size:11px;color:var(--slate-dim);margin-top:4px">Discovery precision and execution follow-through are tracked separately. No win rate is calculated.</div></div>
-      <button class="pill" onclick="loadValidations()">Refresh</button>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text)">20-Setup Correction Validation</div><div style="font-size:11px;color:var(--slate-dim);margin-top:4px">Discovery precision and execution follow-through are tracked separately. No win rate is calculated. The 20-setup study is FX; metals and indices are tracked as separate samples.</div></div>
+      <div style="display:flex;gap:8px;align-items:center"><select id="validationAsset" onchange="loadValidations()" style="font-size:12px"><option value="FX" selected>FX study</option><option value="METAL">Metals (separate)</option><option value="INDEX">Indices (separate)</option><option value="ALL">All records</option></select>
+      <button class="pill" onclick="loadValidations()">Refresh</button></div>
     </div>
     <div class="validation-grid">
       <div class="stat-box" style="text-align:left"><div class="stat-label">Study progress</div><div class="stat-value" id="v-progress">0 / 20</div><div class="validation-progress"><div id="v-progress-bar" style="width:0%"></div></div></div>
@@ -660,7 +662,7 @@
 </div>
 
 <script>
-  let allSetups = [], allNearMisses = [], dir = 'ALL', correctionStage = 'ALL', scanning = false;
+  let allSetups = [], allNearMisses = [], dir = 'ALL', correctionStage = 'ALL', scanning = false, instrumentMetaMap = {};
   let latestTerminalScanTime = null;
   let knownSetupIds = new Set();
   let setupAlertsEnabled = localStorage.getItem('forexSetupAlerts') === 'on';
@@ -994,6 +996,7 @@
       if (!response.ok) throw new Error('Correction feed unavailable');
       const data = await response.json();
       allSetups = data.candidates || [];
+      instrumentMetaMap = data.instruments || {};
       allNearMisses = data.otherRegimes || [];
       latestTerminalScanTime = data.generatedAt || null;
       document.getElementById('lastScan').textContent = latestTerminalScanTime
@@ -2129,6 +2132,7 @@
     const zoneTimeframe = document.getElementById('zoneTimeframe')?.value || 'ALL';
     const zoneState = document.getElementById('zoneState')?.value || 'ALL';
     const depth = document.getElementById('correctionDepth')?.value || 'ALL';
+    const asset = document.getElementById('assetClass')?.value || 'ALL';
     return allSetups.filter(candidate => {
       if (dir !== 'ALL' && candidate.thesisDirection !== dir) return false;
       if (correctionStage !== 'ALL' && candidate.stage !== correctionStage) return false;
@@ -2137,6 +2141,7 @@
       if (zoneState !== 'ALL' && (zoneState === 'NONE' ? candidate.location.zone : candidate.location.zone?.state !== zoneState)) return false;
       // Display filter only: depth never affects qualification, stage, priority or sort.
       if (depth !== 'ALL' && candidate.maturity?.correctionDepth !== depth) return false;
+      if (asset !== 'ALL' && metaFor(candidate.pair).assetClass !== asset) return false;
       const haystack = [candidate.pair, candidate.stage, candidate.location.zone?.timeframe, candidate.location.zone?.state, candidate.location.zone?.type, ...(candidate.location.labels || []), ...(candidate.exposure || [])].join(' ').toLowerCase();
       return !search || haystack.includes(search);
     });
@@ -2231,16 +2236,37 @@
     await loadValidations();
   }
 
+  function validationAsset() { return document.getElementById('validationAsset')?.value || 'FX'; }
+  function validationRecordsInView() {
+    const asset = validationAsset();
+    return asset === 'ALL' ? correctionValidations : correctionValidations.filter(record => metaFor(record.pair).assetClass === asset);
+  }
+  // Same counting as the server's CorrectionValidationStore.summary(), applied to the records in view.
+  function summarizeValidations(records) {
+    const count = (field, value) => records.filter(record => record[field] === value).length;
+    const yes = count('manualSmcAgreement', 'YES'), no = count('manualSmcAgreement', 'NO'), reviewed = yes + no;
+    return {
+      target: 20, tracked: records.length,
+      complete: records.filter(record => record.status === 'COMPLETE').length,
+      open: records.filter(record => record.status === 'OPEN').length,
+      remaining: Math.max(0, 20 - records.length),
+      manualAgreement: { yes, no, pending: count('manualSmcAgreement', 'PENDING'), reviewed, rate: reviewed ? yes / reviewed : null },
+      followThrough: { chochBos30m: count('chochBos30mObserved', 'YES'), retest: count('retestObserved', 'YES'), trigger5m: count('trigger5mObserved', 'YES'), sensibleTarget: count('sensibleTargetBeforeInvalidation', 'YES') },
+    };
+  }
+
   async function loadValidations() {
     try {
       const data = await loadValidationData();
-      const summary = data.summary;
-      document.getElementById('v-progress').textContent = `${summary.tracked} / ${summary.target}`;
+      const asset = validationAsset();
+      const separateSample = asset === 'METAL' || asset === 'INDEX';
+      const summary = asset === 'ALL' ? data.summary : summarizeValidations(validationRecordsInView());
+      document.getElementById('v-progress').textContent = separateSample ? `${summary.tracked} tracked` : `${summary.tracked} / ${summary.target}`;
       document.getElementById('v-progress-bar').style.width = `${Math.min(100, summary.tracked / summary.target * 100)}%`;
       document.getElementById('v-agreement').textContent = summary.manualAgreement.rate == null ? '—' : `${Math.round(summary.manualAgreement.rate * 100)}%`;
       document.getElementById('v-agreement-detail').textContent = `${summary.manualAgreement.yes} yes · ${summary.manualAgreement.no} no · ${summary.manualAgreement.pending} pending`;
       document.getElementById('v-status').textContent = `${summary.complete} complete`;
-      document.getElementById('v-open').textContent = `${summary.open} open · ${summary.remaining} remaining to 20`;
+      document.getElementById('v-open').textContent = separateSample ? `${summary.open} open · separate sample` : `${summary.open} open · ${summary.remaining} remaining to 20`;
       document.getElementById('v-follow').textContent = `${summary.followThrough.chochBos30m} shifts`;
       document.getElementById('v-follow-detail').textContent = `${summary.followThrough.retest} retests · ${summary.followThrough.trigger5m} triggers · ${summary.followThrough.sensibleTarget} sensible targets`;
       renderValidations();
@@ -2251,12 +2277,13 @@
 
   function renderValidations() {
     const list = document.getElementById('validationList');
-    if (!correctionValidations.length) {
+    const records = validationRecordsInView();
+    if (!records.length) {
       list.innerHTML = '<div class="empty-journal"><div>No corrections tracked yet</div><div style="font-size:11px">Use “Track validation” on a correction card.</div></div>';
       return;
     }
-    list.innerHTML = correctionValidations.map(record => `<article class="validation-card">
-      <div style="display:flex;justify-content:space-between;gap:12px"><div><div class="journal-symbol">${escapeHtml(record.pair.replace('_','/'))}</div><div class="journal-meta"><span class="badge tf">${escapeHtml(record.dailyThesis)} DAILY</span><span class="badge tf">1H ${escapeHtml(record.h1CorrectionLeg)}</span><span class="badge tf">${escapeHtml(stageLabel(record.h1CorrectionStage))}</span></div></div><div style="text-align:right"><select class="pnl-input" onchange="updateValidation(${record.id},'status',this.value)"><option value="OPEN" ${record.status==='OPEN'?'selected':''}>OPEN</option><option value="COMPLETE" ${record.status==='COMPLETE'?'selected':''}>COMPLETE</option></select><div class="journal-date">${new Date(record.scanTimestamp).toLocaleString()}</div></div></div>
+    list.innerHTML = records.map(record => `<article class="validation-card">
+      <div style="display:flex;justify-content:space-between;gap:12px"><div><div class="journal-symbol">${escapeHtml(record.pair.replace('_','/'))}</div><div class="journal-meta"><span class="badge tf">${escapeHtml(record.dailyThesis)} DAILY</span><span class="badge tf">1H ${escapeHtml(record.h1CorrectionLeg)}</span><span class="badge tf">${escapeHtml(stageLabel(record.h1CorrectionStage))}</span><span class="badge tf">${metaFor(record.pair).assetClass}</span></div></div><div style="text-align:right"><select class="pnl-input" onchange="updateValidation(${record.id},'status',this.value)"><option value="OPEN" ${record.status==='OPEN'?'selected':''}>OPEN</option><option value="COMPLETE" ${record.status==='COMPLETE'?'selected':''}>COMPLETE</option></select><div class="journal-date">${new Date(record.scanTimestamp).toLocaleString()}</div></div></div>
       <div style="font-size:11px;color:var(--slate);margin-top:8px">4H ${escapeHtml(record.h4Context)} · ${escapeHtml(record.locationContext)}</div>
       <div class="validation-fields">
         ${validationSelect(record,'manualSmcAgreement','Manual SMC agreement')}
@@ -2290,6 +2317,25 @@
     main.innerHTML = '<div class="setup-grid">' + filtered.map(renderCard).join('') + '</div>';
   }
 
+  // Instrument units/precision come from the correction payload; the pair-name
+  // fallback covers validation records viewed before any scan has loaded.
+  function metaFor(pair) {
+    if (instrumentMetaMap[pair]) return instrumentMetaMap[pair];
+    if (/^(XAU|XAG)_/.test(pair)) return { assetClass: 'METAL', distanceUnit: 'usd', displayPrecision: pair.startsWith('XAU') ? 3 : 5 };
+    if (/^(US30|NAS100)_/.test(pair)) return { assetClass: 'INDEX', distanceUnit: 'points', displayPrecision: 1 };
+    return { assetClass: 'FX', distanceUnit: 'pips', displayPrecision: pair.includes('JPY') ? 3 : 5 };
+  }
+  // FX prices keep the existing fmt(); metals/indices use their own precision.
+  function px(value, pair) {
+    const meta = metaFor(pair);
+    if (meta.assetClass === 'FX') return fmt(value, pair);
+    return value == null || isNaN(value) ? '—' : Number(value).toFixed(meta.displayPrecision);
+  }
+  function unitText(value, pair) {
+    const unit = metaFor(pair).distanceUnit;
+    return unit === 'usd' ? `$${value}` : unit === 'points' ? `${value} pts` : `${value} pips`;
+  }
+
   // Informational correction maturity from completed 1H candles. No grading.
   function renderCorrectionMaturity(candidate) {
     const m = candidate.maturity;
@@ -2301,9 +2347,9 @@
       ? `${Number(m.retracementPercent).toFixed(0)}% retracement · ${m.correctionDepth}`
       : 'Retracement depth unavailable';
     const detail = [
-      m.correctionStartTime ? `Correction start ${new Date(m.correctionStartTime).toLocaleString()} @ ${fmt(m.correctionStartPrice, candidate.pair)}` : '',
-      m.correctionEndPrice != null ? `Completed-candle extreme ${fmt(m.correctionEndPrice, candidate.pair)} · ${m.correctionDistancePips} pips · ${m.correctionDistancePercent}%` : '',
-      m.priorImpulseStartPrice != null ? `Prior impulse ${fmt(m.priorImpulseStartPrice, candidate.pair)} → ${fmt(m.priorImpulseEndPrice, candidate.pair)}` : '',
+      m.correctionStartTime ? `Correction start ${new Date(m.correctionStartTime).toLocaleString()} @ ${px(m.correctionStartPrice, candidate.pair)}` : '',
+      m.correctionEndPrice != null ? `Completed-candle extreme ${px(m.correctionEndPrice, candidate.pair)} · ${unitText(m.correctionDistancePips, candidate.pair)} · ${m.correctionDistancePercent}%` : '',
+      m.priorImpulseStartPrice != null ? `Prior impulse ${px(m.priorImpulseStartPrice, candidate.pair)} → ${px(m.priorImpulseEndPrice, candidate.pair)}` : '',
     ].filter(Boolean).join('\n');
     const equilibrium = m.crossedEquilibrium === true ? '<div class="correction-equilibrium">Past 50% equilibrium</div>' : '';
     return `<div class="correction-maturity" title="${escapeHtml(detail)}"><div>${age}</div><div>${depth}</div>${equilibrium}</div>`;
@@ -2313,7 +2359,7 @@
     const bullish = candidate.thesisDirection === 'LONG';
     const locations = candidate.location.labels.length ? candidate.location.labels.join(' · ') : 'No named HTF location yet';
     const shift = candidate.confirmation30m.shiftDetected
-      ? `Detected${candidate.confirmation30m.bosLevel ? ' @ ' + fmt(candidate.confirmation30m.bosLevel, candidate.pair) : ''}`
+      ? `Detected${candidate.confirmation30m.bosLevel ? ' @ ' + px(candidate.confirmation30m.bosLevel, candidate.pair) : ''}`
       : 'Not detected (not required)';
     const zone = candidate.location.zone;
     const zoneTf = zone?.timeframe === 'D' ? 'Daily' : '4H';
@@ -2321,21 +2367,21 @@
       ? `1H ${candidate.correctionDirection === 'LONG' ? 'bullish' : 'bearish'} correction ${zone.state === 'IN_ZONE' ? 'into' : zone.state === 'APPROACHING' ? 'approaching' : 'toward'} ${zoneTf} ${zone.type.toLowerCase()}`
       : `1H ${candidate.correctionDirection === 'LONG' ? 'bullish' : 'bearish'} correction against Daily thesis`;
     const zoneDetail = zone
-      ? `${zoneTf} ${zone.type.toLowerCase()} · ${fmt(zone.low,candidate.pair)}–${fmt(zone.high,candidate.pair)} · ${zone.state.replace('_',' ')}<br><span style="color:var(--slate)">${zone.distanceAtr} ATR · ${zone.distancePips} pips · ${zone.distancePercent}% · ${zone.freshness.replaceAll('_',' ').toLowerCase()} · ${zone.ageCandles} completed ${zoneTf} candles old</span>`
+      ? `${zoneTf} ${zone.type.toLowerCase()} · ${px(zone.low,candidate.pair)}–${px(zone.high,candidate.pair)} · ${zone.state.replace('_',' ')}<br><span style="color:var(--slate)">${zone.distanceAtr} ATR · ${unitText(zone.distancePips, candidate.pair)} · ${zone.distancePercent}% · ${zone.freshness.replaceAll('_',' ').toLowerCase()} · ${zone.ageCandles} completed ${zoneTf} candles old</span>`
       : locations;
     return `<article class="setup-card"><div class="card-body">
       <div class="card-top"><div class="card-left"><div class="dir-icon ${bullish ? 'long' : 'short'}">${bullish ? '↑' : '↓'}</div><div>
         <div class="symbol">${candidate.pair.replace('_','/')}</div>
-        <div class="badges"><span class="badge ${bullish ? 'long' : 'short'}">${bullish ? 'BULLISH' : 'BEARISH'} THESIS</span><span class="badge tf">${stageLabel(candidate.stage)}</span></div>
+        <div class="badges"><span class="badge ${bullish ? 'long' : 'short'}">${bullish ? 'BULLISH' : 'BEARISH'} THESIS</span><span class="badge tf">${stageLabel(candidate.stage)}</span><span class="badge tf">${metaFor(candidate.pair).assetClass}</span></div>
       </div></div><div style="text-align:right"><div style="font-size:22px;font-weight:850">${candidate.priority}</div><div class="rr-sub">watch priority</div></div></div>
       <div class="pattern-name">${escapeHtml(correctionContext)}</div>
       ${renderCorrectionMaturity(candidate)}
       <div style="font-size:12px;color:var(--gold);margin:8px 0">${escapeHtml(lifecycleNext(candidate))}</div>
-      <div class="current-price">Live location price: <span>${fmt(candidate.price,candidate.pair)}</span></div>
+      <div class="current-price">Live location price: <span>${px(candidate.price,candidate.pair)}</span></div>
       <div class="levels-grid">
         <div class="level-box"><div class="level-label entry">Direction</div><div class="level-price entry">D ${candidate.dailyStructure} · 4H ${candidate.h4Structure || 'MIXED'}</div></div>
         <div class="level-box"><div class="level-label tp1">HTF zone location</div><div style="font-size:12px;margin-top:7px">${zoneDetail}</div></div>
-        <div class="level-box sl"><div class="level-label sl">Completed-candle invalidation</div><div class="level-price sl">${fmt(candidate.invalidation.level,candidate.pair)}</div></div>
+        <div class="level-box sl"><div class="level-label sl">Completed-candle invalidation</div><div class="level-price sl">${px(candidate.invalidation.level,candidate.pair)}</div></div>
       </div>
       ${zone ? `<div style="font-size:11px;color:var(--slate);margin-top:8px">Supporting context: ${escapeHtml((candidate.location.labels || []).slice(1).join(' · ') || 'None')}</div>` : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
