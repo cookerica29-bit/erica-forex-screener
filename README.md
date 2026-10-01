@@ -23,6 +23,14 @@ Correction discovery is still defined only by an intact Daily swing thesis and a
 ## Deploy to Railway
 Push to GitHub, connect to Railway, add OANDA_API_KEY env var.
 
+Priority pairs require durable runtime storage in production. Configure one of:
+
+1. A Railway MySQL database with `DATABASE_URL`, `MYSQL_URL`, or Railway's `MYSQLHOST`/`MYSQLPORT`/`MYSQLUSER`/`MYSQLPASSWORD`/`MYSQLDATABASE` variables.
+2. A Railway volume mounted on the service. The app uses `RAILWAY_VOLUME_MOUNT_PATH/settings.json` when Railway exposes `RAILWAY_VOLUME_MOUNT_PATH`.
+3. An explicit durable file path via `SETTINGS_FILE` or `PRIORITY_PAIRS_STORE`.
+
+If Railway has no database and no mounted volume, `POST /api/priority-pairs` returns a 500 instead of pretending the priority pairs were persisted.
+
 ## TradingView to Telegram paper alerts
 TradingView can send webhook alerts to the scanner, and the scanner will:
 
@@ -63,3 +71,13 @@ TradingView alert message:
 ```
 
 Use `"action": "sell"` for short alerts. The endpoint requires `symbol`, `action`, `entry`, `sl`, and `tp` so every paper alert has measurable risk/reward.
+
+## Trending Telegram alerts
+
+The server refreshes the Trending list every 15 minutes and sends a Telegram message when a market newly enters one of the surfaced Trending sections:
+
+- Strong Bullish Trends
+- Strong Bearish Trends
+- Pullback Opportunities
+
+The first successful trend scan after a restart establishes a baseline without sending alerts. This uses the same `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` variables as the existing scanner alerts.

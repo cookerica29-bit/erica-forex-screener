@@ -2,29 +2,113 @@ import { drizzle } from 'drizzle-orm/mysql2';
 import mysql from 'mysql2/promise';
 import { journalEntries } from '../drizzle/schema.js';
 import { eq, desc } from 'drizzle-orm';
+import fs from 'fs/promises';
+import path from 'path';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: mysql.Pool | null = null;
+
+type SettingsRecord = Record<string, string>;
+export type JournalResult = 'RUNNING' | 'WINNER' | 'STOPPED' | 'FAILED' | 'BREAKEVEN' | 'PENDING';
+export type DirectionCorrect = 'YES' | 'NO' | 'PENDING' | 'N/A';
+export type EntryQuality = 'GOOD' | 'EARLY' | 'LATE' | 'N/A' | 'PENDING';
+type LegacyOutcome = 'WIN' | 'LOSS' | 'BREAKEVEN' | 'PENDING';
+type SettingsStorageInfo = {
+  backend: 'mysql' | 'file' | 'unavailable';
+  durable: boolean;
+  detail: string;
+  path?: string;
+};
+
+function getDatabaseUrl(): { url: string; source: string } | null {
+  const url =
+    process.env.DATABASE_URL ||
+    process.env.MYSQL_URL ||
+    process.env.MYSQL_PRIVATE_URL ||
+    process.env.MYSQL_PUBLIC_URL;
+
+  if (url) {
+    return {
+      url,
+      source: process.env.DATABASE_URL ? 'DATABASE_URL' :
+        process.env.MYSQL_URL ? 'MYSQL_URL' :
+        process.env.MYSQL_PRIVATE_URL ? 'MYSQL_PRIVATE_URL' : 'MYSQL_PUBLIC_URL',
+    };
+  }
+
+  const { MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE } = process.env;
+  if (MYSQLHOST && MYSQLPORT && MYSQLUSER && MYSQLPASSWORD && MYSQLDATABASE) {
+    return {
+      url: `mysql://${encodeURIComponent(MYSQLUSER)}:${encodeURIComponent(MYSQLPASSWORD)}@${MYSQLHOST}:${MYSQLPORT}/${MYSQLDATABASE}`,
+      source: 'MYSQLHOST/MYSQLPORT/MYSQLUSER/MYSQLPASSWORD/MYSQLDATABASE',
+    };
+  }
+
+  return null;
+}
+
+function isRailwayRuntime() {
+  return Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID);
+}
+
+function hasDatabaseConfig() {
+  return getDatabaseUrl() !== null;
+}
+
+function getSettingsFilePath(): { filePath: string; durable: boolean; detail: string } | null {
+  const configuredPath = process.env.SETTINGS_FILE || process.env.PRIORITY_PAIRS_STORE;
+  if (configuredPath) {
+    return { filePath: configuredPath, durable: true, detail: 'configured file path' };
+  }
+
+  if (process.env.RAILWAY_VOLUME_MOUNT_PATH) {
+    return {
+      filePath: path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'settings.json'),
+      durable: true,
+      detail: `Railway volume ${process.env.RAILWAY_VOLUME_NAME || '(unnamed)'}`,
+    };
+  }
+
+  if (isRailwayRuntime()) {
+    return null;
+  }
+
+  return { filePath: '/tmp/erica-forex-settings.json', durable: false, detail: 'local development fallback' };
+}
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  const dbConfig = getDatabaseUrl();
+  if (!_db && dbConfig) {
     try {
-      const pool = mysql.createPool({
-        uri: process.env.DATABASE_URL,
+      _pool = mysql.createPool({
+        uri: dbConfig.url,
         waitForConnections: true,
         connectionLimit: 5,
         queueLimit: 0,
       });
-      _db = drizzle(pool);
-      await initSchema(pool);
+      _db = drizzle(_pool);
+      await initSchema(_pool);
+      console.log(`[Database] Connected using ${dbConfig.source}`);
     } catch (error) {
       console.warn('[Database] Failed to connect:', error);
       _db = null;
+      _pool = null;
     }
   }
   return _db;
 }
 
+
 async function initSchema(pool: mysql.Pool) {
+  // Key-value store for persistent app settings (e.g. priority pairs)
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS settings (
+      \`key\` VARCHAR(100) PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS journal_entries (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -43,8 +127,16 @@ async function initSchema(pool: mysql.Pool) {
       rr2 DECIMAL(4,1),
       rr3 DECIMAL(4,1),
       outcome ENUM('WIN','LOSS','BREAKEVEN','PENDING') DEFAULT 'PENDING',
+      result ENUM('RUNNING','WINNER','STOPPED','FAILED','BREAKEVEN','PENDING') DEFAULT 'PENDING',
+      direction_correct ENUM('YES','NO','PENDING','N/A') DEFAULT 'PENDING',
+      entry_quality ENUM('GOOD','EARLY','LATE','N/A','PENDING') DEFAULT 'PENDING',
       pnl DECIMAL(10,2),
       notes TEXT,
+      review_notes TEXT,
+      reversal_confirmed BOOLEAN DEFAULT FALSE,
+      reversal_reason TEXT,
+      setup_grade VARCHAR(1),
+      setup_grade_reason TEXT,
       confluences TEXT,
       session VARCHAR(30),
       pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -78,7 +170,87 @@ async function initSchema(pool: mysql.Pool) {
     await pool.execute(`ALTER TABLE journal_entries ADD COLUMN trade_type VARCHAR(10) DEFAULT NULL`);
     console.log('[Database] Added trade_type column');
   }
+  // Entry-quality review columns. Keep the legacy outcome column for existing analytics.
+  const [reviewRows] = await pool.execute(`
+    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'journal_entries'
+      AND COLUMN_NAME IN ('result', 'direction_correct', 'entry_quality', 'review_notes')
+  `) as any[];
+  const reviewColumns = new Set(reviewRows.map((row: any) => row.COLUMN_NAME));
+  if (!reviewColumns.has('result')) {
+    await pool.execute(`
+      ALTER TABLE journal_entries
+      ADD COLUMN result ENUM('RUNNING','WINNER','STOPPED','FAILED','BREAKEVEN','PENDING') DEFAULT 'PENDING'
+    `);
+    await pool.execute(`
+      UPDATE journal_entries
+      SET result = CASE outcome
+        WHEN 'WIN' THEN 'WINNER'
+        WHEN 'LOSS' THEN 'STOPPED'
+        WHEN 'BREAKEVEN' THEN 'BREAKEVEN'
+        ELSE 'PENDING'
+      END
+    `);
+    console.log('[Database] Added result column');
+  }
+  if (!reviewColumns.has('direction_correct')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN direction_correct ENUM('YES','NO','PENDING','N/A') DEFAULT 'PENDING'`);
+    console.log('[Database] Added direction_correct column');
+  }
+  if (!reviewColumns.has('entry_quality')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN entry_quality ENUM('GOOD','EARLY','LATE','N/A','PENDING') DEFAULT 'PENDING'`);
+    console.log('[Database] Added entry_quality column');
+  }
+  if (!reviewColumns.has('review_notes')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN review_notes TEXT`);
+    console.log('[Database] Added review_notes column');
+  }
+  const [reversalRows] = await pool.execute(`
+    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'journal_entries'
+      AND COLUMN_NAME IN ('reversal_confirmed', 'reversal_reason')
+  `) as any[];
+  const reversalColumns = new Set(reversalRows.map((row: any) => row.COLUMN_NAME));
+  if (!reversalColumns.has('reversal_confirmed')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN reversal_confirmed BOOLEAN DEFAULT FALSE`);
+    console.log('[Database] Added reversal_confirmed column');
+  }
+  if (!reversalColumns.has('reversal_reason')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN reversal_reason TEXT`);
+    console.log('[Database] Added reversal_reason column');
+  }
+  const [gradeRows] = await pool.execute(`
+    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'journal_entries'
+      AND COLUMN_NAME IN ('setup_grade', 'setup_grade_reason')
+  `) as any[];
+  const gradeColumns = new Set(gradeRows.map((row: any) => row.COLUMN_NAME));
+  if (!gradeColumns.has('setup_grade')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN setup_grade VARCHAR(1)`);
+    console.log('[Database] Added setup_grade column');
+  }
+  if (!gradeColumns.has('setup_grade_reason')) {
+    await pool.execute(`ALTER TABLE journal_entries ADD COLUMN setup_grade_reason TEXT`);
+    console.log('[Database] Added setup_grade_reason column');
+  }
   console.log('[Database] Schema ready');
+}
+
+function resultToOutcome(result: JournalResult): LegacyOutcome {
+  if (result === 'WINNER') return 'WIN';
+  if (result === 'STOPPED' || result === 'FAILED') return 'LOSS';
+  if (result === 'BREAKEVEN') return 'BREAKEVEN';
+  return 'PENDING';
+}
+
+function outcomeToResult(outcome: LegacyOutcome): JournalResult {
+  if (outcome === 'WIN') return 'WINNER';
+  if (outcome === 'LOSS') return 'STOPPED';
+  if (outcome === 'BREAKEVEN') return 'BREAKEVEN';
+  return 'PENDING';
 }
 
 export async function getJournalEntries() {
@@ -107,6 +279,14 @@ export async function createJournalEntry(data: {
   newsRisk?: boolean;
   notes?: string;
   tradeType?: string;
+  result?: JournalResult;
+  directionCorrect?: DirectionCorrect;
+  entryQuality?: EntryQuality;
+  reviewNotes?: string;
+  reversalConfirmed?: boolean;
+  reversalReason?: string;
+  setupGrade?: 'A' | 'B' | 'C';
+  setupGradeReason?: string;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
@@ -130,24 +310,50 @@ export async function createJournalEntry(data: {
     newsRisk: data.newsRisk ?? false,
     notes: data.notes ?? null,
     tradeType: data.tradeType ?? null,
-    outcome: 'PENDING',
+    result: data.result ?? 'PENDING',
+    directionCorrect: data.directionCorrect ?? 'PENDING',
+    entryQuality: data.entryQuality ?? 'PENDING',
+    reviewNotes: data.reviewNotes ?? null,
+    reversalConfirmed: data.reversalConfirmed ?? false,
+    reversalReason: data.reversalReason ?? null,
+    setupGrade: data.setupGrade ?? null,
+    setupGradeReason: data.setupGradeReason ?? null,
+    outcome: resultToOutcome(data.result ?? 'PENDING'),
   }).$returningId();
   return result[0].id;
 }
 
 export async function updateJournalEntry(id: number, data: {
-  outcome?: 'WIN' | 'LOSS' | 'BREAKEVEN' | 'PENDING';
+  outcome?: LegacyOutcome;
   pnl?: number;
   notes?: string;
   tradeType?: string;
+  result?: JournalResult;
+  directionCorrect?: DirectionCorrect;
+  entryQuality?: EntryQuality;
+  reviewNotes?: string;
+  reversalConfirmed?: boolean;
+  reversalReason?: string;
+  setupGrade?: 'A' | 'B' | 'C';
+  setupGradeReason?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
+  const result = data.result ?? (data.outcome ? outcomeToResult(data.outcome) : undefined);
+  const outcome = data.result ? resultToOutcome(data.result) : data.outcome;
   await db.update(journalEntries).set({
-    ...(data.outcome && { outcome: data.outcome }),
+    ...(outcome && { outcome }),
+    ...(result && { result }),
     ...(data.pnl !== undefined && { pnl: String(data.pnl) }),
     ...(data.notes !== undefined && { notes: data.notes }),
     ...(data.tradeType !== undefined && { tradeType: data.tradeType }),
+    ...(data.directionCorrect !== undefined && { directionCorrect: data.directionCorrect }),
+    ...(data.entryQuality !== undefined && { entryQuality: data.entryQuality }),
+    ...(data.reviewNotes !== undefined && { reviewNotes: data.reviewNotes }),
+    ...(data.reversalConfirmed !== undefined && { reversalConfirmed: data.reversalConfirmed }),
+    ...(data.reversalReason !== undefined && { reversalReason: data.reversalReason }),
+    ...(data.setupGrade !== undefined && { setupGrade: data.setupGrade }),
+    ...(data.setupGradeReason !== undefined && { setupGradeReason: data.setupGradeReason }),
   }).where(eq(journalEntries.id, id));
 }
 
@@ -161,6 +367,124 @@ export async function clearAllJournalEntries() {
   const db = await getDb();
   if (!db) throw new Error('Database not available');
   await db.delete(journalEntries);
+}
+
+// ── Settings (persistent key-value) ─────────────────────────────────────────
+
+async function readFileSettings(): Promise<SettingsRecord> {
+  const file = getSettingsFilePath();
+  if (!file) return {};
+  try {
+    const raw = await fs.readFile(file.filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as SettingsRecord : {};
+  } catch (e: any) {
+    if (e?.code !== 'ENOENT') console.warn('[Settings] file read failed:', e);
+    return {};
+  }
+}
+
+async function writeFileSettings(settings: SettingsRecord): Promise<boolean> {
+  const file = getSettingsFilePath();
+  if (!file) {
+    console.warn('[Settings] no durable file backend available: attach a Railway volume or configure MySQL');
+    return false;
+  }
+  try {
+    await fs.mkdir(path.dirname(file.filePath), { recursive: true });
+    const tmp = `${file.filePath}.${process.pid}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(settings, null, 2), 'utf8');
+    await fs.rename(tmp, file.filePath);
+    return true;
+  } catch (e) {
+    console.warn('[Settings] file write failed:', e);
+    return false;
+  }
+}
+
+export async function getSetting(key: string): Promise<string | null> {
+  await getDb(); // ensure pool is initialised
+  if (_pool) {
+    try {
+      const [rows] = await _pool.execute('SELECT value FROM settings WHERE `key` = ?', [key]) as any[];
+      return rows.length ? rows[0].value : null;
+    } catch (e) {
+      console.warn('[Settings] getSetting DB failed:', e);
+      throw e;
+    }
+  }
+  if (hasDatabaseConfig()) {
+    throw new Error('Database settings backend is configured but unavailable');
+  }
+  const settings = await readFileSettings();
+  return settings[key] ?? null;
+}
+
+export async function setSetting(key: string, value: string): Promise<boolean> {
+  await getDb();
+  if (_pool) {
+    try {
+      await _pool.execute(
+        'INSERT INTO settings (`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = CURRENT_TIMESTAMP',
+        [key, value]
+      );
+      return true;
+    } catch (e) {
+      console.warn('[Settings] setSetting DB failed:', e);
+      return false;
+    }
+  }
+  if (hasDatabaseConfig()) return false;
+  const settings = await readFileSettings();
+  settings[key] = value;
+  return writeFileSettings(settings);
+}
+
+export async function deleteSetting(key: string): Promise<boolean> {
+  await getDb();
+  if (_pool) {
+    try {
+      await _pool.execute('DELETE FROM settings WHERE `key` = ?', [key]);
+      return true;
+    } catch (e) {
+      console.warn('[Settings] deleteSetting DB failed:', e);
+      return false;
+    }
+  }
+  if (hasDatabaseConfig()) return false;
+  const settings = await readFileSettings();
+  delete settings[key];
+  return writeFileSettings(settings);
+}
+
+export async function getSettingsStorageInfo(): Promise<SettingsStorageInfo> {
+  await getDb();
+  if (_pool) {
+    return { backend: 'mysql', durable: true, detail: 'settings table' };
+  }
+  if (hasDatabaseConfig()) {
+    return {
+      backend: 'unavailable',
+      durable: false,
+      detail: 'MySQL settings backend is configured but currently unavailable.',
+    };
+  }
+
+  const file = getSettingsFilePath();
+  if (file) {
+    return {
+      backend: 'file',
+      durable: file.durable,
+      detail: file.detail,
+      path: file.filePath,
+    };
+  }
+
+  return {
+    backend: 'unavailable',
+    durable: false,
+    detail: 'No MySQL config and no Railway volume mount path. Set DATABASE_URL/MYSQL_URL or attach a Railway volume.',
+  };
 }
 
 // Returns win/loss counts keyed by "pattern|||timeframe" for journal-weighted scoring
