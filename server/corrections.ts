@@ -56,6 +56,8 @@ export interface CorrectionCandidate {
   exposure: string[];
   scannedAt: string;
   lifecycle?: import('./correctionLifecycle.js').CorrectionLifecycle;
+  /** Informational only (completed 1H candles). Never affects qualification, stage, zones or priority. */
+  maturity?: CorrectionMaturity;
 }
 
 export interface CorrectionScanPayload {
@@ -147,6 +149,118 @@ function pipSize(pair: string): number {
   if (pair.includes('JPY')) return 0.01;
   if (pair.startsWith('XAU_') || pair.startsWith('XAG_')) return 0.01;
   return 0.0001;
+}
+
+// ── Correction maturity (informational context only) ───────────────────────
+export type CorrectionDepth = 'SHALLOW' | 'DEVELOPING' | 'DEEP';
+
+export interface CorrectionMaturity {
+  correctionStartTime: string | null;
+  correctionAgeBars: number | null;
+  correctionStartPrice: number | null;
+  correctionEndPrice: number | null;
+  correctionDistancePrice: number | null;
+  correctionDistancePips: number | null;
+  correctionDistancePercent: number | null;
+  priorImpulseStartTime: string | null;
+  priorImpulseEndTime: string | null;
+  priorImpulseStartPrice: number | null;
+  priorImpulseEndPrice: number | null;
+  priorImpulseDistance: number | null;
+  retracementPercent: number | null;
+  correctionDepth: CorrectionDepth | null;
+  crossedEquilibrium: boolean | null;
+}
+
+/** Descriptive thresholds only -- never used to qualify, exclude, rank or sort. */
+export const MATURITY_RULES = { pivotMargin: 3, shallowBelow: 33, deepFrom: 66, equilibrium: 50 } as const;
+
+export function classifyCorrectionDepth(retracementPercent: number | null): CorrectionDepth | null {
+  if (retracementPercent == null || !Number.isFinite(retracementPercent)) return null;
+  if (retracementPercent < MATURITY_RULES.shallowBelow) return 'SHALLOW';
+  if (retracementPercent < MATURITY_RULES.deepFrom) return 'DEVELOPING';
+  return 'DEEP';
+}
+
+function emptyMaturity(): CorrectionMaturity {
+  return {
+    correctionStartTime: null, correctionAgeBars: null, correctionStartPrice: null, correctionEndPrice: null,
+    correctionDistancePrice: null, correctionDistancePips: null, correctionDistancePercent: null,
+    priorImpulseStartTime: null, priorImpulseEndTime: null, priorImpulseStartPrice: null, priorImpulseEndPrice: null,
+    priorImpulseDistance: null, retracementPercent: null, correctionDepth: null, crossedEquilibrium: null,
+  };
+}
+
+/**
+ * Age and depth of the active 1H counter-leg, from COMPLETED 1H candles only
+ * (a candle flagged complete === false is dropped; live price is never used).
+ * Reuses the scanner's own swings() pivots.
+ *
+ * Correction start (bullish Daily thesis -> bearish correction; mirrored for
+ * bearish): walk back from the most recent confirmed 1H swing high through the
+ * active lower-high sequence to the swing high that began it -- the pivot whose
+ * preceding swing high is lower. It must not have been exceeded by any later
+ * completed candle. If the sequence runs back to the first swing in the
+ * available history, the start is not identifiable and every field is null.
+ *
+ * Age: the start pivot is bar 0; the first completed 1H candle after it is bar 1.
+ * Correction end: the most extreme completed low (bearish) / high (bullish)
+ * after the start pivot.
+ *
+ * Prior impulse: the thesis-direction structural leg ending at the start pivot,
+ * found the same way -- walk back through its higher-low (bullish impulse) /
+ * lower-high (bearish impulse) sequence of confirmed swings before the start
+ * pivot to the swing that began it. If that sequence runs back to the first
+ * swing in the available history, the impulse is not identifiable: impulse and
+ * retracement fields stay null while start/age/distance are kept.
+ */
+export function computeCorrectionMaturity(pair: string, h1: Candle[], thesis: Direction): CorrectionMaturity {
+  const out = emptyMaturity();
+  const completed = h1.filter(candle => (candle as Candle & { complete?: boolean }).complete !== false);
+  const bearishCorrection = thesis === 'LONG';
+  const pivots = swings(completed, MATURITY_RULES.pivotMargin);
+  // "a is beyond b" in the thesis direction: higher for swing highs, lower for swing lows.
+  const beyond = (a: number, b: number) => bearishCorrection ? a > b : a < b;
+  const origins = pivots.filter(pivot => pivot.type === (bearishCorrection ? 'high' : 'low'));
+  if (!origins.length) return out;
+  let k = origins.length - 1;
+  while (k > 0 && beyond(origins[k - 1].price, origins[k].price)) k--;
+  if (k === 0) return out;
+  const origin = origins[k];
+  const after = completed.slice(origin.index + 1);
+  if (!after.length) return out;
+  if (after.some(candle => beyond(bearishCorrection ? candle.h : candle.l, origin.price))) return out;
+
+  const startPrice = origin.price;
+  const endPrice = bearishCorrection ? Math.min(...after.map(candle => candle.l)) : Math.max(...after.map(candle => candle.h));
+  const distance = Math.abs(endPrice - startPrice);
+  out.correctionStartTime = completed[origin.index].t;
+  out.correctionAgeBars = after.length;
+  out.correctionStartPrice = startPrice;
+  out.correctionEndPrice = endPrice;
+  out.correctionDistancePrice = Number(distance.toFixed(6));
+  out.correctionDistancePips = Number((distance / pipSize(pair)).toFixed(1));
+  out.correctionDistancePercent = Number((distance / Math.max(Math.abs(startPrice), Number.EPSILON) * 100).toFixed(3));
+
+  const opposite = pivots.filter(pivot => pivot.type === (bearishCorrection ? 'low' : 'high') && pivot.index < origin.index);
+  // "a is deeper than b" against the thesis: lower for swing lows, higher for swing highs.
+  const deeper = (a: number, b: number) => bearishCorrection ? a < b : a > b;
+  let j = opposite.length - 1;
+  while (j > 0 && deeper(opposite[j - 1].price, opposite[j].price)) j--;
+  if (j <= 0) return out;
+  const impulseStart = opposite[j];
+  const impulseDistance = Math.abs(startPrice - impulseStart.price);
+  if (!(impulseDistance > 0) || !beyond(startPrice, impulseStart.price)) return out;
+  const retracement = distance / impulseDistance * 100;
+  out.priorImpulseStartTime = completed[impulseStart.index].t;
+  out.priorImpulseEndTime = completed[origin.index].t;
+  out.priorImpulseStartPrice = impulseStart.price;
+  out.priorImpulseEndPrice = startPrice;
+  out.priorImpulseDistance = Number(impulseDistance.toFixed(6));
+  out.retracementPercent = Number(retracement.toFixed(2));
+  out.correctionDepth = classifyCorrectionDepth(retracement);
+  out.crossedEquilibrium = retracement >= MATURITY_RULES.equilibrium;
+  return out;
 }
 
 /**
@@ -282,6 +396,7 @@ export function analyzeCorrection(input: {
     correctionQuality: { cleanCounterLeg, legAtr: Number(legDistance.toFixed(2)), bars: 24, extended },
     priority: Math.max(0, priority), priorityReasons,
     exposure: currencies(pair), scannedAt: new Date().toISOString(),
+    maturity: computeCorrectionMaturity(pair, h1, dailyDirection),
   } };
 }
 

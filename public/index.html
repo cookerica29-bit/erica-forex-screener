@@ -66,6 +66,8 @@
     .badge.tf { color: var(--slate-dim); border-color: rgba(71,85,105,0.5); background: transparent; }
     .badge.session { color: #64748b; border-color: rgba(71,85,105,0.3); background: transparent; }
     .pattern-name { font-size: 13px; color: var(--slate); margin-top: 7px; }
+    .correction-maturity { font-size: 12px; color: var(--slate); margin: 6px 0 2px; line-height: 1.55; }
+    .correction-equilibrium { font-size: 11px; color: var(--slate-dim); }
     .rr-block { text-align: right; }
     .rr-main { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
     .rr-main.rr-great { color: var(--green); }
@@ -351,6 +353,7 @@
   <label style="font-size:12px;color:var(--slate);display:flex;align-items:center;gap:6px;"><input id="locationOnly" type="checkbox" onchange="renderSetups()"> At/approaching location</label>
   <label style="font-size:12px;color:var(--slate);">Zone timeframe <select id="zoneTimeframe" onchange="renderSetups()"><option value="ALL">All</option><option value="D">Daily</option><option value="H4">4H</option><option value="NONE">No zone</option></select></label>
   <label style="font-size:12px;color:var(--slate);">Zone state <select id="zoneState" onchange="renderSetups()"><option value="ALL">All</option><option>IN_ZONE</option><option>APPROACHING</option><option>AWAY</option><option value="NONE">No zone</option></select></label>
+  <label style="font-size:12px;color:var(--slate);">Depth <select id="correctionDepth" onchange="renderSetups()"><option value="ALL">Any depth</option><option value="SHALLOW">Shallow</option><option value="DEVELOPING">Developing</option><option value="DEEP">Deep</option></select></label>
 </div>
 
 <div class="challenge-guard" id="challengeGuard">
@@ -2125,12 +2128,15 @@
     const locationOnly = document.getElementById('locationOnly')?.checked;
     const zoneTimeframe = document.getElementById('zoneTimeframe')?.value || 'ALL';
     const zoneState = document.getElementById('zoneState')?.value || 'ALL';
+    const depth = document.getElementById('correctionDepth')?.value || 'ALL';
     return allSetups.filter(candidate => {
       if (dir !== 'ALL' && candidate.thesisDirection !== dir) return false;
       if (correctionStage !== 'ALL' && candidate.stage !== correctionStage) return false;
       if (locationOnly && !candidate.location.atLocation && !candidate.location.approaching) return false;
       if (zoneTimeframe !== 'ALL' && (zoneTimeframe === 'NONE' ? candidate.location.zone : candidate.location.zone?.timeframe !== zoneTimeframe)) return false;
       if (zoneState !== 'ALL' && (zoneState === 'NONE' ? candidate.location.zone : candidate.location.zone?.state !== zoneState)) return false;
+      // Display filter only: depth never affects qualification, stage, priority or sort.
+      if (depth !== 'ALL' && candidate.maturity?.correctionDepth !== depth) return false;
       const haystack = [candidate.pair, candidate.stage, candidate.location.zone?.timeframe, candidate.location.zone?.state, candidate.location.zone?.type, ...(candidate.location.labels || []), ...(candidate.exposure || [])].join(' ').toLowerCase();
       return !search || haystack.includes(search);
     });
@@ -2284,6 +2290,25 @@
     main.innerHTML = '<div class="setup-grid">' + filtered.map(renderCard).join('') + '</div>';
   }
 
+  // Informational correction maturity from completed 1H candles. No grading.
+  function renderCorrectionMaturity(candidate) {
+    const m = candidate.maturity;
+    if (!m) return '';
+    const age = m.correctionAgeBars != null
+      ? `${m.correctionAgeBars} completed 1H candle${m.correctionAgeBars === 1 ? '' : 's'}`
+      : 'Correction age unavailable';
+    const depth = m.retracementPercent != null
+      ? `${Number(m.retracementPercent).toFixed(0)}% retracement · ${m.correctionDepth}`
+      : 'Retracement depth unavailable';
+    const detail = [
+      m.correctionStartTime ? `Correction start ${new Date(m.correctionStartTime).toLocaleString()} @ ${fmt(m.correctionStartPrice, candidate.pair)}` : '',
+      m.correctionEndPrice != null ? `Completed-candle extreme ${fmt(m.correctionEndPrice, candidate.pair)} · ${m.correctionDistancePips} pips · ${m.correctionDistancePercent}%` : '',
+      m.priorImpulseStartPrice != null ? `Prior impulse ${fmt(m.priorImpulseStartPrice, candidate.pair)} → ${fmt(m.priorImpulseEndPrice, candidate.pair)}` : '',
+    ].filter(Boolean).join('\n');
+    const equilibrium = m.crossedEquilibrium === true ? '<div class="correction-equilibrium">Past 50% equilibrium</div>' : '';
+    return `<div class="correction-maturity" title="${escapeHtml(detail)}"><div>${age}</div><div>${depth}</div>${equilibrium}</div>`;
+  }
+
   function renderCard(candidate) {
     const bullish = candidate.thesisDirection === 'LONG';
     const locations = candidate.location.labels.length ? candidate.location.labels.join(' · ') : 'No named HTF location yet';
@@ -2304,6 +2329,7 @@
         <div class="badges"><span class="badge ${bullish ? 'long' : 'short'}">${bullish ? 'BULLISH' : 'BEARISH'} THESIS</span><span class="badge tf">${stageLabel(candidate.stage)}</span></div>
       </div></div><div style="text-align:right"><div style="font-size:22px;font-weight:850">${candidate.priority}</div><div class="rr-sub">watch priority</div></div></div>
       <div class="pattern-name">${escapeHtml(correctionContext)}</div>
+      ${renderCorrectionMaturity(candidate)}
       <div style="font-size:12px;color:var(--gold);margin:8px 0">${escapeHtml(lifecycleNext(candidate))}</div>
       <div class="current-price">Live location price: <span>${fmt(candidate.price,candidate.pair)}</span></div>
       <div class="levels-grid">
