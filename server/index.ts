@@ -8,6 +8,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getJournalEntries, createJournalEntry, updateJournalEntry, deleteJournalEntry, clearAllJournalEntries, getPatternStats } from './db.js';
 import { debugScan, Setup, JournalStats } from './scanner.js';
+import { CorrectionScanPayload, scanCorrections } from './corrections.js';
+import { correctionValidationStore } from './correctionValidations.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -23,6 +25,7 @@ let latestRejected: Array<{ pair: string; reason: string; detail: any; granulari
 let cachedJournalStats: JournalStats = {};
 let lastScanTime: string | null = null;
 let pendingApprovals: (Setup & { id: string })[] = [];
+let latestCorrections: CorrectionScanPayload | null = null;
 
 async function sendTelegram(text: string, parseMode?: 'Markdown') {
   const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -148,6 +151,55 @@ setInterval(scheduledScan, 15 * 60 * 1000);
 // ─── SCANNER API ──────────────────────────────────────────────────────────────
 app.get('/api/setups', (_req, res) => {
   res.json({ setups: latestSetups, lastScanTime, count: latestSetups.length });
+});
+
+// Correction discovery is deliberately separate from the legacy entry/setup route.
+// It surfaces watch candidates; it never queues approvals, Telegram alerts, or broker actions.
+app.get('/api/corrections', (_req, res) => {
+  if (!latestCorrections) return res.status(404).json({ error: 'No correction scan yet. Run POST /api/corrections/scan.' });
+  res.json(latestCorrections);
+});
+
+app.post('/api/corrections/scan', async (_req, res) => {
+  try {
+    latestCorrections = await scanCorrections();
+    res.json(latestCorrections);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Validation is a manual discovery-quality study, deliberately separate from the trade journal.
+app.get('/api/correction-validations', async (_req, res) => {
+  try {
+    const [records, summary] = await Promise.all([
+      correctionValidationStore.list(),
+      correctionValidationStore.summary(),
+    ]);
+    return res.json({ records, summary });
+  } catch (error: any) {
+    console.error('[Correction validation] GET failed:', error.message);
+    return res.status(500).json({ error: 'Failed to load correction validations' });
+  }
+});
+
+app.post('/api/correction-validations', async (req, res) => {
+  try {
+    const result = await correctionValidationStore.create(req.body || {});
+    return res.status(result.created ? 201 : 200).json(result);
+  } catch (error: any) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.patch('/api/correction-validations/:id', async (req, res) => {
+  try {
+    const record = await correctionValidationStore.update(Number(req.params.id), req.body || {});
+    if (!record) return res.status(404).json({ error: 'Correction validation not found' });
+    return res.json({ record });
+  } catch (error: any) {
+    return res.status(400).json({ error: error.message });
+  }
 });
 
 app.post('/api/scan', async (req, res) => {

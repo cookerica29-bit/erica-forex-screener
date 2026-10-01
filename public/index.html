@@ -3,60 +3,61 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🔥 Forex Scanner</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔥</text></svg>">
+  <title>Kairos Forex Command Center</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #060810; --card: #0C1018; --inner: #080B10; --border: #1e2530;
-      --green: #00FF88; --red: #FF3B5C; --gold: #F5A623; --blue: #60A5FA;
-      --slate: #94a3b8; --slate-dim: #475569; --slate-dark: #1e293b; --text: #f1f5f9;
+      color-scheme: dark;
+      --bg: #070d14; --panel: #0d1722; --card: #0b141f; --inner: #111c2a; --border: #263548;
+      --green: #6ee7a8; --red: #ff8a9a; --gold: #f7d778; --blue: #8ab4ff;
+      --slate: #a9b8cb; --slate-dim: #72839a; --slate-dark: #172233; --text: #eef5ff;
     }
-    body { background: var(--bg); background-image: radial-gradient(rgba(96,165,250,0.03) 1px, transparent 1px); background-size: 32px 32px; color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; min-height: 100vh; }
-    .header { background: rgba(13,17,23,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; position: sticky; top: 0; z-index: 100; }
-    .header-left { display: flex; align-items: center; gap: 10px; }
-    .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); animation: pulse 2s infinite; }
+    html, body { max-width: 100%; overflow-x: hidden; }
+    body { background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-height: 100vh; }
+    .header { background: #080f18; border-bottom: 1px solid var(--border); padding: 22px 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; position: sticky; top: 0; z-index: 100; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-    .header-title { font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #f1f5f9 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: -0.3px; }
-    .header-sub { font-size: 11px; color: var(--slate-dim); text-transform: uppercase; letter-spacing: 1px; }
-    .oanda-badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; border: 1px solid rgba(96,165,250,0.4); color: var(--blue); background: rgba(96,165,250,0.08); }
-    .controls { padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-bottom: 1px solid var(--border); }
-    .control-group { display: flex; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 2px; }
-    .control-label { font-size: 10px; color: var(--slate-dim); text-transform: uppercase; padding: 0 8px; }
-    .pill { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: none; background: transparent; color: var(--slate); cursor: pointer; transition: all 0.15s; font-family: inherit; }
+    .header-title { font-size: 30px; font-weight: 800; color: var(--text); letter-spacing: 0; }
+    .header-sub { font-size: 15px; color: var(--slate); margin-top: 4px; }
+    .oanda-badge { font-size: 12px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); color: var(--blue); background: var(--panel); font-weight: 700; }
+    .controls { padding: 18px 28px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-bottom: 1px solid var(--border); background: #0a111b; }
+    .control-group { display: flex; align-items: center; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 4px; gap: 2px; }
+    .control-label { font-size: 11px; color: var(--slate-dim); text-transform: uppercase; padding: 0 8px; letter-spacing: 0.08em; font-weight: 700; }
+    .pill { font-size: 12px; padding: 7px 11px; border-radius: 6px; border: none; background: transparent; color: var(--slate); cursor: pointer; transition: all 0.15s; font-family: inherit; font-weight: 700; }
     .pill:hover { color: var(--text); }
     .pill.active { background: var(--slate-dark); color: var(--text); }
     .pill.active.green { background: rgba(0,255,136,0.15); color: var(--green); }
     .pill.active.red { background: rgba(255,59,92,0.15); color: var(--red); }
     .pill.active.gold { background: rgba(245,166,35,0.15); color: var(--gold); }
     .pill.active.blue { background: rgba(96,165,250,0.15); color: var(--blue); }
-    .scan-btn { padding: 8px 20px; border-radius: 8px; border: 1px solid rgba(96,165,250,0.4); background: rgba(96,165,250,0.1); color: var(--blue); font-size: 13px; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; font-weight: 600; }
-    .scan-btn:hover { background: rgba(96,165,250,0.2); border-color: rgba(96,165,250,0.6); transform: scale(1.02); }
+    .scan-btn { padding: 11px 18px; border-radius: 8px; border: 1px solid #375173; background: #13243a; color: var(--text); font-size: 14px; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; font-weight: 800; }
+    .scan-btn:hover { background: #17304d; border-color: #4d6f99; }
     .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .alert-toggle { padding: 11px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--slate); font-size: 13px; font-family: inherit; cursor: pointer; font-weight: 800; }
+    .alert-toggle.on { color: var(--green); border-color: rgba(110,231,168,0.45); background: rgba(110,231,168,0.08); }
+    .alert-toggle.blocked { color: var(--red); border-color: rgba(255,138,154,0.45); background: rgba(255,138,154,0.08); }
     .spin { animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .stats-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
-    .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; border-top: 2px solid rgba(96,165,250,0.3); border-radius: 0 0 8px 8px; }
-    .stat-value { font-size: 24px; font-weight: 800; }
-    .stat-label { font-size: 9px; color: var(--slate-dim); text-transform: uppercase; margin-top: 2px; letter-spacing: 0.5px; }
-    .setup-grid { padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
-    .setup-card { background: linear-gradient(135deg, #0D1117 0%, #0a0f16 100%); border-radius: 14px; border: 1px solid #1e2530; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
-    .setup-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-    @keyframes premiumPulse { 0%, 100% { box-shadow: 0 0 20px rgba(245,166,35,0.06); } 50% { box-shadow: 0 0 30px rgba(245,166,35,0.15); } }
-    .setup-card.premium { border-color: rgba(245,166,35,0.4); animation: premiumPulse 3s ease-in-out infinite; }
-    .setup-card.premium::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(245,166,35,0.6), transparent); }
-    .setup-card.strong { border-color: rgba(96,165,250,0.3); }
-    .setup-card.strong::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(96,165,250,0.5), transparent); }
-    .card-body { padding: 14px; }
+    .stats-bar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; padding: 24px 28px; border-bottom: 1px solid var(--border); background: #0a111b; }
+    .stat-box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px; text-align: left; }
+    .stat-value { font-size: 31px; font-weight: 850; letter-spacing: 0; }
+    .stat-label { font-size: 12px; color: var(--slate-dim); text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.12em; font-weight: 800; }
+    .setup-grid { padding: 24px 28px; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 18px; }
+    .setup-card { background: var(--card); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; transition: border-color 0.2s, background 0.2s; position: relative; }
+    .setup-card:hover { border-color: #3c516c; background: #0d1724; }
+    .setup-card.premium { border-color: rgba(247,215,120,0.45); }
+    .setup-card.strong { border-color: rgba(138,180,255,0.35); }
+    .card-body { padding: 18px; }
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
     .card-left { display: flex; align-items: center; gap: 10px; }
-    .dir-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .dir-icon { width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; font-weight: 900; }
     .dir-icon.long { background: rgba(0,255,136,0.12); border: 1px solid rgba(0,255,136,0.2); border-radius: 10px; }
     .dir-icon.short { background: rgba(255,59,92,0.12); border: 1px solid rgba(255,59,92,0.2); border-radius: 10px; }
-    .symbol { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; color: var(--text); }
+    .symbol { font-size: 24px; font-weight: 850; letter-spacing: 0; color: var(--text); }
     .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
-    .badge { font-size: 9px; padding: 2px 6px; border-radius: 99px; border: 1px solid; }
+    .badge { font-size: 11px; padding: 4px 8px; border-radius: 999px; border: 1px solid; font-weight: 800; letter-spacing: 0.06em; }
     .badge.premium { color: var(--gold); border-color: rgba(245,166,35,0.4); background: rgba(245,166,35,0.08); }
     .badge.strong { color: var(--blue); border-color: rgba(96,165,250,0.4); background: rgba(96,165,250,0.08); }
     .badge.developing { color: var(--slate); border-color: rgba(148,163,184,0.3); background: rgba(148,163,184,0.05); }
@@ -64,7 +65,7 @@
     .badge.short { color: var(--red); border-color: rgba(255,59,92,0.4); background: rgba(255,59,92,0.06); }
     .badge.tf { color: var(--slate-dim); border-color: rgba(71,85,105,0.5); background: transparent; }
     .badge.session { color: #64748b; border-color: rgba(71,85,105,0.3); background: transparent; }
-    .pattern-name { font-size: 11px; color: var(--slate-dim); margin-top: 3px; }
+    .pattern-name { font-size: 13px; color: var(--slate); margin-top: 7px; }
     .rr-block { text-align: right; }
     .rr-main { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
     .rr-main.rr-great { color: var(--green); }
@@ -75,8 +76,8 @@
     .current-price span { color: var(--blue); }
     .levels-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 6px; }
     .levels-grid-ext { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
-    .level-box { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.06); transition: background 0.15s; }
-    .level-box:hover { background: rgba(255,255,255,0.05); }
+    .level-box { background: var(--inner); border-radius: 8px; padding: 12px; border: 1px solid var(--border); transition: background 0.15s; min-height: 72px; }
+    .level-box:hover { background: #142033; }
     .level-box.sl { border-color: rgba(255,59,92,0.25); border-left: 3px solid rgba(255,59,92,0.5); }
     .level-box.tp1 { border-color: rgba(0,255,136,0.2); border-left: 3px solid rgba(0,255,136,0.5); }
     .level-box.tp2 { border-color: rgba(0,255,136,0.12); border-left: 3px solid rgba(0,255,136,0.35); }
@@ -118,24 +119,40 @@
     .pnl-input { flex: 1; padding: 4px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px; font-family: inherit; outline: none; }
     .notes-row { display: flex; flex-direction: column; gap: 4px; }
     .notes-input { width: 100%; padding: 6px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px; font-family: inherit; outline: none; resize: vertical; min-height: 60px; }
-    .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 16px; }
+    .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 90px 20px; gap: 16px; }
     .loading-ring { width: 56px; height: 56px; border-radius: 50%; border: 2px solid rgba(96,165,250,0.15); border-top-color: var(--blue); animation: spin 1s linear infinite; }
     .loading-text { color: var(--blue); font-size: 13px; text-align: center; }
     .loading-sub { color: var(--slate-dim); font-size: 11px; }
-    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 10px; color: var(--slate-dim); }
-    .filter-row { padding: 0 20px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .search-box { flex: 1; min-width: 160px; max-width: 240px; padding: 6px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; font-family: inherit; outline: none; }
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 92px 20px; gap: 10px; color: var(--slate-dim); font-size: 15px; }
+    .filter-row { padding: 18px 28px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: #0a111b; }
+    .search-box { flex: 1; min-width: 220px; max-width: 320px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; font-family: inherit; outline: none; }
     .search-box::placeholder { color: var(--slate-dim); }
     .result-count { font-size: 11px; color: var(--slate-dim); }
     .result-count span { color: var(--text); }
+    .challenge-guard { margin: 18px 28px 0; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: grid; grid-template-columns: 1.2fr repeat(4, 1fr); gap: 12px; align-items: stretch; }
+    .challenge-main { display: flex; flex-direction: column; justify-content: space-between; gap: 10px; }
+    .challenge-kicker { color: var(--slate-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 800; }
+    .challenge-title { color: var(--text); font-size: 20px; font-weight: 850; }
+    .challenge-status { display: inline-flex; align-items: center; width: fit-content; border-radius: 999px; border: 1px solid var(--border); padding: 5px 10px; font-size: 11px; font-weight: 850; letter-spacing: 0.04em; text-transform: uppercase; }
+    .challenge-status.clear { color: var(--green); border-color: rgba(110,231,168,0.45); background: rgba(110,231,168,0.08); }
+    .challenge-status.caution { color: var(--gold); border-color: rgba(247,215,120,0.45); background: rgba(247,215,120,0.08); }
+    .challenge-status.locked { color: var(--red); border-color: rgba(255,138,154,0.45); background: rgba(255,138,154,0.08); }
+    .challenge-metric { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; min-height: 84px; display: flex; flex-direction: column; justify-content: space-between; }
+    .challenge-metric-label { color: var(--slate-dim); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 800; }
+    .challenge-metric-value { color: var(--text); font-size: 20px; font-weight: 850; margin-top: 8px; }
+    .challenge-metric-sub { color: var(--slate-dim); font-size: 10px; margin-top: 4px; }
+    .challenge-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .challenge-link { border: 1px solid var(--border); background: transparent; color: var(--slate); border-radius: 6px; padding: 5px 9px; font-size: 11px; font-weight: 750; font-family: inherit; cursor: pointer; }
+    .challenge-link:hover { color: var(--text); border-color: #3c516c; }
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: repeat(3, 1fr); }
       .setup-grid { grid-template-columns: 1fr; padding: 10px; }
+      .challenge-guard { grid-template-columns: 1fr; margin: 12px 10px 0; }
     }
-    .tab-nav { display: flex; background: rgba(13,17,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 24px; gap: 4px; }
-    .tab-btn { padding: 14px 20px; font-size: 12px; font-family: inherit; border: none; background: transparent; color: var(--slate-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; font-weight: 500; letter-spacing: 0.3px; }
+    .tab-nav { display: flex; background: #080f18; border-bottom: 1px solid var(--border); padding: 0 28px; gap: 4px; }
+    .tab-btn { padding: 16px 18px; font-size: 14px; font-family: inherit; border: none; background: transparent; color: var(--slate-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; font-weight: 750; letter-spacing: 0; }
     .tab-btn:hover { color: var(--slate); }
-    .tab-btn.active { color: var(--text); border-bottom-color: var(--blue); background: rgba(96,165,250,0.05); border-radius: 6px 6px 0 0; }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--blue); background: #0c1724; border-radius: 6px 6px 0 0; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     .journal-page { padding: 16px 20px; }
@@ -176,6 +193,16 @@
     .journal-edit-btn { font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--slate-dim); cursor: pointer; font-family: inherit; }
     .journal-edit-btn:hover { color: var(--text); border-color: var(--slate); }
     .journal-edit-panel { margin-top: 10px; padding: 10px; background: var(--inner); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+    .validation-progress { height: 8px; border-radius: 99px; background: var(--inner); overflow: hidden; margin-top: 8px; }
+    .validation-progress > div { height: 100%; background: linear-gradient(90deg,var(--blue),var(--green)); transition: width .25s; }
+    .validation-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; }
+    .validation-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+    .validation-fields { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px; }
+    .validation-field { padding:8px;background:var(--inner);border:1px solid var(--border);border-radius:7px; }
+    .validation-field label { display:block;font-size:9px;color:var(--slate-dim);text-transform:uppercase;margin-bottom:5px;line-height:1.4; }
+    .validation-field select, .validation-field input, .validation-field textarea { width:100%;background:#080f18;color:var(--text);border:1px solid var(--border);border-radius:5px;padding:6px;font-family:inherit;font-size:11px; }
+    .track-btn { margin-top:12px;width:100%;padding:9px;border-radius:6px;border:1px solid rgba(96,165,250,.45);background:rgba(96,165,250,.1);color:var(--blue);font:700 11px inherit;cursor:pointer; }
+    .track-btn:disabled { color:var(--slate-dim);border-color:var(--border);cursor:default; }
     @media (max-width: 600px) { .journal-stats { grid-template-columns: repeat(3, 1fr); } .journal-levels { grid-template-columns: repeat(3, 1fr); } }
     .breakdown-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .breakdown-label { font-size: 11px; color: var(--slate); min-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -209,7 +236,33 @@
     .nm-reason { font-size: 11px; color: var(--slate-dim); margin-bottom: 5px; line-height: 1.4; }
     .nm-stats { font-size: 10px; color: #334155; }
     @media (max-width: 768px) {
+      .header { align-items: stretch; padding: 18px 16px; position: static; }
+      .header-left { align-items: flex-start; display: grid; grid-template-columns: auto 1fr; gap: 10px; min-width: 0; width: 100%; }
+      .header-left > div { min-width: 0; width: 100%; }
+      .header-title { font-size: 24px; line-height: 1.08; white-space: normal; }
+      .header-sub { font-size: 14px; line-height: 1.35; }
+      .oanda-badge, .header-left > span:last-child { grid-column: 2; width: fit-content; }
+      #header-challenge { width: 100%; justify-content: space-between; }
+      .header > div:last-child { align-items: stretch !important; display: grid !important; grid-template-columns: 1fr 1fr; width: 100%; }
+      .header > div:last-child > * { min-width: 0; }
+      #lastScan, #scanTfLabel { grid-column: 1 / -1; }
+      .header > div:last-child .control-group { grid-column: 1 / -1; justify-content: center; min-width: 0; }
+      .scan-btn, .alert-toggle { justify-content: center; min-height: 44px; overflow-wrap: anywhere; width: 100%; }
+      .tab-nav { overflow-x: auto; padding: 0 12px; width: 100%; }
+      .tab-nav .tab-btn { flex: 0 0 auto; min-height: 44px; }
+      .controls { align-items: stretch; padding: 12px; }
+      .controls .control-group { min-width: 0; overflow-x: auto; width: 100%; }
+      .controls .pill { flex: 1; min-height: 40px; white-space: nowrap; }
       .stats-bar { grid-template-columns: repeat(2, 1fr) !important; }
+      .stat-box { padding: 14px; }
+      .stat-value { font-size: 26px; }
+      .setup-grid { grid-template-columns: 1fr !important; padding: 14px 12px; }
+      .setup-card { border-radius: 8px; }
+      .card-top { gap: 12px; }
+      .levels-grid, .levels-grid-ext, .conditions-grid { grid-template-columns: 1fr !important; }
+      .confluences { gap: 6px; }
+      .challenge-guard { grid-template-columns: 1fr 1fr; }
+      .challenge-main { grid-column: 1 / -1; }
       #bot-challenge > div:first-child { grid-template-columns: 1fr !important; }
       .tbl-wrap { overflow-x: auto; }
       #bot-positions-body td { font-size: 11px; padding: 8px 6px; }
@@ -220,17 +273,28 @@
       #bot-approvals-list > div { flex-wrap: wrap; gap: 8px; }
       #bot-approvals-list button { padding: 8px 16px !important; font-size: 12px !important; flex: 1; }
     }
+    @media (max-width: 430px) {
+      .header-title { font-size: 21px; }
+      .header-left { gap: 8px; }
+      .oanda-badge { order: 3; }
+      .stats-bar { grid-template-columns: 1fr 1fr !important; gap: 10px; padding: 14px 12px; }
+      .challenge-guard { grid-template-columns: 1fr; }
+      .journal-stats { grid-template-columns: repeat(2, 1fr); }
+      .validation-grid, .validation-fields { grid-template-columns:1fr; }
+      .journal-levels { grid-template-columns: 1fr; }
+      .modal, .journal-edit-panel { width: calc(100vw - 20px) !important; max-width: calc(100vw - 20px) !important; }
+    }
   </style>
 </head>
 <body>
-<div style="height:3px;background:linear-gradient(90deg,#60A5FA,#00FF88,#F5A623,#FF3B5C);position:fixed;top:0;left:0;right:0;z-index:999;"></div>
+<div style="height:1px;background:#263548;position:fixed;top:0;left:0;right:0;z-index:999;"></div>
 
 <div class="header">
   <div class="header-left">
     <div class="pulse"></div>
     <div>
-      <div class="header-title">🔥 Forex Scanner</div>
-      <div class="header-sub">Live OANDA · Price Action</div>
+      <div class="header-title">Kairos Forex Command Center</div>
+      <div class="header-sub">Direction → Correction → Location. Confirmation stays informational and execution stays manual.</div>
     </div>
     <span class="oanda-badge">OANDA v20</span>
     <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#22c55e;font-weight:600;">
@@ -239,7 +303,7 @@
     </span>
   </div>
   <div id="header-challenge" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;">E8 Challenge</div>
+    <div style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;">FundedNext</div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div style="width:120px;height:4px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden;">
         <div id="header-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#60A5FA,#00FF88);border-radius:99px;transition:width .5s;"></div>
@@ -249,69 +313,98 @@
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
     <span id="lastScan" style="font-size:10px;color:var(--slate-dim)"></span>
-    <div class="control-group">
-      <span class="control-label">TF</span>
-      <button class="pill" id="tf-M30" onclick="setScanTf('M30')">M30</button>
-      <button class="pill" id="tf-H1" onclick="setScanTf('H1')">H1</button>
-      <button class="pill active blue" id="tf-H4" onclick="setScanTf('H4')">H4</button>
-    </div>
     <button class="scan-btn" onclick="runScan()" id="scanBtn">
       <span id="scanIcon">↻</span> Scan Now
     </button>
-    <span id="scanTfLabel" style="font-size:10px;color:var(--slate-dim);"></span>
+    <span id="scanTfLabel" style="font-size:10px;color:var(--slate-dim);">Daily + 4H regime · 1H correction · 30M context</span>
   </div>
 </div>
 
 <div class="tab-nav">
-  <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner</button>
-  <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">📓 Journal</button>
-  <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">📊 Analytics</button>
-  <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">🧮 Calculator</button>
-  <button class="tab-btn" onclick="switchTab('bot')" id="tab-bot">🤖 Bot</button>
+  <button class="tab-btn active" onclick="switchTab('scanner')" id="tab-scanner">Scanner</button>
+  <button class="tab-btn" onclick="switchTab('validation')" id="tab-validation">Validation</button>
+  <button class="tab-btn" onclick="switchTab('journal')" id="tab-journal">Journal</button>
+  <button class="tab-btn" onclick="switchTab('analytics')" id="tab-analytics">Analytics</button>
+  <button class="tab-btn" onclick="switchTab('calculator')" id="tab-calculator">Calculator</button>
+  <button class="tab-btn" onclick="switchTab('bot')" id="tab-bot">Bot</button>
 </div>
 
 <div id="content-scanner" class="tab-content active">
 
 <div class="controls">
   <div class="control-group">
-    <span class="control-label">Min RR</span>
-    <button class="pill active gold" onclick="setRR(1.5)" id="rr-1.5">1.5:1</button>
-    <button class="pill" onclick="setRR(2)" id="rr-2">2:1</button>
-    <button class="pill" onclick="setRR(2.5)" id="rr-2.5">2.5:1</button>
-    <button class="pill" onclick="setRR(3)" id="rr-3">3:1</button>
+    <span class="control-label">Stage</span>
+    <button class="pill active" onclick="setStage('ALL')" id="stage-ALL">All</button>
+    <button class="pill" onclick="setStage('CORRECTION_IN_PROGRESS')" id="stage-CORRECTION_IN_PROGRESS">In progress</button>
+    <button class="pill" onclick="setStage('APPROACHING_LOCATION')" id="stage-APPROACHING_LOCATION">Approaching</button>
+    <button class="pill" onclick="setStage('AT_LOCATION')" id="stage-AT_LOCATION">At location</button>
+    <button class="pill" onclick="setStage('WAITING_FOR_RETEST')" id="stage-WAITING_FOR_RETEST">Waiting retest</button>
+    <button class="pill" onclick="setStage('TRIGGER_5M_OBSERVED')" id="stage-TRIGGER_5M_OBSERVED">5M trigger</button>
+    <button class="pill" onclick="setStage('WAITING_FOR_RETEST')" id="stage-WAITING_FOR_RETEST">Waiting retest</button>
+    <button class="pill" onclick="setStage('TREND_RESUMED')" id="stage-TREND_RESUMED">Resumed</button>
   </div>
   <div class="control-group">
     <button class="pill active" onclick="setDir('ALL')" id="dir-ALL">All</button>
-    <button class="pill" onclick="setDir('LONG')" id="dir-LONG">Long</button>
-    <button class="pill" onclick="setDir('SHORT')" id="dir-SHORT">Short</button>
+    <button class="pill" onclick="setDir('LONG')" id="dir-LONG">Bullish thesis</button>
+    <button class="pill" onclick="setDir('SHORT')" id="dir-SHORT">Bearish thesis</button>
   </div>
-  <div class="control-group">
-    <button class="pill active" onclick="setQuality('ALL')" id="q-ALL">All</button>
-    <button class="pill" onclick="setQuality('PREMIUM')" id="q-PREMIUM">Premium</button>
-    <button class="pill" onclick="setQuality('STRONG')" id="q-STRONG">Strong</button>
-    <button class="pill" onclick="setQuality('DEVELOPING')" id="q-DEVELOPING">Developing</button>
+  <label style="font-size:12px;color:var(--slate);display:flex;align-items:center;gap:6px;"><input id="locationOnly" type="checkbox" onchange="renderSetups()"> At/approaching location</label>
+  <label style="font-size:12px;color:var(--slate);">Zone timeframe <select id="zoneTimeframe" onchange="renderSetups()"><option value="ALL">All</option><option value="D">Daily</option><option value="H4">4H</option><option value="NONE">No zone</option></select></label>
+  <label style="font-size:12px;color:var(--slate);">Zone state <select id="zoneState" onchange="renderSetups()"><option value="ALL">All</option><option>IN_ZONE</option><option>APPROACHING</option><option>AWAY</option><option value="NONE">No zone</option></select></label>
+</div>
+
+<div class="challenge-guard" id="challengeGuard">
+  <div class="challenge-main">
+    <div>
+      <div class="challenge-kicker">Prop Firm Guard</div>
+      <div class="challenge-title" id="challenge-name">E8 Challenge</div>
+    </div>
+    <div class="challenge-actions">
+      <span class="challenge-status clear" id="challenge-status">Clear to trade</span>
+      <button class="challenge-link" onclick="editChallengeGuard()">Update</button>
+    </div>
+  </div>
+  <div class="challenge-metric">
+    <div class="challenge-metric-label">Balance</div>
+    <div class="challenge-metric-value" id="challenge-balance">—</div>
+    <div class="challenge-metric-sub" id="challenge-start">Start —</div>
+  </div>
+  <div class="challenge-metric">
+    <div class="challenge-metric-label">Target Left</div>
+    <div class="challenge-metric-value" id="challenge-target-left">—</div>
+    <div class="challenge-metric-sub" id="challenge-progress">— complete</div>
+  </div>
+  <div class="challenge-metric">
+    <div class="challenge-metric-label">Daily Room</div>
+    <div class="challenge-metric-value" id="challenge-daily-room">—</div>
+    <div class="challenge-metric-sub" id="challenge-daily-pnl">Daily P&L —</div>
+  </div>
+  <div class="challenge-metric">
+    <div class="challenge-metric-label">Drawdown Room</div>
+    <div class="challenge-metric-value" id="challenge-dd-room">—</div>
+    <div class="challenge-metric-sub" id="challenge-peak">Peak —</div>
   </div>
 </div>
 
 <div class="stats-bar">
-  <div class="stat-box"><div class="stat-value" id="s-total" style="color:var(--text)">—</div><div class="stat-label">Total</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-premium" style="color:var(--gold)">—</div><div class="stat-label">Premium</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-strong" style="color:var(--blue)">—</div><div class="stat-label">Strong</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-avgrr" style="color:var(--green)">—</div><div class="stat-label">Avg RR</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-long" style="color:var(--green)">—</div><div class="stat-label">Long</div></div>
-  <div class="stat-box"><div class="stat-value" id="s-short" style="color:var(--red)">—</div><div class="stat-label">Short</div></div>
+  <div class="stat-box"><div class="stat-label">Corrections</div><div class="stat-value" id="s-total" style="color:var(--text)">—</div></div>
+  <div class="stat-box"><div class="stat-label">At Location</div><div class="stat-value" id="s-premium" style="color:var(--gold)">—</div></div>
+  <div class="stat-box"><div class="stat-label">30M Shift</div><div class="stat-value" id="s-strong" style="color:var(--blue)">—</div></div>
+  <div class="stat-box"><div class="stat-label">Waiting Retest</div><div class="stat-value" id="s-avgrr" style="color:var(--green)">—</div></div>
+  <div class="stat-box"><div class="stat-label">Bullish Thesis</div><div class="stat-value" id="s-long" style="color:var(--green)">—</div></div>
+  <div class="stat-box"><div class="stat-label">Bearish Thesis</div><div class="stat-value" id="s-short" style="color:var(--red)">—</div></div>
 </div>
 
 <div class="filter-row">
-  <input class="search-box" type="text" placeholder="Search pair or pattern..." id="searchBox" oninput="renderSetups()" />
+  <input class="search-box" type="text" placeholder="Search pair, stage, location, or currency..." id="searchBox" oninput="renderSetups()" />
   <span id="resultCount" class="result-count"></span>
 </div>
 
 <div id="mainContent">
   <div class="empty-state" id="initState">
-    <div style="font-size:48px;opacity:0.4">📡</div>
-    <div style="color:var(--slate-dim);font-size:13px;">Hit Scan to fetch live OANDA data</div>
-    <div style="color:var(--slate-dim);font-size:11px;opacity:0.6;">Scanning 16 pairs across all sessions</div>
+    <div style="width:46px;height:46px;border-radius:8px;border:1px solid var(--border);background:var(--panel);"></div>
+    <div style="color:var(--slate-dim);font-size:13px;">Run a correction scan to fetch live OANDA data</div>
+    <div style="color:var(--slate-dim);font-size:11px;opacity:0.6;">Discovery only — never an entry signal</div>
   </div>
 </div>
 
@@ -319,13 +412,29 @@
 
 </div>
 
+<div id="content-validation" class="tab-content">
+  <div class="journal-page">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px;">
+      <div><div style="font-size:17px;font-weight:800;color:var(--text)">20-Setup Correction Validation</div><div style="font-size:11px;color:var(--slate-dim);margin-top:4px">Discovery precision and execution follow-through are tracked separately. No win rate is calculated.</div></div>
+      <button class="pill" onclick="loadValidations()">Refresh</button>
+    </div>
+    <div class="validation-grid">
+      <div class="stat-box" style="text-align:left"><div class="stat-label">Study progress</div><div class="stat-value" id="v-progress">0 / 20</div><div class="validation-progress"><div id="v-progress-bar" style="width:0%"></div></div></div>
+      <div class="stat-box" style="text-align:left"><div class="stat-label">Manual SMC agreement</div><div class="stat-value" id="v-agreement">—</div><div class="rr-sub" id="v-agreement-detail">0 reviewed</div></div>
+      <div class="stat-box" style="text-align:left"><div class="stat-label">Study status</div><div class="stat-value" id="v-status">0 complete</div><div class="rr-sub" id="v-open">0 open</div></div>
+      <div class="stat-box" style="text-align:left"><div class="stat-label">Follow-through</div><div class="stat-value" id="v-follow">0 shifts</div><div class="rr-sub" id="v-follow-detail">0 retests · 0 triggers</div></div>
+    </div>
+    <div id="validationList"><div class="empty-journal"><div>No corrections tracked yet</div><div style="font-size:11px">Use “Track validation” on a correction card.</div></div></div>
+  </div>
+</div>
+
 <div id="content-calculator" class="tab-content">
   <div class="journal-page">
     <div style="max-width:600px;margin:0 auto;">
 
       <div class="stat-box" style="text-align:left;padding:20px;margin-bottom:16px;">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px;">🧮 Position Size Calculator</div>
-        <div style="font-size:11px;color:var(--slate-dim);margin-bottom:16px;">💡 Tip: Click "Send to Bot" on any scanner card to auto-fill these values</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px;">Position Size Calculator</div>
+        <div style="font-size:11px;color:var(--slate-dim);margin-bottom:16px;">Click "Send to Bot" on any scanner card to auto-fill these values.</div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
           <div>
@@ -443,22 +552,22 @@
     <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <span style="font-size:11px;color:var(--slate-dim);">Show:</span>
       <button onclick="setAnalyticsFilter('all')" class="type-btn active-live" id="filter-all">All</button>
-      <button onclick="setAnalyticsFilter('live')" class="type-btn" id="filter-live">💰 Live Only</button>
-      <button onclick="setAnalyticsFilter('paper')" class="type-btn" id="filter-paper">📝 Paper Only</button>
+      <button onclick="setAnalyticsFilter('live')" class="type-btn" id="filter-live">Live Only</button>
+      <button onclick="setAnalyticsFilter('paper')" class="type-btn" id="filter-paper">Paper Only</button>
       <div style="margin-left:auto;">
-        <button onclick="resetAnalytics()" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,59,92,0.4);background:rgba(255,59,92,0.08);color:var(--red);font-family:inherit;cursor:pointer;">⚠ Reset All Data</button>
+        <button onclick="resetAnalytics()" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,59,92,0.4);background:rgba(255,59,92,0.08);color:var(--red);font-family:inherit;cursor:pointer;">Reset All Data</button>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--slate);cursor:pointer;">
         <input type="checkbox" id="excludeNewsRisk" onchange="reloadAnalytics()" style="accent-color:#fbbf24;width:14px;height:14px;">
-        <span>Exclude ⚠️ news-risk trades from analytics</span>
+        <span>Exclude news-risk trades from analytics</span>
       </label>
     </div>
 
     <!-- Equity Curve -->
     <div class="stat-box" style="text-align:left;padding:16px;margin-bottom:16px;">
-      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">📈 Equity Curve (Cumulative R)</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">Equity Curve (Cumulative R)</div>
       <div id="equity-curve-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;"></div>
       <div id="equity-curve-wrap">
         <div id="equity-curve-placeholder" style="color:var(--slate-dim);font-size:12px;padding:32px 0;text-align:center;">Need at least 2 closed trades to render equity curve</div>
@@ -478,33 +587,33 @@
     <!-- Pattern Breakdown -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
       <div class="stat-box" style="text-align:left;padding:16px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">📊 Pattern Breakdown</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">Pattern Breakdown</div>
         <div id="a-patterns"></div>
       </div>
 
       <!-- Timeframe Breakdown -->
       <div class="stat-box" style="text-align:left;padding:16px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">⏱ Timeframe Breakdown</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">Timeframe Breakdown</div>
         <div id="a-timeframes"></div>
       </div>
     </div>
 
     <!-- Pair Breakdown -->
     <div class="stat-box" style="text-align:left;padding:16px;margin-bottom:16px;">
-      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">💱 Pair Breakdown</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">Pair Breakdown</div>
       <div id="a-pairs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;"></div>
     </div>
 
     <!-- Direction Breakdown -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div class="stat-box" style="text-align:left;padding:16px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">📈 Direction Breakdown</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">Direction Breakdown</div>
         <div id="a-directions"></div>
       </div>
 
       <!-- Session Breakdown -->
       <div class="stat-box" style="text-align:left;padding:16px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">🕐 Session Breakdown</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">Session Breakdown</div>
         <div id="a-sessions"></div>
       </div>
     </div>
@@ -515,10 +624,10 @@
 <div id="content-journal" class="tab-content">
   <div class="journal-page">
     <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
-      <button onclick="setJournalView('active')" id="journal-active-btn" class="type-btn active-live">📋 Active</button>
-      <button onclick="setJournalView('completed')" id="journal-completed-btn" class="type-btn">✅ Completed</button>
-      <button onclick="setJournalView('all')" id="journal-all-btn" class="type-btn">📊 All</button>
-      <button onclick="exportJournalCSV()" style="margin-left:auto;padding:6px 14px;border-radius:8px;border:1px solid rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);color:var(--green);font-size:11px;font-family:inherit;cursor:pointer;font-weight:600;">📥 Export CSV</button>
+      <button onclick="setJournalView('active')" id="journal-active-btn" class="type-btn active-live">Active</button>
+      <button onclick="setJournalView('completed')" id="journal-completed-btn" class="type-btn">Completed</button>
+      <button onclick="setJournalView('all')" id="journal-all-btn" class="type-btn">All</button>
+      <button onclick="exportJournalCSV()" style="margin-left:auto;padding:6px 14px;border-radius:8px;border:1px solid rgba(0,255,136,0.3);background:rgba(0,255,136,0.06);color:var(--green);font-size:11px;font-family:inherit;cursor:pointer;font-weight:600;">Export CSV</button>
     </div>
     <div class="journal-stats">
       <div class="stat-box"><div class="stat-value" id="j-total" style="color:var(--text)">—</div><div class="stat-label">Total</div></div>
@@ -539,7 +648,7 @@
     </div>
     <div id="journalList" class="journal-list">
       <div class="empty-journal">
-        <div style="font-size:32px;opacity:0.3">📓</div>
+        <div style="width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--panel);"></div>
         <div>No journal entries yet</div>
         <div style="font-size:11px;">Push setups from the Scanner tab to start tracking</div>
       </div>
@@ -548,9 +657,14 @@
 </div>
 
 <script>
-  let allSetups = [], allNearMisses = [], minRR = 1.5, dir = 'ALL', quality = 'ALL', scanning = false;
+  let allSetups = [], allNearMisses = [], dir = 'ALL', correctionStage = 'ALL', scanning = false;
+  let latestTerminalScanTime = null;
+  let knownSetupIds = new Set();
+  let setupAlertsEnabled = localStorage.getItem('forexSetupAlerts') === 'on';
+  let setupAlertsInitialized = false;
   let autoRefreshTimer = null;
   let nearMissOpen = false;
+  const SHOW_FOREX_AUDIT = false;
 
   const PAIRS = ['XAG_USD','XAU_USD','GBP_JPY','NZD_USD','AUD_USD','AUD_JPY','USD_JPY','GBP_USD','EUR_USD'];
   const PAIR_LABELS = { XAG_USD:'XAG/USD', XAU_USD:'XAU/USD', GBP_JPY:'GBP/JPY', NZD_USD:'NZD/USD', AUD_USD:'AUD/USD', AUD_JPY:'AUD/JPY', USD_JPY:'USD/JPY', GBP_USD:'GBP/USD', EUR_USD:'EUR/USD' };
@@ -872,34 +986,16 @@
 
   async function fetchLatestSetups() {
     try {
-      const [setupsRes, nmRes] = await Promise.all([
-        fetch('/api/setups'),
-        fetch('/api/near-misses'),
-      ]);
-      if (!setupsRes.ok) return;
-      const data = await setupsRes.json();
-      if (!data.setups || data.setups.length === 0) return;
-      // Normalize server Setup objects to match client-side shape
-      allSetups = data.setups.map((s, i) => {
-        const sym = s.symbol || s.pair;
-        const entry = s.entry;
-        const sl = s.sl || s.stopLoss;
-        const risk = sl ? Math.abs(entry - sl) : 0;
-        return {
-          ...s,
-          id:            s.id || `${sym}-${s.timeframe}-server-${i}`,
-          symbol:        sym,
-          displaySymbol: s.displaySymbol || (PAIR_LABELS[sym] || sym.replace('_', '/')),
-          currentPrice:  s.currentPrice || entry,
-          sl:            sl,
-          confluences:   s.confluences || s.confluence || [],
-          rr2:           s.rr2 || (risk > 0 ? parseFloat((Math.abs(s.tp2 - entry) / risk).toFixed(1)) : 0),
-          rr3:           s.rr3 || (risk > 0 ? parseFloat((Math.abs(s.tp3 - entry) / risk).toFixed(1)) : 0),
-        };
-      });
-      allNearMisses = nmRes.ok ? await nmRes.json() : [];
-      document.getElementById('lastScan').textContent =
-        `Auto scan: ${new Date(data.lastScanTime).toLocaleTimeString()}`;
+      const response = await fetch('/api/corrections');
+      if (response.status === 404) return;
+      if (!response.ok) throw new Error('Correction feed unavailable');
+      const data = await response.json();
+      allSetups = data.candidates || [];
+      allNearMisses = data.otherRegimes || [];
+      latestTerminalScanTime = data.generatedAt || null;
+      document.getElementById('lastScan').textContent = latestTerminalScanTime
+        ? `Correction scan: ${new Date(latestTerminalScanTime).toLocaleTimeString()}`
+        : 'No correction scan yet';
       renderSetups();
       renderNearMisses();
     } catch(e) {
@@ -907,53 +1003,118 @@
     }
   }
 
+  function setupNotificationTitle(setup) {
+    return `${setup.displaySymbol} ${setup.direction} ${setup.timeframe}`;
+  }
+
+  function setupNotificationBody(setup) {
+    return `${setup.quality} · ${setup.pattern} · R:R ${setup.rrRatio}:1 · Entry ${fmt(setup.entry, setup.symbol)}`;
+  }
+
+  function playSetupAlertTone() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.38);
+    } catch(e) {
+      console.warn('Alert tone unavailable:', e.message);
+    }
+  }
+
+  function updateAlertToggle() {
+    const btn = document.getElementById('alertToggle');
+    if (!btn) return;
+    const blocked = 'Notification' in window && Notification.permission === 'denied';
+    btn.className = 'alert-toggle' + (blocked ? ' blocked' : setupAlertsEnabled ? ' on' : '');
+    btn.textContent = blocked ? 'Alerts Blocked' : setupAlertsEnabled ? 'Alerts On' : 'Alerts Off';
+  }
+
+  async function toggleSetupAlerts() {
+    if (!('Notification' in window)) {
+      setupAlertsEnabled = !setupAlertsEnabled;
+      localStorage.setItem('forexSetupAlerts', setupAlertsEnabled ? 'on' : 'off');
+      updateAlertToggle();
+      return;
+    }
+    if (!setupAlertsEnabled && Notification.permission === 'default') {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        setupAlertsEnabled = false;
+        localStorage.setItem('forexSetupAlerts', 'off');
+        updateAlertToggle();
+        return;
+      }
+    }
+    if (Notification.permission === 'denied') {
+      setupAlertsEnabled = false;
+      localStorage.setItem('forexSetupAlerts', 'off');
+      updateAlertToggle();
+      return;
+    }
+    setupAlertsEnabled = !setupAlertsEnabled;
+    localStorage.setItem('forexSetupAlerts', setupAlertsEnabled ? 'on' : 'off');
+    if (setupAlertsEnabled) playSetupAlertTone();
+    updateAlertToggle();
+  }
+
+  function notifyForNewSetups(nextSetups) {
+    const nextIds = new Set(nextSetups.map(s => s.id));
+    const newSetups = nextSetups.filter(s => !knownSetupIds.has(s.id));
+    if (setupAlertsInitialized && setupAlertsEnabled && newSetups.length) {
+      for (const setup of newSetups) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(setupNotificationTitle(setup), {
+            body: setupNotificationBody(setup),
+            tag: setup.id,
+            requireInteraction: true,
+          });
+        }
+      }
+      playSetupAlertTone();
+      document.title = `(${newSetups.length}) New Forex Setup`;
+    } else if (!newSetups.length) {
+      document.title = 'Kairos Forex Command Center';
+    }
+    knownSetupIds = nextIds;
+    setupAlertsInitialized = true;
+  }
+
   function isLondonOrNYOpen() {
     const h = new Date().getUTCHours();
     return (h >= 8 && h < 12) || (h >= 13 && h < 15);
   }
 
-  let selectedScanTf = 'H4';
-
-  function setScanTf(tf) {
-    selectedScanTf = tf;
-    ['M30','H1','H4'].forEach(t => {
-      const el = document.getElementById('tf-' + t);
-      if (el) { el.className = 'pill' + (t === tf ? ' active blue' : ''); }
-    });
-  }
-
-  function updateScanTfLabel() {
-    const el = document.getElementById('scanTfLabel');
-    if (el) el.textContent = `Scanning ${selectedScanTf}`;
-  }
+  function updateScanTfLabel() {}
 
   async function runScan() {
     if(scanning) return;
     scanning=true; updateScanBtn(true); showLoading(); updateScanTfLabel();
-    const tfsToScan = [selectedScanTf];
-    const results=[];
-    for(const gran of tfsToScan){
-      const htfGran = HTF_MAP[gran] || 'D';
-      for(const pair of PAIRS){
-        try{
-          const [c,h]=await Promise.all([fetchCandles(pair,gran,250),fetchCandles(pair,htfGran,100)]);
-          const s=analyzeCandles(c,h,pair);
-          if(s) results.push(s);
-        }catch(e){console.error(`Skip ${pair} ${gran}:`,e.message);}
-      }
-    }
-    const ord={PREMIUM:0,STRONG:1,DEVELOPING:2};
-    results.sort((a,b)=>ord[a.quality]-ord[b.quality]||b.rrRatio-a.rrRatio);
-    allSetups=results; scanning=false; updateScanBtn(false);
-    document.getElementById('lastScan').textContent=`Last scan: ${new Date().toLocaleTimeString()}`;
-    // Trigger backend scan (uses journal-weighted scoring) then fetch near-misses
     try {
-      await fetch(`/api/scan?tf=${selectedScanTf}`, { method: 'POST' });
-      const nmRes = await fetch('/api/near-misses');
-      allNearMisses = nmRes.ok ? await nmRes.json() : [];
-    } catch(e) { console.warn('Backend scan failed:', e); }
-    renderSetups();
-    renderNearMisses();
+      const res = await fetch('/api/corrections/scan', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Backend scan failed' }));
+        throw new Error(err.error || 'Backend scan failed');
+      }
+      await fetchLatestSetups();
+    } catch(e) {
+      console.warn('Terminal scan failed:', e);
+      document.getElementById('mainContent').innerHTML =
+        `<div class="empty-state"><div style="width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--panel);"></div><div>Terminal scan failed</div><div style="font-size:11px;opacity:0.6;">${String(e.message || e)}</div></div>`;
+    } finally {
+      scanning=false;
+      updateScanBtn(false);
+    }
   }
 
   function getFiltered() {
@@ -977,9 +1138,15 @@
     document.getElementById('s-long').textContent=all.filter(s=>s.direction==='LONG').length||'—';
     document.getElementById('s-short').textContent=all.filter(s=>s.direction==='SHORT').length||'—';
     const main=document.getElementById('mainContent');
-    if(!all.length){main.innerHTML='<div class="empty-state"><div style="font-size:48px;opacity:0.4">📡</div><div>Hit Scan to fetch live OANDA data</div><div style="font-size:11px;opacity:0.6;">Scanning 16 pairs across all sessions</div></div>';document.getElementById('resultCount').textContent='';return;}
+    if(!all.length){
+      const title = latestTerminalScanTime ? 'No approved forex setups right now' : 'Run a terminal scan to fetch live OANDA data';
+      const sub = latestTerminalScanTime ? 'The terminal scan ran cleanly. Rejected setups remain in the background audit.' : 'Scanning 16 pairs across all sessions';
+      main.innerHTML=`<div class="empty-state"><div style="width:46px;height:46px;border-radius:8px;border:1px solid var(--border);background:var(--panel);"></div><div>${title}</div><div style="font-size:11px;opacity:0.6;">${sub}</div></div>`;
+      document.getElementById('resultCount').textContent='';
+      return;
+    }
     document.getElementById('resultCount').innerHTML=`Showing <span>${filtered.length}</span> setup${filtered.length!==1?'s':''} · min ${minRR}:1 RR`;
-    if(!filtered.length){main.innerHTML='<div class="empty-state"><div style="font-size:32px;opacity:0.3">🔍</div><div>No setups match your filters</div></div>';return;}
+    if(!filtered.length){main.innerHTML='<div class="empty-state"><div style="width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--panel);"></div><div>No setups match your filters</div></div>';return;}
     main.innerHTML='<div class="setup-grid">'+filtered.map(s => renderCard(s, allSetups.indexOf(s))).join('')+'</div>';
   }
 
@@ -994,11 +1161,11 @@
           <div>
             <div class="symbol">${s.displaySymbol}</div>
             <div class="badges">
-              <span class="badge ${qc}">${s.quality==='PREMIUM'?'⭐':'⚡'} ${s.quality}</span>
+              <span class="badge ${qc}">${s.quality}</span>
               <span class="badge ${isL?'long':'short'}">${s.direction}</span>
               <span class="badge tf">${s.timeframe}</span>
               ${s.session?`<span class="badge session">${s.session}</span>`:''}
-              ${s.newsRisk?`<span class="news-risk-pill">⚠️ NEWS RISK</span>`:''}
+              ${s.newsRisk?`<span class="news-risk-pill">NEWS RISK</span>`:''}
             </div>
             <div class="pattern-name">${s.pattern}</div>
           </div>
@@ -1023,30 +1190,30 @@
         return `<div class="checklist" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);">
           <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-dim);margin-bottom:8px;">Conditions Met</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-            ${ci(c.trendConfirmed?'pass':'fail',c.trendConfirmed?'✅':'❌','Trend confirmed')}
-            ${ci(c.emaSlope?'pass':'fail',c.emaSlope?'✅':'❌','EMA slope')}
-            ${ci(c.pullbackToEMA?'pass':'fail',c.pullbackToEMA?'✅':'❌','Pullback to EMA')}
-            ${ci(c.momentumCandle?'pass':'fail',c.momentumCandle?'✅':'❌','Momentum candle')}
-            ${ci(c.rsiInZone?'pass':'fail',c.rsiInZone?'✅':'❌','RSI in zone')}
-            ${ci(c.htfAligned?'pass':'fail',c.htfAligned?'✅':'❌','HTF aligned')}
-            ${ci(c.notSandwiched?'pass':'fail',c.notSandwiched?'✅':'❌','Not sandwiched')}
-            ${ci(c.minRR?'pass':'fail',c.minRR?'✅':'❌','Min 2.0 R:R')}
-            ${ci(c.impulseStrong!==false?'pass':'fail',c.impulseStrong!==false?'✅':'❌','Strong impulse leg')}
-            ${ci(c.structureClearance!==false?'pass':'fail',c.structureClearance!==false?'✅':'❌','Structure clearance')}
-            ${ci(c.tp1Fresh!==false?'pass':'fail',c.tp1Fresh!==false?'✅':'❌','TP1 fresh level')}
-            ${ci(c.volumeSurge?'bonus':'inactive',c.volumeSurge?'⭐':'○','Volume surge')}
-            ${ci(c.liquiditySweep?'bonus':'inactive',c.liquiditySweep?'⭐':'○','Liquidity sweep')}
-            ${ci(c.pdhlConfluence?'bonus':'inactive',c.pdhlConfluence?'⭐':'○','PDH/PDL level')}
-            ${ci(c.goodSession?'bonus':'inactive',c.goodSession?'⭐':'○','Good session')}
-            ${ci(c.historicalEdge?'bonus':'inactive',c.historicalEdge?'⭐':'○','Historical edge')}
+            ${ci(c.trendConfirmed?'pass':'fail',c.trendConfirmed?'Pass':'Miss','Trend confirmed')}
+            ${ci(c.bosConfirmed?'pass':'fail',c.bosConfirmed?'Pass':'Miss','BOS confirmed')}
+            ${ci(c.pullbackToOB?'pass':'fail',c.pullbackToOB?'Pass':'Miss','Pullback to OB')}
+            ${ci(c.momentumCandle?'pass':'fail',c.momentumCandle?'Pass':'Miss','Momentum candle')}
+            ${ci(c.rsiInZone?'pass':'fail',c.rsiInZone?'Pass':'Miss','RSI in zone')}
+            ${ci(c.htfAligned?'pass':'fail',c.htfAligned?'Pass':'Miss','HTF aligned')}
+            ${ci(c.notSandwiched?'pass':'fail',c.notSandwiched?'Pass':'Miss','Not sandwiched')}
+            ${ci(c.minRR?'pass':'fail',c.minRR?'Pass':'Miss',`Min ${minRR}:1 R:R`)}
+            ${ci(c.impulseStrong!==false?'pass':'fail',c.impulseStrong!==false?'Pass':'Miss','Strong impulse leg')}
+            ${ci(c.structureClearance!==false?'pass':'fail',c.structureClearance!==false?'Pass':'Miss','Structure clearance')}
+            ${ci(c.tp1Fresh!==false?'pass':'fail',c.tp1Fresh!==false?'Pass':'Miss','TP1 fresh level')}
+            ${ci(c.volumeSurge?'bonus':'inactive',c.volumeSurge?'Bonus':'Idle','Volume surge')}
+            ${ci(c.liquiditySweep?'bonus':'inactive',c.liquiditySweep?'Bonus':'Idle','Liquidity sweep')}
+            ${ci(c.pdhlConfluence?'bonus':'inactive',c.pdhlConfluence?'Bonus':'Idle','PDH/PDL level')}
+            ${ci(c.goodSession?'bonus':'inactive',c.goodSession?'Bonus':'Idle','Good session')}
+            ${ci(c.historicalEdge?'bonus':'inactive',c.historicalEdge?'Bonus':'Idle','Historical edge')}
           </div>
         </div>`;
       })()}
       <div class="scanned-at">Scanned: ${new Date(s.scannedAt).toLocaleTimeString()} · Live data via Oanda v20 API</div>
       <div class="card-actions">
-        <button class="push-btn" onclick="pushToJournal('${s.id}')" id="push-${s.id}">📓 Push to Journal</button>
-        <button class="send-bot-btn" onclick="sendToBot(this,${idx})">🤖 Send to Bot</button>
-        <button class="push-btn" onclick="fillCalculator(${idx})" style="border-color:rgba(148,163,184,0.3);background:rgba(148,163,184,0.05);color:var(--slate);">📊 Calculate</button>
+        <button class="push-btn" onclick="pushToJournal('${s.id}')" id="push-${s.id}">Push to Journal</button>
+        <button class="send-bot-btn" onclick="sendToBot(this,${idx})">Send to Bot</button>
+        <button class="push-btn" onclick="fillCalculator(${idx})" style="border-color:rgba(148,163,184,0.3);background:rgba(148,163,184,0.05);color:var(--slate);">Calculate</button>
       </div>
       <div class="journal-panel" id="journal-${s.id}" style="display:none;">
         <div class="outcome-row">
@@ -1092,6 +1259,7 @@
 
   function renderNearMisses() {
     const container = document.getElementById('nearMissContent');
+    if (!SHOW_FOREX_AUDIT) { if (container) container.innerHTML = ''; return; }
     if (!container || !allNearMisses.length) { if (container) container.innerHTML = ''; return; }
     const fmt = (n, pair) => n == null ? '—' : (pair && (pair.includes('JPY')||pair.includes('XAU')||pair.includes('XAG')) ? Number(n).toFixed(3) : Number(n).toFixed(5));
     const chk = (pass, label) => `<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:${pass?'var(--green)':'var(--red)'}">
@@ -1166,13 +1334,14 @@
   function setDir(v){dir=v;document.querySelectorAll('[id^="dir-"]').forEach(b=>b.classList.remove('active','green','red'));const b=document.getElementById('dir-'+v);b.classList.add('active');if(v==='LONG')b.classList.add('green');if(v==='SHORT')b.classList.add('red');renderSetups();}
   function setQuality(v){quality=v;document.querySelectorAll('[id^="q-"]').forEach(b=>b.classList.remove('active','gold','blue'));const b=document.getElementById('q-'+v);b.classList.add('active');if(v==='PREMIUM')b.classList.add('gold');if(v==='STRONG')b.classList.add('blue');renderSetups();}
   function updateScanBtn(loading){const btn=document.getElementById('scanBtn');const icon=document.getElementById('scanIcon');btn.disabled=loading;icon.className=loading?'spin':'';btn.childNodes[1].textContent=loading?' Scanning...':' Scan';}
-  function showLoading(){document.getElementById('mainContent').innerHTML='<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Fetching live OANDA data · 9 pairs</div></div></div>';document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
+  function showLoading(){document.getElementById('mainContent').innerHTML='<div class="loading-state"><div class="loading-ring"></div><div><div class="loading-text">SCANNING FOREX MARKETS...</div><div class="loading-sub">Terminal scan · clean dashboard candidates only</div></div></div>';document.getElementById('resultCount').textContent='';['s-total','s-premium','s-strong','s-avgrr','s-long','s-short'].forEach(id=>{document.getElementById(id).textContent='—';});}
 
   const journalMap = {};
   let journalEntries = [];
   let _journalEntries = [];
   let jFilter = 'ALL';
   let journalView = 'active';
+  let correctionValidations = [];
 
   async function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1180,6 +1349,7 @@
     document.getElementById('tab-' + tab).classList.add('active');
     document.getElementById('content-' + tab).classList.add('active');
     if (tab === 'journal') await loadJournal();
+    if (tab === 'validation') await loadValidations();
     if (tab === 'analytics') await loadAnalytics();
     if (tab === 'calculator') { document.getElementById('calc-account').value = '25308'; calcPosition(); }
     clearInterval(autoRefreshTimer);
@@ -1561,7 +1731,7 @@
 
     const list = document.getElementById('journalList');
     if (!filtered.length) {
-      list.innerHTML = '<div class="empty-journal"><div style="font-size:32px;opacity:0.3">📓</div><div>No entries found</div></div>';
+      list.innerHTML = '<div class="empty-journal"><div style="width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--panel);"></div><div>No entries found</div></div>';
       return;
     }
 
@@ -1572,7 +1742,7 @@
       const fmtP = (n) => n ? (isJpy(e.symbol) ? parseFloat(n).toFixed(3) : parseFloat(n).toFixed(5)) : '—';
       const pnlVal = parseFloat(e.pnl);
       const pnlHtml = e.pnl ? `<span class="journal-pnl ${pnlVal >= 0 ? 'positive' : 'negative'}">${pnlVal >= 0 ? '+' : ''}$${Math.abs(pnlVal || 0).toFixed(2)}</span>` : '';
-      const notesHtml = e.notes ? `<div class="journal-notes-text">📝 ${e.notes}</div>` : '';
+      const notesHtml = e.notes ? `<div class="journal-notes-text">${e.notes}</div>` : '';
       const date = new Date(e.pushedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
       return `<div class="journal-card ${outcome}">
@@ -1584,7 +1754,7 @@
               <span class="badge ${isLong ? 'long' : 'short'}">${e.direction}</span>
               <span class="badge tf">${e.timeframe}</span>
               <span class="badge ${(e.quality || '').toLowerCase()}">${e.quality}</span>
-              ${e.newsRisk ? `<span class="news-risk-pill">⚠️ NEWS RISK</span>` : ''}
+              ${e.newsRisk ? `<span class="news-risk-pill">NEWS RISK</span>` : ''}
             </div>
             <div class="pattern-name">${e.pattern}</div>
           </div>
@@ -1600,8 +1770,8 @@
         </div>
         <div style="margin-bottom:8px;">
           <span style="font-size:10px;color:var(--slate-dim);text-transform:uppercase;letter-spacing:.08em;">Type:</span>
-          <button onclick="setTradeType(this,${e.id},'live')" class="type-btn ${e.tradeType==='live'?'active-live':''}" style="margin-left:6px;">💰 Live</button>
-          <button onclick="setTradeType(this,${e.id},'paper')" class="type-btn ${e.tradeType==='paper'?'active-paper':''}" style="margin-left:4px;">📝 Paper</button>
+          <button onclick="setTradeType(this,${e.id},'live')" class="type-btn ${e.tradeType==='live'?'active-live':''}" style="margin-left:6px;">Live</button>
+          <button onclick="setTradeType(this,${e.id},'paper')" class="type-btn ${e.tradeType==='paper'?'active-paper':''}" style="margin-left:4px;">Paper</button>
         </div>
         <div class="journal-outcome-row">
           <span class="outcome-label">Outcome:</span>
@@ -1609,8 +1779,8 @@
           <button class="outcome-btn loss ${outcome === 'loss' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'LOSS')">LOSS</button>
           <button class="outcome-btn be ${outcome === 'breakeven' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'BREAKEVEN')">BE</button>
           <button class="outcome-btn pending ${outcome === 'pending' ? 'active-outcome' : ''}" onclick="updateJournalOutcome(${e.id},'PENDING')">PENDING</button>
-          <button class="journal-edit-btn" onclick="toggleJournalEdit(${e.id})">✏️ Edit</button>
-          <button class="journal-edit-btn" onclick="deleteJournalCard(${e.id})">🗑 Delete</button>
+          <button class="journal-edit-btn" onclick="toggleJournalEdit(${e.id})">Edit</button>
+          <button class="journal-edit-btn" onclick="deleteJournalCard(${e.id})">Delete</button>
         </div>
         <div class="journal-edit-panel" id="jedit-${e.id}" style="display:none;">
           <div class="pnl-row">
@@ -1708,6 +1878,8 @@
   async function pushToJournal(setupId) {
     const setup = allSetups.find(s => s.id === setupId);
     if (!setup) return;
+    const btn = document.getElementById('push-' + setupId);
+    if (btn) btn.textContent = 'Saving...';
     try {
       const res = await fetch('/api/journal', {
         method: 'POST',
@@ -1733,14 +1905,17 @@
         }),
       });
       const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Journal save failed');
       if (data.success) {
         journalMap[setupId] = data.id;
-        const btn = document.getElementById('push-' + setupId);
         if (btn) { btn.textContent = '✓ Journaled'; btn.classList.add('pushed'); }
         const panel = document.getElementById('journal-' + setupId);
         if (panel) panel.style.display = 'flex';
       }
-    } catch(e) { console.error('Push failed:', e); }
+    } catch(e) {
+      if (btn) btn.textContent = 'Journal failed';
+      console.error('Push failed:', e);
+    }
   }
 
   async function setOutcome(setupId, outcome) {
@@ -1841,7 +2016,8 @@
   }
 
   function updateHeaderChallenge(balance) {
-    const start = 25233.27, target = 26747.27;
+    const cfg = loadChallengeGuard();
+    const start = cfg.startBalance, target = cfg.targetBalance;
     const pct = Math.max(0, Math.min(100, ((balance - start) / (target - start)) * 100));
     const bar = document.getElementById('header-progress-bar');
     const text = document.getElementById('header-progress-text');
@@ -1849,9 +2025,321 @@
     if (text) text.textContent = pct.toFixed(1) + '% to pass';
   }
 
+  const CHALLENGE_GUARD_DEFAULTS = {
+    version: 'fundednext-stellar-15k-1step-20260823',
+    name: 'FundedNext Stellar 15k',
+    startBalance: 15000,
+    targetBalance: 16500,
+    currentBalance: 14833.75,
+    peakBalance: 15000,
+    dailyPnl: 0,
+    maxDailyLoss: 450,
+    maxDrawdown: 900,
+  };
+
+  function money(n) {
+    const value = Number(n);
+    if (!Number.isFinite(value)) return '—';
+    const sign = value < 0 ? '-' : '';
+    return `${sign}$${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function loadChallengeGuard() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('forexChallengeGuard') || '{}');
+      const legacyDefault =
+        saved.name === 'E8 Challenge' &&
+        Number(saved.startBalance) === 25233.27 &&
+        Number(saved.targetBalance) === 26747.27;
+      if (legacyDefault || saved.version !== CHALLENGE_GUARD_DEFAULTS.version) {
+        return { ...CHALLENGE_GUARD_DEFAULTS };
+      }
+      return { ...CHALLENGE_GUARD_DEFAULTS, ...saved };
+    } catch {
+      return { ...CHALLENGE_GUARD_DEFAULTS };
+    }
+  }
+
+  function saveChallengeGuard(next) {
+    localStorage.setItem('forexChallengeGuard', JSON.stringify(next));
+  }
+
+  function challengeStatus(cfg) {
+    const dailyRoom = cfg.maxDailyLoss + Math.min(0, cfg.dailyPnl);
+    const drawdownUsed = Math.max(0, cfg.peakBalance - cfg.currentBalance);
+    const drawdownRoom = cfg.maxDrawdown - drawdownUsed;
+    if (dailyRoom <= 0 || drawdownRoom <= 0) return { label: 'Stop trading', cls: 'locked', dailyRoom, drawdownRoom };
+    if (dailyRoom <= cfg.maxDailyLoss * 0.35 || drawdownRoom <= cfg.maxDrawdown * 0.35) return { label: 'Caution', cls: 'caution', dailyRoom, drawdownRoom };
+    return { label: 'Clear to trade', cls: 'clear', dailyRoom, drawdownRoom };
+  }
+
+  function renderChallengeGuard(overrides = {}) {
+    const cfg = { ...loadChallengeGuard(), ...overrides };
+    cfg.peakBalance = Math.max(cfg.peakBalance, cfg.currentBalance);
+    saveChallengeGuard(cfg);
+
+    const status = challengeStatus(cfg);
+    const targetLeft = Math.max(0, cfg.targetBalance - cfg.currentBalance);
+    const progress = Math.max(0, Math.min(100, ((cfg.currentBalance - cfg.startBalance) / (cfg.targetBalance - cfg.startBalance)) * 100));
+
+    document.getElementById('challenge-name').textContent = cfg.name;
+    document.getElementById('challenge-balance').textContent = money(cfg.currentBalance);
+    document.getElementById('challenge-start').textContent = `Start ${money(cfg.startBalance)}`;
+    document.getElementById('challenge-target-left').textContent = money(targetLeft);
+    document.getElementById('challenge-progress').textContent = `${progress.toFixed(1)}% complete`;
+    document.getElementById('challenge-daily-room').textContent = money(status.dailyRoom);
+    document.getElementById('challenge-daily-pnl').textContent = `Daily P&L ${money(cfg.dailyPnl)}`;
+    document.getElementById('challenge-dd-room').textContent = money(status.drawdownRoom);
+    document.getElementById('challenge-peak').textContent = `Peak ${money(cfg.peakBalance)}`;
+
+    const badge = document.getElementById('challenge-status');
+    badge.textContent = status.label;
+    badge.className = `challenge-status ${status.cls}`;
+    updateHeaderChallenge(cfg.currentBalance);
+  }
+
+  window.editChallengeGuard = function() {
+    const cfg = loadChallengeGuard();
+    const currentBalance = Number(prompt('Current challenge balance', String(cfg.currentBalance)));
+    if (!Number.isFinite(currentBalance)) return;
+    const dailyPnl = Number(prompt('Today’s realized/unrealized P&L', String(cfg.dailyPnl)));
+    if (!Number.isFinite(dailyPnl)) return;
+    const peakBalance = Number(prompt('Peak balance for drawdown tracking', String(Math.max(cfg.peakBalance, currentBalance))));
+    if (!Number.isFinite(peakBalance)) return;
+    renderChallengeGuard({ currentBalance, dailyPnl, peakBalance });
+  };
+
   // Populate scanner immediately on page load, then refresh every 15 min
   updateScanTfLabel();
-  fetchLatestSetups();
+  updateAlertToggle();
+  function setStage(value) {
+    correctionStage = value;
+    document.querySelectorAll('[id^="stage-"]').forEach(button => button.classList.remove('active','blue'));
+    const button = document.getElementById('stage-' + value);
+    if (button) button.classList.add('active','blue');
+    renderSetups();
+  }
+
+  function getFiltered() {
+    const search = (document.getElementById('searchBox').value || '').toLowerCase();
+    const locationOnly = document.getElementById('locationOnly')?.checked;
+    const zoneTimeframe = document.getElementById('zoneTimeframe')?.value || 'ALL';
+    const zoneState = document.getElementById('zoneState')?.value || 'ALL';
+    return allSetups.filter(candidate => {
+      if (dir !== 'ALL' && candidate.thesisDirection !== dir) return false;
+      if (correctionStage !== 'ALL' && candidate.stage !== correctionStage) return false;
+      if (locationOnly && !candidate.location.atLocation && !candidate.location.approaching) return false;
+      if (zoneTimeframe !== 'ALL' && (zoneTimeframe === 'NONE' ? candidate.location.zone : candidate.location.zone?.timeframe !== zoneTimeframe)) return false;
+      if (zoneState !== 'ALL' && (zoneState === 'NONE' ? candidate.location.zone : candidate.location.zone?.state !== zoneState)) return false;
+      const haystack = [candidate.pair, candidate.stage, candidate.location.zone?.timeframe, candidate.location.zone?.state, candidate.location.zone?.type, ...(candidate.location.labels || []), ...(candidate.exposure || [])].join(' ').toLowerCase();
+      return !search || haystack.includes(search);
+    });
+  }
+
+  function stageLabel(stage) {
+    return ({
+      CORRECTION_IN_PROGRESS: 'CORRECTION IN PROGRESS',
+      APPROACHING_LOCATION: 'APPROACHING LOCATION',
+      AT_LOCATION: 'AT LOCATION',
+      SHIFT_30M_DETECTED: '30M SHIFT DETECTED',
+      WAITING_FOR_RETEST: 'WAITING FOR RETEST',
+      TRIGGER_5M_OBSERVED: '5M TRIGGER OBSERVED',
+      TREND_RESUMED: 'TREND RESUMED',
+      INVALIDATED: 'INVALIDATED',
+    })[stage] || stage;
+  }
+
+  function lifecycleNext(candidate) {
+    const lifecycle = candidate.lifecycle || {};
+    if (candidate.stage === 'INVALIDATED') return 'Thesis invalidated by completed structural candle';
+    if (candidate.stage === 'TREND_RESUMED') return 'Lower timeframes realigned with the Daily thesis';
+    if (candidate.stage === 'TRIGGER_5M_OBSERVED') return '5M trigger observed — watching for timeframe realignment';
+    if (lifecycle.retestTimestamp) return 'Retest seen — waiting for fresh 5M structural trigger';
+    if (lifecycle.shiftTimestamp) return `Shift detected — waiting for retest near ${fmt(lifecycle.shiftLevel, candidate.pair)}`;
+    if (candidate.stage === 'AT_LOCATION') return 'At location — waiting for fresh 30M shift';
+    if (candidate.stage === 'APPROACHING_LOCATION') return 'Approaching location — waiting for price to reach it';
+    return 'Correction in progress — waiting for meaningful location';
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+  }
+
+  function validationEpisodeId(candidate) {
+    if (candidate.episodeId) return candidate.episodeId;
+    const level = Number(candidate.invalidation?.level);
+    return [candidate.pair, candidate.thesisDirection, candidate.correctionDirection, Number.isFinite(level) ? level.toFixed(5) : ''].join('|').toUpperCase();
+  }
+
+  function trackedValidation(candidate) {
+    const episode = validationEpisodeId(candidate);
+    return correctionValidations.find(record => record.status === 'OPEN' && record.correctionEpisodeId === episode);
+  }
+
+  async function trackValidation(pair) {
+    const candidate = allSetups.find(item => item.pair === pair);
+    if (!candidate) return;
+    const response = await fetch('/api/correction-validations', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        pair: candidate.pair,
+        correctionEpisodeId: validationEpisodeId(candidate),
+        scanTimestamp: candidate.scannedAt,
+        dailyThesis: candidate.thesisDirection === 'LONG' ? 'BULLISH' : 'BEARISH',
+        h4Context: candidate.h4Structure ? `${candidate.h4Structure} structure` : 'MIXED structure',
+        h1CorrectionLeg: candidate.correctionDirection === 'LONG' ? 'BULLISH' : 'BEARISH',
+        h1CorrectionStage: candidate.stage,
+        locationContext: (candidate.location.labels || []).join(' · ') || 'No named HTF location yet',
+        invalidationLevel: candidate.invalidation?.level,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) { alert(data.error || 'Could not track validation'); return; }
+    await loadValidationData();
+    renderSetups();
+    if (!data.created) alert('This active correction episode is already being tracked.');
+  }
+
+  async function loadValidationData() {
+    const response = await fetch('/api/correction-validations');
+    if (!response.ok) throw new Error('Validation feed unavailable');
+    const data = await response.json();
+    correctionValidations = data.records || [];
+    return data;
+  }
+
+  function answerOptions(selected) {
+    return ['PENDING','YES','NO'].map(value => `<option value="${value}" ${value === selected ? 'selected' : ''}>${value}</option>`).join('');
+  }
+
+  function validationSelect(record, field, label) {
+    return `<div class="validation-field"><label>${label}</label><select onchange="updateValidation(${record.id},'${field}',this.value)">${answerOptions(record[field])}</select></div>`;
+  }
+
+  async function updateValidation(id, field, value) {
+    const response = await fetch('/api/correction-validations/' + id, {
+      method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({[field]:value}),
+    });
+    if (!response.ok) { const data=await response.json(); alert(data.error || 'Update failed'); return; }
+    await loadValidations();
+  }
+
+  async function loadValidations() {
+    try {
+      const data = await loadValidationData();
+      const summary = data.summary;
+      document.getElementById('v-progress').textContent = `${summary.tracked} / ${summary.target}`;
+      document.getElementById('v-progress-bar').style.width = `${Math.min(100, summary.tracked / summary.target * 100)}%`;
+      document.getElementById('v-agreement').textContent = summary.manualAgreement.rate == null ? '—' : `${Math.round(summary.manualAgreement.rate * 100)}%`;
+      document.getElementById('v-agreement-detail').textContent = `${summary.manualAgreement.yes} yes · ${summary.manualAgreement.no} no · ${summary.manualAgreement.pending} pending`;
+      document.getElementById('v-status').textContent = `${summary.complete} complete`;
+      document.getElementById('v-open').textContent = `${summary.open} open · ${summary.remaining} remaining to 20`;
+      document.getElementById('v-follow').textContent = `${summary.followThrough.chochBos30m} shifts`;
+      document.getElementById('v-follow-detail').textContent = `${summary.followThrough.retest} retests · ${summary.followThrough.trigger5m} triggers · ${summary.followThrough.sensibleTarget} sensible targets`;
+      renderValidations();
+    } catch (error) {
+      document.getElementById('validationList').innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    }
+  }
+
+  function renderValidations() {
+    const list = document.getElementById('validationList');
+    if (!correctionValidations.length) {
+      list.innerHTML = '<div class="empty-journal"><div>No corrections tracked yet</div><div style="font-size:11px">Use “Track validation” on a correction card.</div></div>';
+      return;
+    }
+    list.innerHTML = correctionValidations.map(record => `<article class="validation-card">
+      <div style="display:flex;justify-content:space-between;gap:12px"><div><div class="journal-symbol">${escapeHtml(record.pair.replace('_','/'))}</div><div class="journal-meta"><span class="badge tf">${escapeHtml(record.dailyThesis)} DAILY</span><span class="badge tf">1H ${escapeHtml(record.h1CorrectionLeg)}</span><span class="badge tf">${escapeHtml(stageLabel(record.h1CorrectionStage))}</span></div></div><div style="text-align:right"><select class="pnl-input" onchange="updateValidation(${record.id},'status',this.value)"><option value="OPEN" ${record.status==='OPEN'?'selected':''}>OPEN</option><option value="COMPLETE" ${record.status==='COMPLETE'?'selected':''}>COMPLETE</option></select><div class="journal-date">${new Date(record.scanTimestamp).toLocaleString()}</div></div></div>
+      <div style="font-size:11px;color:var(--slate);margin-top:8px">4H ${escapeHtml(record.h4Context)} · ${escapeHtml(record.locationContext)}</div>
+      <div class="validation-fields">
+        ${validationSelect(record,'manualSmcAgreement','Manual SMC agreement')}
+        ${validationSelect(record,'meaningfulLocationAgreement','Meaningful location agreement')}
+        ${validationSelect(record,'chochBos30mObserved','30M CHoCH / BOS observed')}
+        ${validationSelect(record,'retestObserved','Retest observed')}
+        ${validationSelect(record,'trigger5mObserved','5M trigger observed')}
+        ${validationSelect(record,'sensibleTargetBeforeInvalidation','Sensible target before invalidation')}
+        <div class="validation-field"><label>False-positive reason</label><input value="${escapeHtml(record.falsePositiveReason)}" onchange="updateValidation(${record.id},'falsePositiveReason',this.value)" placeholder="Leave blank if valid"></div>
+        <div class="validation-field" style="grid-column:span 2"><label>Notes</label><textarea rows="2" onchange="updateValidation(${record.id},'notes',this.value)" placeholder="Manual read and later observations">${escapeHtml(record.notes)}</textarea></div>
+      </div>
+      <div class="journal-date">Created ${new Date(record.createdAt).toLocaleString()} · Updated ${new Date(record.updatedAt).toLocaleString()}</div>
+    </article>`).join('');
+  }
+
+  function renderSetups() {
+    const filtered = getFiltered();
+    document.getElementById('s-total').textContent = allSetups.length || '—';
+    document.getElementById('s-premium').textContent = allSetups.filter(c => c.location.atLocation || c.location.approaching).length || '—';
+    document.getElementById('s-strong').textContent = allSetups.filter(c => c.confirmation30m.shiftDetected).length || '—';
+    document.getElementById('s-avgrr').textContent = allSetups.filter(c => c.stage === 'WAITING_FOR_RETEST').length || '—';
+    document.getElementById('s-long').textContent = allSetups.filter(c => c.thesisDirection === 'LONG').length || '—';
+    document.getElementById('s-short').textContent = allSetups.filter(c => c.thesisDirection === 'SHORT').length || '—';
+    document.getElementById('resultCount').innerHTML = `Showing <span>${filtered.length}</span> correction candidate${filtered.length === 1 ? '' : 's'} · discovery only`;
+    const main = document.getElementById('mainContent');
+    if (!allSetups.length) {
+      main.innerHTML = `<div class="empty-state"><div>No active correction candidates</div><div style="font-size:11px;opacity:.7">Aligned, ranging, and invalidated regimes are kept in the secondary audit.</div></div>`;
+      return;
+    }
+    if (!filtered.length) { main.innerHTML = '<div class="empty-state">No corrections match these filters.</div>'; return; }
+    main.innerHTML = '<div class="setup-grid">' + filtered.map(renderCard).join('') + '</div>';
+  }
+
+  function renderCard(candidate) {
+    const bullish = candidate.thesisDirection === 'LONG';
+    const locations = candidate.location.labels.length ? candidate.location.labels.join(' · ') : 'No named HTF location yet';
+    const shift = candidate.confirmation30m.shiftDetected
+      ? `Detected${candidate.confirmation30m.bosLevel ? ' @ ' + fmt(candidate.confirmation30m.bosLevel, candidate.pair) : ''}`
+      : 'Not detected (not required)';
+    const zone = candidate.location.zone;
+    const zoneTf = zone?.timeframe === 'D' ? 'Daily' : '4H';
+    const correctionContext = zone
+      ? `1H ${candidate.correctionDirection === 'LONG' ? 'bullish' : 'bearish'} correction ${zone.state === 'IN_ZONE' ? 'into' : zone.state === 'APPROACHING' ? 'approaching' : 'toward'} ${zoneTf} ${zone.type.toLowerCase()}`
+      : `1H ${candidate.correctionDirection === 'LONG' ? 'bullish' : 'bearish'} correction against Daily thesis`;
+    const zoneDetail = zone
+      ? `${zoneTf} ${zone.type.toLowerCase()} · ${fmt(zone.low,candidate.pair)}–${fmt(zone.high,candidate.pair)} · ${zone.state.replace('_',' ')}<br><span style="color:var(--slate)">${zone.distanceAtr} ATR · ${zone.distancePips} pips · ${zone.distancePercent}% · ${zone.freshness.replaceAll('_',' ').toLowerCase()} · ${zone.ageCandles} completed ${zoneTf} candles old</span>`
+      : locations;
+    return `<article class="setup-card"><div class="card-body">
+      <div class="card-top"><div class="card-left"><div class="dir-icon ${bullish ? 'long' : 'short'}">${bullish ? '↑' : '↓'}</div><div>
+        <div class="symbol">${candidate.pair.replace('_','/')}</div>
+        <div class="badges"><span class="badge ${bullish ? 'long' : 'short'}">${bullish ? 'BULLISH' : 'BEARISH'} THESIS</span><span class="badge tf">${stageLabel(candidate.stage)}</span></div>
+      </div></div><div style="text-align:right"><div style="font-size:22px;font-weight:850">${candidate.priority}</div><div class="rr-sub">watch priority</div></div></div>
+      <div class="pattern-name">${escapeHtml(correctionContext)}</div>
+      <div style="font-size:12px;color:var(--gold);margin:8px 0">${escapeHtml(lifecycleNext(candidate))}</div>
+      <div class="current-price">Live location price: <span>${fmt(candidate.price,candidate.pair)}</span></div>
+      <div class="levels-grid">
+        <div class="level-box"><div class="level-label entry">Direction</div><div class="level-price entry">D ${candidate.dailyStructure} · 4H ${candidate.h4Structure || 'MIXED'}</div></div>
+        <div class="level-box"><div class="level-label tp1">HTF zone location</div><div style="font-size:12px;margin-top:7px">${zoneDetail}</div></div>
+        <div class="level-box sl"><div class="level-label sl">Completed-candle invalidation</div><div class="level-price sl">${fmt(candidate.invalidation.level,candidate.pair)}</div></div>
+      </div>
+      ${zone ? `<div style="font-size:11px;color:var(--slate);margin-top:8px">Supporting context: ${escapeHtml((candidate.location.labels || []).slice(1).join(' · ') || 'None')}</div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <div class="level-box"><div class="level-label">1H correction quality</div><div style="font-size:12px;margin-top:7px">${candidate.correctionQuality.cleanCounterLeg ? 'Clean counter-leg' : 'Developing leg'} · ${candidate.correctionQuality.legAtr} ATR${candidate.correctionQuality.extended ? ' · EXTENDED' : ''}</div></div>
+        <div class="level-box"><div class="level-label">30M confirmation state</div><div style="font-size:12px;margin-top:7px">${shift}</div></div>
+      </div>
+      <div class="conf-section"><div class="conf-title">Why it is ranked here</div><div class="conf-tags">${candidate.priorityReasons.map(reason => `<span class="conf-tag">${reason}</span>`).join('')}</div></div>
+      <div style="font-size:11px;color:var(--slate);margin-top:12px;padding:10px;border:1px solid var(--border);border-radius:6px">${candidate.invalidation.rule}</div>
+      <button class="track-btn" onclick="trackValidation('${candidate.pair}')" ${trackedValidation(candidate) ? 'disabled' : ''}>${trackedValidation(candidate) ? 'Tracking this active episode' : 'Track validation'}</button>
+      <div class="scanned-at">Episode ${escapeHtml((candidate.episodeId || 'pending').slice(-28))} · watch state only · execution remains manual</div>
+    </div></article>`;
+  }
+
+  function renderNearMisses() {
+    const container = document.getElementById('nearMissContent');
+    if (!container || !allNearMisses.length) { if (container) container.innerHTML = ''; return; }
+    const counts = allNearMisses.reduce((map, item) => { map[item.state] = (map[item.state] || 0) + 1; return map; }, {});
+    container.innerHTML = `<details class="near-miss-section" style="margin:0 28px 24px"><summary class="near-miss-header"><span class="near-miss-title">Other regimes</span><span class="near-miss-count">${allNearMisses.length} pairs</span><span style="font-size:10px;color:var(--slate-dim);margin-left:auto">${Object.entries(counts).map(([key,value]) => `${key.replaceAll('_',' ')} ${value}`).join(' · ')}</span></summary><div class="near-miss-grid">${allNearMisses.map(item => `<div class="nm-card"><strong>${item.pair.replace('_','/')}</strong><div class="pattern-name">${item.state.replaceAll('_',' ')}</div><div class="nm-reason">${item.reason}</div></div>`).join('')}</div></details>`;
+  }
+
+  function setDir(value) {
+    dir = value;
+    document.querySelectorAll('[id^="dir-"]').forEach(button => button.classList.remove('active','green','red'));
+    const button = document.getElementById('dir-' + value);
+    if (button) button.classList.add('active', value === 'LONG' ? 'green' : value === 'SHORT' ? 'red' : '');
+    renderSetups();
+  }
+
+  renderChallengeGuard();
+  loadValidationData().catch(() => null).finally(fetchLatestSetups);
   autoRefreshTimer = setInterval(fetchLatestSetups, 15 * 60 * 1000);
 </script>
 
@@ -1950,6 +2438,13 @@
       const news = newsRes.ok ? await newsRes.json() : null;
       const autoEx = autoRes.ok ? await autoRes.json() : null;
       renderChallenge(challenge);
+      if (challenge) {
+        renderChallengeGuard({
+          currentBalance: Number(challenge.current_balance ?? challenge.balance ?? challenge.currentBalance ?? loadChallengeGuard().currentBalance),
+          peakBalance: Number(challenge.peak_balance ?? challenge.peakBalance ?? loadChallengeGuard().peakBalance),
+          dailyPnl: Number(challenge.daily_pnl ?? challenge.dailyPnl ?? loadChallengeGuard().dailyPnl),
+        });
+      }
       renderNews(news);
       renderAutoExecute(autoEx);
       if(!sRes.ok)throw new Error(`${sRes.status}`);
@@ -1958,7 +2453,7 @@
       const signals=sigRes.ok?await sigRes.json():[];
       const bal=s.balance!=null?'$'+Number(s.balance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
       document.getElementById('bot-balance').textContent=bal;
-      if (s.balance) updateHeaderChallenge(s.balance);
+      if (s.balance) renderChallengeGuard({ currentBalance: Number(s.balance) });
       const pnlEl=document.getElementById('bot-pnl');
       if(s.daily_pnl_pct!=null){const sign=s.daily_pnl_pct>=0?'+':'';pnlEl.textContent=sign+Number(s.daily_pnl_pct).toFixed(2)+'%';pnlEl.style.color=s.daily_pnl_pct>=0?'var(--green)':'var(--red)';}
       document.getElementById('bot-open').textContent=s.open_positions!=null?`${s.open_positions} / ${s.max_open_trades??'?'}`:'—';
